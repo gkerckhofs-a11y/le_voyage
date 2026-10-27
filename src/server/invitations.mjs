@@ -28,7 +28,7 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
    const user=await identity(header);if(!/^[a-f0-9]{64}$/.test(id))throw denied();
    return db.runTransaction(async tx=>{allowed((await tx.get(member(scope,user.uid))).data(),scope,user.uid);const ref=db.doc(`invitations/${id}`),invite=(await tx.get(ref)).data();if(!invite||invite.issuerUid!==user.uid||!same(invite.scope,scope)||invite.status==='accepted')throw denied();tx.update(ref,{status:'revoked',revokedAt:now()});return {revoked:true};});
   },
-  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);return {status:invite.status,expiresAt:invite.expiresAt,organizationName:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:'Les Explorateurs'};});},
+  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);const teamIdentity=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/campaigns/${invite.scope.campaignId}/teamIdentities/${invite.scope.teamId}`))).data();return {status:invite.status,expiresAt:invite.expiresAt,organizationName:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:teamIdentity?.teamName??'Les Explorateurs'};});},
   async accept(header,token,displayName){
    if(typeof displayName!=='string'||displayName.trim().length<2||displayName.trim().length>60||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Object.assign(new Error('Invalid display name'),{status:400});
    const user=await identity(header),ref=db.doc(`invitations/${hash(token)}`);
