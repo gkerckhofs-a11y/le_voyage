@@ -1,7 +1,7 @@
 name: Server access boundary
 on:
   pull_request:
-    paths: ['src/server/access.mjs', 'tests/access/**', '.github/workflows/access.yml']
+    paths: ['src/server/access.mjs', 'src/server/staging-config.mjs', 'tests/access/**', '.github/workflows/access.yml']
 permissions:
   contents: read
 jobs:

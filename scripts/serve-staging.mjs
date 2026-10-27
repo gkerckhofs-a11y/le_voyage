@@ -1,0 +1,14 @@
+import {resolve} from 'node:path';
+import {initializeApp,applicationDefault} from 'firebase-admin/app';
+import {stagingConfig,testGate} from '../src/server/staging-config.mjs';
+import {createFirestoreAdapter} from '../src/server/firestore-adapter.mjs';
+import {createFirebaseHttp} from '../src/server/firebase-http.mjs';
+import {createDemoServer} from '../src/server/http.mjs';
+const config=stagingConfig();
+const adapter=createFirestoreAdapter(initializeApp({projectId:config.projectId,credential:applicationDefault()}));
+const integration=await createFirebaseHttp({adapter,password:config.authPassword,loginEndpoint:'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+config.apiKey});
+const server=createDemoServer({root:resolve('dist-web'),directory:'/tmp/rc-unused-local-store',apiHandler:integration.handler,remoteOrigins:config.origins});
+const handler=server.listeners('request')[0],gate=testGate(config.accessPassword);server.removeAllListeners('request');
+server.on('request',(req,res)=>{if(gate(req,res))handler(req,res);});
+server.listen(Number(process.env.PORT||8080),'0.0.0.0',()=>console.log('Isolated test application ready.'));
+process.once('SIGTERM',()=>{server.close(async()=>{await integration.close();process.exit(0);});setTimeout(()=>process.exit(0),8000).unref();});

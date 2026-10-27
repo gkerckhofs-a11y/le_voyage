@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "site": "rc-voyage-test-20261027",
+    "public": "empty",
+    "rewrites": [{"source": "**", "run": {"serviceId": "voyage-test", "region": "europe-west1"}}]
+  }
+}

@@ -1,7 +1,7 @@
 name: Firebase isolated integration
 on:
   pull_request:
-    paths: ['src/server/access.mjs', 'src/server/invitations.mjs', 'src/server/team-vote.mjs', 'src/server/gift-preferences.mjs', 'src/server/weekly-questionnaire.mjs', 'src/server/week-coordination.mjs', 'src/server/scoring-policy.mjs', 'src/server/coordination-access.mjs', 'src/server/firebase-emulator.mjs', 'src/server/firebase-http.mjs', 'src/server/http.mjs', 'scripts/serve-firebase.mjs', 'src/web/**', 'web/**', 'tests/firebase-browser/**', 'playwright.firebase.config.mjs', 'src/server/demo-service.mjs', 'src/application/**', 'src/domain/**', 'firebase/**', 'tests/firebase/**', 'package*.json', '.github/workflows/firebase-emulators.yml']
+    paths: ['src/server/access.mjs', 'src/server/invitations.mjs', 'src/server/team-vote.mjs', 'src/server/gift-preferences.mjs', 'src/server/weekly-questionnaire.mjs', 'src/server/week-coordination.mjs', 'src/server/scoring-policy.mjs', 'src/server/coordination-access.mjs', 'src/server/firebase-emulator.mjs', 'src/server/firestore-adapter.mjs', 'src/server/staging-config.mjs', 'src/server/firebase-http.mjs', 'src/server/http.mjs', 'scripts/serve-firebase.mjs', 'src/web/**', 'web/**', 'tests/firebase-browser/**', 'playwright.firebase.config.mjs', 'src/server/demo-service.mjs', 'src/application/**', 'src/domain/**', 'firebase/**', 'tests/firebase/**', 'package*.json', '.github/workflows/firebase-emulators.yml']
 permissions:
   contents: read
 jobs:
