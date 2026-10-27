@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Le Voyage de Lex EKHO — démonstration fictive du voyage collectif Rouge Clémence.">
+  <meta name="theme-color" content="#f6f2e9"><title>Le collectif · Rouge Clémence</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="collective.css"><script type="module" src="assets/web/collective.js"></script>
+</head>
+<body class="collective-page">
+<a class="skip-link" href="#map">Aller à la carte</a>
+<header class="header">
+  <div class="wordmark">Rouge Clémence<span>LES PETITES ATTENTIONS. LES GRANDES HISTOIRES.</span></div>
+  <nav aria-label="Navigation principale"><a href="index.html">Notre voyage</a><a href="collectif.html" aria-current="page">Le collectif</a></nav>
+  <span class="demo-label"><span></span> <span id="demo-company">Lex EKHO</span> · Démonstration</span>
+</header>
+<main>
+  <div class="heading"><div><p class="eyebrow">LE VOYAGE DE <span id="company">LEX EKHO</span></p><h1>Une belle fête, ensemble.</h1></div><div class="view-actions"><label for="scenario">Scénario fictif</label><select id="scenario"><option value="journey">En route · semaine 24</option><option value="before-freeze">Avant le gel · semaine 42</option><option value="frozen">Après le gel · semaine 46</option><option value="tpe">TPE · une seule équipe</option></select><button id="kiosk-toggle" aria-pressed="false">Écran collectif</button></div></div>
+  <div id="collective-content"><section class="journey-shell" aria-label="Le voyage collectif">
+    <div id="map" class="map" tabindex="0" role="region" aria-label="Carte du voyage. Flèches pour déplacer, plus et moins pour zoomer, touche Début pour retrouver la voiture." aria-describedby="map-help">
+      <svg id="scene" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" aria-label="Route illustrée du collectif"><g id="world"></g></svg>
+    </div>
+    <div class="map-topline"><span class="map-chapter" id="chapter">Au fil de la rivière</span><span class="map-edition">ÉDITION 2026 <i>·</i> UNE ANNÉE ENSEMBLE</span></div>
+    <aside class="journey-card" id="journey-card" aria-label="Notre progression collective">
+      <div class="team-title"><span class="color-dot" aria-hidden="true"></span><div><p class="eyebrow">NOTRE CONVOI</p><h2 id="team-name">Tous ensemble</h2></div><button class="collapse" id="collapse" aria-label="Replier le panneau de progression" aria-expanded="true">−</button></div>
+      <div class="card-details" id="card-details">
+        <div class="distance-line"><strong id="distance">—</strong><span>km parcourus</span></div>
+        <div class="progress-track" role="meter" id="distance-meter" aria-label="Distance parcourue" aria-valuemin="0" aria-valuemax="4600" aria-valuenow="0"><span id="progress-fill"></span></div>
+        <div class="progress-caption"><span>Un chemin commun</span><span id="maximum">— km</span></div>
+        <div class="week-block"><span class="week-label" id="week">Semaine —</span><span class="week-date" id="week-date"></span><div class="week-km"><span class="sun" aria-hidden="true">☀</span><strong id="week-km">— km</strong><span>cette semaine</span></div></div>
+        <div class="formula-summary"><p class="eyebrow" id="formula-state">Formule acquise</p><div><strong id="reception-level">— / —</strong><span>niveaux de fête</span></div><p id="formula-title">Réception conviviale</p></div>
+        <button class="replay" id="replay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v6h6M5 11a7 7 0 1 1 1 7"/></svg>Revoir notre avancée</button>
+      </div>
+    </aside>
+    <div class="map-controls" aria-label="Commandes de la carte"><button id="zoom-in" aria-label="Agrandir la carte">+</button><button id="zoom-out" aria-label="Réduire la carte">−</button><span></span><button id="recenter" aria-label="Retrouver notre convoi"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg></button></div>
+    <div class="map-bottom"><p id="map-help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacez la carte, le voyage continue…</span></p><button id="simple-toggle" aria-pressed="false">Vue simplifiée</button></div>
+    <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
+  </section>
+  <section class="reception-panel" aria-label="Notre réception annuelle">
+    <div class="reception-heading"><div><p class="eyebrow">UNE SEULE RÉCEPTION ANNUELLE · <span id="reception-date">—</span></p><h2>La fête est garantie.</h2><p><span id="base-title">Réception conviviale</span> incluse ; chaque escale la rend plus belle.</p></div><div class="freeze-info"><strong>Gel des prestations · <span id="freeze-date">—</span></strong><p id="freeze-status"></p><span id="reception-basis"></span></div></div>
+    <ol id="tier-list" class="tier-list"></ol><p class="reception-footnote" id="future-note"></p>
+    <p id="kiosk-note" class="reception-footnote" hidden>Recentrage automatique après 30 secondes d’inactivité · Démonstration fictive</p>
+  </section></div>
+  <div class="page-bottom"><p><span class="small-leaf" aria-hidden="true">❧</span> Le plaisir de se retrouver.</p><button id="about-open">Données fictives · À propos de la démo</button></div>
+  <section id="fallback" class="fallback" hidden><h2>Notre voyage collectif</h2><p>La carte ne peut pas être chargée. Rechargez la page pour réessayer.</p><button id="retry">Réessayer</button></section>
+</main>
+<dialog id="about"><button id="about-close" class="dialog-close" aria-label="Fermer les informations">×</button><p class="eyebrow">UNE FÊTE, UNE ANNÉE ENSEMBLE</p><h2>Le voyage collectif</h2><p>Tous les chiffres, dates et prestations de cette démonstration sont fictifs. Aucun résultat réel de Lex EKHO n’est utilisé. Les formules illustrées ne constituent pas une offre commerciale.</p><p>Le convoi avance à la moyenne des kilomètres des équipes, quel que soit leur effectif. La réception de base reste garantie. Les escales enrichissent cette même fête ; elles ne représentent pas plusieurs événements.</p><p>Explorez les états en cours, avant gel et après gel. Dans ce dernier scénario, la voiture continue, mais le niveau de réception reste figé. Aucune réservation auprès d’un prestataire n’est effectuée.</p><p>L’écran collectif recentre la carte après 30 secondes d’inactivité. Il présente uniquement des données fictives ; son accès sécurisé reste à intégrer avant tout usage réel.</p></dialog>
+<noscript><div class="noscript">Cette carte demande JavaScript. La démonstration est entièrement fictive. Une seule réception annuelle est garantie ; les escales en enrichissent les prestations.</div></noscript>
+</body></html>

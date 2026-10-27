@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, readdir, rm, cp } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { demoJourney } from './demo-journey.mjs';
+import { collectiveScenarios, demoCollective } from './demo-collective.mjs';
 const root=resolve(import.meta.dirname,'..'),output=resolve(root,'dist-web');
 await rm(output,{recursive:true,force:true});await mkdir(output,{recursive:true});
 const compiled=resolve(root,'.web-compiled');
@@ -18,5 +19,6 @@ for(const dir of ['map','web']) {
 }
 await mkdir(resolve(output,'data'),{recursive:true});
 await writeFile(resolve(output,'data/team.json'),JSON.stringify(demoJourney())+'\n');
+for (const scenario of collectiveScenarios) await writeFile(resolve(output,`data/collective-${scenario}.json`),JSON.stringify(demoCollective(scenario))+'\n');
 await rm(compiled,{recursive:true,force:true});
 console.log(`Built ${relative(root,output)}; public projection only, no Firebase connection.`);
