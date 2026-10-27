@@ -51,6 +51,10 @@ Recette ciblée : `npm run test:events` et `npm run test:visual` après le build
 
 ## Mode Firebase local isolé
 
-Avec Java 21 et Node 24 : `npm run build:web`, puis `npm run dev:firebase`. Ouvrir `http://localhost:4173` : la page de connexion propose deux comptes **fictifs**. Les boutons ne sont pas une authentification destinée à de vrais salariés. Auth et Firestore tournent sur émulateurs, projet fictif `demo-rc-voyage` ; aucune connexion au projet Cloud réel n'est autorisée par l'adaptateur. Les campagnes sont partagées par compte fictif pendant cette exécution. L'arrêt des émulateurs sans export perd leurs données ; les sessions serveur ne survivent pas à un redémarrage.
+Avec Java 21 et Node 24 : `npm run build:web`, puis `npm run dev:firebase`. Ouvrir `http://localhost:4173` : la page de connexion propose des comptes **fictifs**. Les boutons ne sont pas une authentification destinée à de vrais salariés. Auth et Firestore tournent sur émulateurs, projet fictif `demo-rc-voyage` ; aucune connexion au projet Cloud réel n'est autorisée par l'adaptateur. Les campagnes sont partagées par compte fictif pendant cette exécution. L'arrêt des émulateurs sans export perd leurs données ; les sessions serveur ne survivent pas à un redémarrage.
 
 `npm run test:firebase:web` exécute les tests HTTP/intégration puis les parcours navigateur desktop/mobile sur émulateurs. Il requiert Chromium Playwright installé (la CI s'en charge). La démonstration locale initiale reste disponible avec `npm run dev`.
+
+### Invitations contrôlées V3-D4
+
+Sur `/connexion.html`, choisir « Administration fictive », créer une invitation puis ouvrir le lien de Camille. Se connecter avec ce compte fictif, choisir un nom affiché et accepter pour accéder à son équipe. Le lien est personnel, valable 24 heures par défaut et révocable avant acceptation. Aucun courriel n’est envoyé ; les identités sont précréées uniquement dans Auth Emulator. Voir [V3-D4](docs/V3-D4.md) pour les garanties et limites.
