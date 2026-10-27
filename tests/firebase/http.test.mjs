@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {resolve} from 'node:path';
+import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';
 import {createFirebaseHttp} from '../../src/server/firebase-http.mjs';
 import {createDemoServer} from '../../src/server/http.mjs';
-test('authenticated HTTP routes preserve scope, reject CSRF, survive refresh and revoke logout',async t=>{
- const app=await createFirebaseHttp(),server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});
+for(const cookieName of ['rc_auth','__session'])test('authenticated HTTP routes preserve scope, reject CSRF, survive refresh and revoke logout: '+cookieName,async t=>{
+ const app=await createFirebaseHttp({adapter:createFirebaseEmulatorAdapter(),cookieName}),server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});
  server.listen(0,'127.0.0.1');await once(server,'listening');const origin=`http://127.0.0.1:${server.address().port}`;
  t.after(async()=>{await new Promise(r=>server.close(r));await app.close();});
  const post=(path,data,cookie='',csrf='',other={})=>fetch(origin+path,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie,'X-Demo-CSRF':csrf,...other},body:JSON.stringify(data)});
@@ -13,7 +14,7 @@ test('authenticated HTTP routes preserve scope, reject CSRF, survive refresh and
  assert.equal((await get('/api/demo/team','')).status,401);
  assert.equal((await post('/api/auth/login',{profile:'lex'},'','',{Origin:'https://foreign.example'})).status,403);
  assert.equal((await post('/api/auth/login',{profile:'lex',tenantId:'client-b'})).status,400);
- const login=await post('/api/auth/login',{profile:'lex'});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];assert.match(login.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);assert.deepEqual(await login.json(),{connected:true});
+ const login=await post('/api/auth/login',{profile:'lex'});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];assert.ok(cookie.startsWith(cookieName+'='));assert.match(login.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);assert.deepEqual(await login.json(),{connected:true});
  const session=await(await post('/api/demo/session',{},cookie)).json();assert.equal(session.authenticated,true);const csrf=session.csrf;
  const initial=await(await get('/api/demo/team',cookie)).json();
  assert.equal((await post('/api/demo/advance',{revision:initial.revision},cookie,'wrong')).status,403);

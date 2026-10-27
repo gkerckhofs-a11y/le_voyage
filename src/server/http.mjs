@@ -11,7 +11,7 @@ const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8'
 const sessionToken=req=>req.headers.cookie?.match(/(?:^|;\s*)rc_demo=([a-f0-9]{64})(?:;|$)/)?.[1];
 function checkOrigin(req,remoteOrigins=[]){
   const host=req.headers.host;
-  if(remoteOrigins.length){if(!remoteOrigins.includes(req.headers.origin)||new URL(req.headers.origin).host!==host||req.headers['sec-fetch-site']==='cross-site')throw failure(403);return;}
+  if(remoteOrigins.length){if(!remoteOrigins.includes(req.headers.origin)||!remoteOrigins.some(o=>new URL(o).host===host)||req.headers['sec-fetch-site']==='cross-site')throw failure(403);return;}
   if(!host||!['localhost','127.0.0.1','[::1]','terminal.local'].includes(new URL('http://'+host).hostname))throw failure(403);
   if(!req.headers.origin||!['http://'+host,'https://'+host].includes(req.headers.origin)||req.headers['sec-fetch-site']==='cross-site')throw failure(403);
 }

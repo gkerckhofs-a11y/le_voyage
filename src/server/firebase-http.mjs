@@ -17,6 +17,8 @@ profiles.tpeadmin={uid:'demo-tpe-admin',tenantId:'fiction-tpe-auto',email:'tpe-a
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(options){
  if(!options)assertEmulators();
+ const cookieName=options?.cookieName??'rc_auth';
+ if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter);
@@ -30,10 +32,10 @@ export async function createFirebaseHttp(options){
   }
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
  }catch(e){await adapter.close();throw e;}
- const cookie=(value,req,age=3300)=>`rc_auth=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
+ const cookie=(value,req,age=3300)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
  async function handler(req,json,path){
   const now=Date.now();for(const [key,s] of sessions)if(s.expires<=now)sessions.delete(key);
-  const token=req.headers.cookie?.match(/(?:^|;\s*)rc_auth=([a-f0-9]{64})(?:;|$)/)?.[1];
+  const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
   if(path==='/api/auth/login'&&req.method==='POST'){
    const {profile:id}=await body(req,['profile']);if(id!=='camille'&&!Object.hasOwn(profiles,id))throw failure(400);
    const profile=id==='camille'?invitedProfile:profiles[id];

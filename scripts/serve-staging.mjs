@@ -6,7 +6,7 @@ import {createFirebaseHttp} from '../src/server/firebase-http.mjs';
 import {createDemoServer} from '../src/server/http.mjs';
 const config=stagingConfig();
 const adapter=createFirestoreAdapter(initializeApp({projectId:config.projectId,credential:applicationDefault()}));
-const integration=await createFirebaseHttp({adapter,password:config.authPassword,loginEndpoint:'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+config.apiKey});
+const integration=await createFirebaseHttp({adapter,cookieName:'__session',password:config.authPassword,loginEndpoint:'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+config.apiKey});
 const server=createDemoServer({root:resolve('dist-web'),directory:'/tmp/rc-unused-local-store',apiHandler:integration.handler,remoteOrigins:config.origins});
 const handler=server.listeners('request')[0],gate=testGate(config.accessPassword);server.removeAllListeners('request');
 server.on('request',(req,res)=>{if(gate(req,res))handler(req,res);});
