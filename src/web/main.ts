@@ -35,7 +35,7 @@ function renderStages(){
   const world=document.getElementById('world');document.getElementById('gift-route-stages')?.remove();
   const ns='http://www.w3.org/2000/svg',group=document.createElementNS(ns,'g');group.id='gift-route-stages';
   for(const [i,stage] of stageData.stages.entries()){
-    const state=stage.status==='unlocked'?'Débloqué':stage.status==='next'?'Prochain':'À venir';
+    const state=stage.status==='unlocked'?'Débloqué':feed.closure?'Non atteint':stage.status==='next'?'Prochain':'À venir';
     const copy=`${i+1}. ${stage.label} · ${format(stage.thresholdKm)} km · ${state}${stage.status==='unlocked'?'':` · encore ${format(stage.remainingKm)} km`}`;
     const li=document.createElement('li'),button=document.createElement('button');button.textContent=copy;button.addEventListener('click',()=>map.focusRatio(stage.thresholdKm/stageData.maximumKm));li.append(button);list.append(li);
     const p=positionAt(route,stage.thresholdKm/stageData.maximumKm),marker=document.createElementNS(ns,'g');marker.classList.add('gift-route-marker');marker.dataset.status=stage.status;marker.setAttribute('transform',`translate(${p.x} ${p.y})`);marker.setAttribute('role','img');marker.setAttribute('aria-label',copy);
@@ -74,7 +74,19 @@ function renderAttentions(){
   ($('advance') as HTMLButtonElement).disabled=busy||!feed.canAdvance;
   $('advance').textContent=feed.canAdvance?'Simuler une semaine':'Voyage simulé terminé';
 }
-function renderFeed(){renderJourney(feed.journey);renderAttentions();}
+function renderClosure(){
+  const end=feed.closure;$('journey-closure').hidden=!end;
+  if(!end||end.kind!=='closure')return;
+  $('closure-summary').textContent=`${format(feed.journey.displayKm)} km réellement parcourus. Votre voiture fait halte ${distanceRatio(end.distance,end.maximumKm)>=1?'au terminus':'près de votre dernière position gagnée'}.`;
+  const count=end.acquiredThresholds.length;
+  $('closure-gifts').textContent=count?`${count} palier${count>1?'s':''} cadeau${count>1?'x':''} acquis : ${end.acquiredThresholds.map(k=>format(k)+' km').join(', ')}. Leur préparation et leur remise restent consultables dans Mes attentions.`:'Aucun palier cadeau acquis cette année. Votre voyage garde toute sa place dans notre histoire commune.';
+  document.querySelector<HTMLElement>('.team-note')!.textContent='Une année partagée, des souvenirs à garder.';
+}
+function renderFeed(){renderJourney(feed.journey);renderAttentions();renderClosure();}
+$('arrival-replay').addEventListener('click',async()=>{
+  if(busy||!feed.closure)return;busy=true;($('arrival-replay') as HTMLButtonElement).disabled=true;
+  try{await map.park(true);}finally{busy=false;($('arrival-replay') as HTMLButtonElement).disabled=false;}
+});
 async function discover(id:string){
   if(busy)return;busy=true;
   try{const result=await sendDemo<{events:PublicEvent[];feed:TeamFeed}>('claim',{eventIds:[id]});feed=result.feed;renderFeed();await map.update(feed.journey,false);showReveals(result.events);}
@@ -87,6 +99,7 @@ $('advance').addEventListener('click',async()=>{
     const result=await sendDemo<{applied:boolean;feed:TeamFeed}>('advance',{revision:feed.revision});
     const receipt=await sendDemo<{events:PublicEvent[];feed:TeamFeed}>('claim',{eventIds:result.feed.unseenEventIds});
     feed=receipt.feed;renderFeed();await map.update(feed.journey,receipt.events.some(e=>e.kind==='progress'));
+    if(feed.closure)await map.park(receipt.events.some(e=>e.kind==='closure'));
     $('advance-status').textContent=result.applied?'La progression est enregistrée.':'Cette semaine était déjà enregistrée.';showReveals(receipt.events);
   }catch{
     // A lost response may follow a committed transaction. Do not retry against a new revision blindly.
@@ -99,7 +112,7 @@ $('reload-progress').addEventListener('click',()=>location.reload());
 async function start(){
   await startDemo();feed=await readDemo<TeamFeed>('team');const data=feed.journey;
   if(data.schemaVersion!==1||data.routeId!==route.id||!/^#[a-fA-F0-9]{6}$/.test(data.team.color))throw new Error('Unsupported journey');
-  renderFeed();map=mountJourneyMap(data,{kind:'team',color:data.team.color,label:data.team.name});renderStages();
+  renderFeed();map=mountJourneyMap(data,{kind:'team',color:data.team.color,label:data.team.name});renderStages();if(feed.closure)await map.park(false);
   $('map').addEventListener('camera-change',()=>{const zoom=Number($('map').dataset.zoom);document.querySelectorAll<SVGGElement>('.gift-route-marker').forEach(el=>{const base=el.getAttribute('transform')!.split(' scale')[0];el.setAttribute('transform',base+` scale(${Math.min(2.5,Math.max(.6,.7/zoom))})`);});});
   // Initial reads never replay motion or open a reveal. Unread attentions remain available on demand.
 }
