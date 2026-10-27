@@ -62,3 +62,7 @@ Sur `/connexion.html`, choisir « Administration fictive », créer une invitati
 ### Vote de l’équipe V3-D5
 
 En mode Firebase, ouvrir « Choix de l’équipe » depuis le voyage, ou `/equipe.html`. Un membre valide un nom et une couleur ; le compte Administration fictive clôture le scrutin depuis le lien de sa page. En cas d’égalité, il choisit parmi les candidats en tête et motive la décision. Le résultat est appliqué à la voiture sans changer la distance. Voir [V3-D5](docs/V3-D5.md).
+
+### Préférences cadeaux V3-D6
+
+En mode Firebase, ouvrir « Mes goûts » depuis le voyage ou `/preferences.html`. Choisir jusqu’à trois catégories, exclure l’alcool ou demander une surprise ; l’anniversaire jour/mois reste facultatif. Les choix sont modifiables et propres au compte connecté. Après un problème réseau ou une modification concurrente, recharger la version enregistrée avant de sauvegarder. Aucun message de contact ni cadeau n’est déclenché par ce formulaire. Voir [V3-D6](docs/V3-D6.md).
