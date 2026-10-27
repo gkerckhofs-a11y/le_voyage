@@ -43,7 +43,8 @@ export function mountJourneyMap(data:MapData,options:Options){
   const initial=position(ratio);
   const camera=new MapCamera($('map'),world,route.width,route.height,{x:initial.x,y:initial.y,zoom:innerWidth<=700?.85:.78},manual);
   camera.center(initial);
-  function recenter(){clearTimeout(idleTimer);follow=true;$('map').parentElement!.classList.remove('overview');camera.follow(positionAt(route,visualRatio));announce('Vous avez retrouvé votre voiture.');}
+  function leaveOverview(){const was=$('map').parentElement!.classList.contains('overview');$('map').parentElement!.classList.remove('overview');return was;}
+  function recenter(){clearTimeout(idleTimer);follow=true;const p=positionAt(route,visualRatio);if(leaveOverview())camera.follow(p);else camera.center(p);announce('Vous avez retrouvé votre voiture.');}
   $('fit-route').addEventListener('click',()=>{manual();$('map').parentElement!.classList.add('overview');camera.fit();announce('Tout le parcours, du départ au terminus.');});
   $('recenter').addEventListener('click',recenter);
   $('map').addEventListener('keydown',e=>{if(e.key==='Home'){e.preventDefault();recenter();}});
@@ -65,7 +66,7 @@ export function mountJourneyMap(data:MapData,options:Options){
   });
   function stopReplay(){cancelAnimationFrame(frame);frame=0;position(ratio);if(follow)camera.center(positionAt(route,ratio));$('map').classList.remove('is-replaying');($('replay') as HTMLButtonElement).disabled=!last;const complete=finishAnimation;finishAnimation=undefined;complete?.();}
   function move(from:number,message:string):Promise<void>{
-    follow=true;
+    follow=true;if(leaveOverview())camera.follow(positionAt(route,from));
     if(reduced.matches||from===ratio){stopReplay();announce(message);return Promise.resolve();}
     ($('replay') as HTMLButtonElement).disabled=true;$('map').classList.add('is-replaying');announce(message);
     const started=performance.now();
@@ -86,7 +87,7 @@ export function mountJourneyMap(data:MapData,options:Options){
   window.addEventListener('resize',()=>{if(follow)camera.center(positionAt(route,visualRatio));});
   ($('replay') as HTMLButtonElement).disabled=!last;
   $('map').dataset.ready='true';
-  return { recenter, focusRatio:(r:number)=>{manual();$('map').parentElement!.classList.remove('overview');camera.follow(positionAt(route,r));},
+  return { recenter, focusRatio:(r:number)=>{manual();const p=positionAt(route,r);if(leaveOverview())camera.follow(p);else camera.center(p);},
     update:async(next:MapData,animate=false)=>{
       const target=distanceRatio(next.distance,next.maximumKm);if(target<ratio)throw new Error('Journey cannot move backwards');
       stopReplay();const from=ratio;data=next;ratio=target;last=data.history.at(-1);
