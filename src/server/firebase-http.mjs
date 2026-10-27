@@ -1,5 +1,6 @@
 import {randomBytes} from 'node:crypto';
 import {createFirebaseEmulatorAdapter,assertEmulators} from './firebase-emulator.mjs';
+import {createTeamVote} from './team-vote.mjs';
 import {createInvitations} from './invitations.mjs';
 import {newDemo} from './demo-service.mjs';
 import {body,authorized} from './http.mjs';
@@ -9,14 +10,14 @@ profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@examp
 const password='Fictitious-Emulator-Only-42!';
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(){
- assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter);
+ assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
    const record=newDemo();record.ledger.state.config.tenantId=profile.tenantId;
    profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
  }catch(e){await adapter.close();throw e;}
@@ -37,6 +38,14 @@ export async function createFirebaseHttp(){
    json(200,{connected:true,...(id==='clem'?{destination:'/invitations.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/team-vote')){
+   if(!session.scope)throw failure(403);
+   if(req.method==='GET'&&path==='/api/team-vote'){json(200,await teamVote.read(session.header,session.scope));return;}
+   if(req.method==='POST'){authorized(req,session);
+    if(path==='/api/team-vote/cast'){const input=await body(req,['name','color']);json(200,await teamVote.cast(session.header,session.scope,input));return;}
+    if(path==='/api/team-vote/close'){const input=await body(req,['name','color','reason']);json(200,await teamVote.close(session.header,session.scope,input));return;}
+   }throw failure(404);
+  }
   if(req.method==='POST'){
    if(path==='/api/invitation/session'){await body(req,[]);await adapter.auth.verifyIdToken(session.header.slice(7),true);json(200,{csrf:session.csrf});return;}
    if(path.startsWith('/api/invitation/')){

@@ -58,3 +58,7 @@ Avec Java 21 et Node 24 : `npm run build:web`, puis `npm run dev:firebase`. Ouvr
 ### Invitations contrôlées V3-D4
 
 Sur `/connexion.html`, choisir « Administration fictive », créer une invitation puis ouvrir le lien de Camille. Se connecter avec ce compte fictif, choisir un nom affiché et accepter pour accéder à son équipe. Le lien est personnel, valable 24 heures par défaut et révocable avant acceptation. Aucun courriel n’est envoyé ; les identités sont précréées uniquement dans Auth Emulator. Voir [V3-D4](docs/V3-D4.md) pour les garanties et limites.
+
+### Vote de l’équipe V3-D5
+
+En mode Firebase, ouvrir « Choix de l’équipe » depuis le voyage, ou `/equipe.html`. Un membre valide un nom et une couleur ; le compte Administration fictive clôture le scrutin depuis le lien de sa page. En cas d’égalité, il choisit parmi les candidats en tête et motive la décision. Le résultat est appliqué à la voiture sans changer la distance. Voir [V3-D5](docs/V3-D5.md).
