@@ -17,3 +17,5 @@
 
 .fit-route{position:absolute;right:24px;top:70px;padding:11px 14px;border:1px solid #bbc6b3;border-radius:8px;background:#fffaf0;color:#294b38;min-height:44px}.overview .journey-card,.overview .map-topline{display:none}.gift-stages{padding:20px 12px}.gift-stages h2{font:26px Georgia,serif;margin:8px 0}.gift-stages p{font-size:13px;color:#53664f}.gift-stages ol{display:flex;flex-wrap:wrap;gap:10px;list-style:none;padding:0}.gift-stages button{max-width:300px;min-height:50px;padding:12px;text-align:left;line-height:1.6;border:1px solid #c4cbb8;background:#fffaf0;border-radius:8px;color:#294b38}.gift-route-marker{pointer-events:none}@media(max-width:700px){.fit-route{right:14px;top:66px;font-size:11px}.gift-stages ol{display:grid}.gift-stages button{max-width:none;width:100%}.overview .map-controls{bottom:65px!important}}
 @media(max-width:700px){.overview .map-controls{flex-direction:row;bottom:65px!important}.overview .map-controls>span{display:none}.overview .map-status{top:16px}}
+
+.season-label{display:inline-block;margin-left:.65rem;font-size:.8rem;font-weight:600;color:#355e49}

@@ -38,6 +38,7 @@ export function collectiveJourneyView(state: State, access: Scope, identity: Rec
   });
   const distance = convoyDistance(state);
   return {
+    timeZone: state.config.calendar?.timeZone ?? 'Europe/Brussels',
     schemaVersion: 1 as const, routeId: 'wallonie-imaginaire-v1', organizationName: identity.organizationName,
     distance: { ...distance }, displayKm: displayKm(distance), maximumKm: weeks.length * 100,
     activeWeeks: weeks.length, completedWeeks: history.length, history,

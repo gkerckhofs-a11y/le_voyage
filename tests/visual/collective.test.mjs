@@ -13,7 +13,7 @@ test('collective projects the weekly mean, never the sum or membership',()=>{
   assert.deepEqual(dto.reception.tiers.map(t=>t.status),['next','unreached','unreached','unreached']);
   assert.equal(dto.reception.formulaTitle,'Réception conviviale');
   assert.doesNotMatch(JSON.stringify(dto),/private-|budget|tenantId|teams|roster|participant|answers|scores|weights|gift|entitlement|preferences/i);
-  assert.deepEqual(Object.keys(dto),['schemaVersion','routeId','organizationName','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','reception']);
+  assert.deepEqual(Object.keys(dto),['timeZone','schemaVersion','routeId','organizationName','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','reception']);
   dto.history[0].distance.numerator='9999';dto.reception.distance.numerator='9999';assert.equal(JSON.stringify(s),before);
 });
 test('scope and public reception metadata are checked without copying extra fields',()=>{

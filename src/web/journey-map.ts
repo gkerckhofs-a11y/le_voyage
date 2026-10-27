@@ -1,11 +1,12 @@
 import { distanceRatio, positionAt, roadsideMarkers } from '../map/geometry.ts';
 import { journeyRoute as route, landscapeZones } from '../map/route.ts';
+import { applySeason, seasonAt, seasonThemes } from './seasons.ts';
 import { MapCamera } from './camera.ts';
 import { landscape, carMarkup, minibusMarkup } from './landscape.ts';
 import type { TeamJourneyView } from '../presentation/journey-view.ts';
 const $ = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
 const format = (n:string|number) => Number(n).toLocaleString('fr-BE');
-type MapData = Pick<TeamJourneyView,'distance'|'displayKm'|'maximumKm'|'history'>;
+type MapData = Pick<TeamJourneyView,'distance'|'displayKm'|'maximumKm'|'history'|'timeZone'>;
 type Options = { kind:'team'|'collective'; color:string; label:string; decorate?:(world:SVGGElement)=>void; autoRecenter?:()=>boolean };
 /** Shared renderer/camera only. Distances and states are supplied by server projections. */
 export function mountJourneyMap(data:MapData,options:Options){
@@ -26,6 +27,19 @@ export function mountJourneyMap(data:MapData,options:Options){
     <g transform="translate(${positionAt(route,1).x} ${positionAt(route,1).y})"><circle r="34" fill="#355e49"/><text y="6" text-anchor="middle" font-size="18" fill="white">FIN</text></g>
     </g>
     <g id="${options.kind}-car" data-testid="${options.kind}-car" role="img" aria-label="${vehicleName}"><circle class="car-shadow-ring" r="67"/><g id="car-heading">${options.kind==='collective'?minibusMarkup(options.color):carMarkup(options.color)}</g><g transform="translate(0 90)"><rect x="-48" y="-17" width="96" height="25" rx="12" fill="#fffbee" stroke="#d0d9b6"/><text class="car-location-label" y="0">Nous sommes ici</text></g></g>`;
+  function refreshSeason(){
+    const season=seasonAt(new Date(),data.timeZone);
+    if(world.dataset.season===season)return;
+    applySeason(world,season);
+    seasonLabel.textContent=seasonThemes[season].label;
+  }
+  const seasonLabel=document.createElement('span');seasonLabel.className='season-label';
+  seasonLabel.setAttribute('aria-label','Saison du paysage');
+  $('chapter').parentElement!.append(seasonLabel);
+  refreshSeason();
+  // Long-lived kiosk: update around civil midnight without touching camera/progression.
+  window.setInterval(refreshSeason,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshSeason();});
   const car=document.getElementById(`${options.kind}-car`)!,heading=document.getElementById('car-heading')!;
   car.setAttribute('aria-label',`${vehicleName} de ${options.label}, ${format(data.displayKm)} kilomètres`);
   options.decorate?.(world);

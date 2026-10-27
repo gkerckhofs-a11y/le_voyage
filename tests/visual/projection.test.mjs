@@ -11,7 +11,7 @@ test('projection includes only the authorized team; no gift plans, budget or oth
   let s=createCampaign({...c,teams:[...c.teams,{id:'PRIVATE-OTHER-TEAM',eligibleWeekIds:weeks.map(w=>w.id)}]});
   for(const teamId of ['cometes','PRIVATE-OTHER-TEAM'])s=closeWeek(s,{...scope,teamId,weekId:weeks[0].id,today:weeks[0].endExclusive},{kind:'evaluate',input:input()});
   const dto=teamJourneyView(s,{...scope,teamId:'cometes'},{...identity,privateExtra:'PRIVATE-EXTRA'}),json=JSON.stringify(dto);
-  assert.deepEqual(Object.keys(dto),['schemaVersion','routeId','organizationName','team','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','stages']);
+  assert.deepEqual(Object.keys(dto),['timeZone','schemaVersion','routeId','organizationName','team','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','stages']);
   assert.equal(dto.team.id,'cometes');assert.equal(dto.history.length,1);assert.equal(dto.maximumKm,400);
   assert.doesNotMatch(json,/PRIVATE|budget|responses|participant|preferences|tenantId|convoy|reception|scores|weights/);
   assert.notEqual(Object.keys(s.entitlements).length,0,'fixture has a real acquired entitlement which must not leak operational metadata');

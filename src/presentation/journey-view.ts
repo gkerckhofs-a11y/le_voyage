@@ -30,6 +30,7 @@ export function teamJourneyView(state: State, access: Scope & { teamId: string }
       label: acquired ? 'Cadeau débloqué' : 'Cadeau mystère à débloquer' };
   });
   return {
+    timeZone: state.config.calendar?.timeZone ?? 'Europe/Brussels',
     schemaVersion: 1 as const, routeId: 'wallonie-imaginaire-v1',
     organizationName: identity.organizationName, team: { id: team.id, name: identity.teamName, color: identity.color },
     distance: { ...teamDistance(state, team.id) }, displayKm: displayKm(teamDistance(state, team.id)),
