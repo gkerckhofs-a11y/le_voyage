@@ -34,9 +34,12 @@ test('escale navigation, keyboard, kiosk idle recenter and reduced motion',async
   await page.clock.install();
   const world=page.locator('#world'),initial=await world.getAttribute('transform');
   await page.locator('.tier-card[data-level="4"]').click();expect(await world.getAttribute('transform')).not.toBe(initial);
-  await page.clock.fastForward(31000);await expect(world).toHaveAttribute('transform',initial);
-  await page.locator('#map').focus();await page.keyboard.press('ArrowRight');expect(await world.getAttribute('transform')).not.toBe(initial);
-  await page.keyboard.press('Home');await expect(world).toHaveAttribute('transform',initial);
+  await page.clock.fastForward(20000);await page.getByRole('button',{name:'Agrandir la carte',exact:true}).click();
+  const exploring=await world.getAttribute('transform');await page.clock.fastForward(15000);await expect(world).toHaveAttribute('transform',exploring);
+  await page.clock.fastForward(16000);expect(await world.getAttribute('transform')).not.toBe(exploring);
+  await page.getByRole('button',{name:'Réduire la carte',exact:true}).click();const centered=await world.getAttribute('transform');
+  await page.locator('#map').focus();await page.keyboard.press('ArrowRight');expect(await world.getAttribute('transform')).not.toBe(centered);
+  await page.keyboard.press('Home');await expect(world).toHaveAttribute('transform',centered);
   await page.getByRole('button',{name:'Revoir notre avancée'}).click();await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);
   await page.getByRole('button',{name:'Quitter l’écran collectif'}).click();await expect(page.locator('body')).not.toHaveClass(/kiosk/);
   await page.locator('#map').focus();await page.keyboard.press('ArrowRight');const manual=await world.getAttribute('transform');await page.clock.fastForward(31000);await expect(world).toHaveAttribute('transform',manual);

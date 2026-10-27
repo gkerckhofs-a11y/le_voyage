@@ -33,7 +33,21 @@ Nouveaux modules : `src/presentation/collective-view.ts`, `src/web/collective.ts
 
 Commandes exécutées localement : `npm run typecheck`, `npm run build:web`, `npm run test:visual` — **16 tests réussis**. Les six cas nouveaux couvrent moyenne et projection minimale, portée refusée, métadonnées publiques, gel malgré franchissement postérieur et sérialisation, TPE, formule de base gelée, clôture répétée sans doublon. La sortie publique contient exactement 17 fichiers autorisés.
 
-La recette navigateur couvre les vues équipe et collective en 1440×900, 1920×1080 et 390×844 ; capture kiosque 1920×1080 après gel ; navigation des escales, recentrage automatique, réduction du mouvement, refresh, TPE, carnet mobile et erreur réseau. **Son résultat distant doit être consulté dans la PR ; aucun succès non exécuté n'est déclaré ici.**
+La [CI visuelle 40508584189](https://github.com/gkerckhofs-a11y/le_voyage/actions/runs/40508584189), au commit fonctionnel `b4f456cf605e6053af8ef83b27dc34a65d975572`, est réussie : typecheck, build, **16 tests ciblés**, **28 tests navigateur réussis et 2 ignorés** (tactile sur desktop uniquement, réussi sur mobile), recette navigateur en 26,8 secondes. La [CI moteur 40508584188](https://github.com/gkerckhofs-a11y/le_voyage/actions/runs/40508584188) est réussie : 29 tests et instantané de simulation inchangé.
+
+La recette couvre les vues équipe et collective en 1440×900, 1920×1080 et 390×844 ; capture kiosque 1920×1080 après gel sans débordement vertical ; navigation des escales, recentrage automatique, réduction du mouvement, refresh, TPE, carnet mobile et erreur réseau. Les contrôles du composant partagé sont revalidés dans la vue équipe. Aucune régression constatée dans ce périmètre.
+
+Le commit de finition conserve ces captures originales et précise la remise à zéro du délai de recentrage lors de l'usage des commandes de carte, y compris le zoom, avec un scénario navigateur renforcé. Son résultat CI est lié dans la PR ; les captures ci-dessous proviennent explicitement du commit fonctionnel cité.
+
+### Captures CI inspectées
+
+Captures de page complète : desktop 1440×986 et 1920×1129, prises dans des viewports 1440×900 et 1920×1080 ; mobile 390×1456, viewport 390×844. Le kiosque est exactement 1920×1080, sans scroll vertical.
+
+![Collectif après gel — kiosque 1920×1080](evidence/v3b-collective-frozen-kiosk-1920.png)
+
+[Desktop 1440×900](evidence/v3b-collective-desktop-1440.png) · [Desktop 1920×1080](evidence/v3b-collective-desktop-1920.png)
+
+![Collectif — mobile 390×844, page complète](evidence/v3b-collective-mobile-390.png)
 
 Vérification manuelle initiale : états avant/après gel et mode écran collectif dans la prévisualisation locale. Un panneau initialement trop haut a été compacté pour rendre le bouton de relecture entièrement visible.
 

@@ -28,7 +28,11 @@ export function mountJourneyMap(data:MapData,options:Options){
   car.setAttribute('aria-label',`Voiture de ${options.label}, ${format(data.displayKm)} kilomètres`);
   options.decorate?.(world);
   let follow=true,visualRatio=ratio,idleTimer=0;
-  function manual(){follow=false;clearTimeout(idleTimer);if(options.autoRecenter?.())idleTimer=window.setTimeout(recenter,30000);}
+  function scheduleIdle(){clearTimeout(idleTimer);if(!follow&&options.autoRecenter?.())idleTimer=window.setTimeout(recenter,30000);}
+  function manual(){follow=false;scheduleIdle();}
+  // Reset while exploring or using controls, not only at the beginning of a drag.
+  for(const event of ['pointermove','pointerdown','pointerup','wheel','keydown','click'])
+    $('map').parentElement!.addEventListener(event,scheduleIdle,{passive:true});
   function position(r:number){
     visualRatio=r;const p=positionAt(route,r);car.setAttribute('transform',`translate(${p.x} ${p.y})`);heading.setAttribute('transform',`rotate(${p.angle+90})`);
     car.setAttribute('data-ratio',String(r));car.setAttribute('data-x',String(p.x));car.setAttribute('data-y',String(p.y));
