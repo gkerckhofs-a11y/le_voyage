@@ -2,7 +2,7 @@ import { deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { createAccessBoundary } from './access.mjs';
-import { teamFeed, claimEvents } from '../application/events.ts';
+import { teamFeed, claimEvents, eventId } from '../application/events.ts';
 import { collectiveJourneyView } from '../presentation/collective-view.ts';
 import { collectiveIdentity } from '../../scripts/demo-collective.mjs';
 import { advance, identity, demoTeamIdentity } from './demo-service.mjs';
@@ -25,7 +25,7 @@ export function createFirestoreAdapter(app){
       const record=JSON.parse(snapshot.data().payload);
       if(record.ledger.state.config.tenantId!==viewer.tenantId||record.ledger.state.config.campaignId!==viewer.campaignId)throw Object.assign(new Error('Access denied'),{status:403});
       const teamIdentity=(await tx.get(db.doc(`tenants/${viewer.tenantId}/campaigns/${viewer.campaignId}/teamIdentities/${viewer.teamId}`))).data();
-      const result=operation(record,viewer,teamIdentity,snapshot.data().collectionMode);
+      const result=await operation(record,viewer,teamIdentity,snapshot.data().collectionMode,tx,ref);
       if(result.record!==record){
         const payload=JSON.stringify(result.record);
         if(Buffer.byteLength(payload)>800000)throw new Error('Campaign snapshot limit exceeded');
@@ -34,17 +34,26 @@ export function createFirestoreAdapter(app){
       return result.value;
     });
   }
+  async function fulfillmentStatus(tx,ref,record,viewer,feed){
+    for(const entitlement of Object.values(record.ledger.state.entitlements)){
+      if(entitlement.teamId!==viewer.teamId)continue;
+      const attention=feed.attentions.find(a=>a.id===eventId(viewer,'attention',entitlement.id));if(!attention)continue;
+      const stored=(await tx.get(ref.collection('giftFulfillments').doc(eventId(viewer,'fulfillment',entitlement.id)))).data();
+      attention.status=stored?.status==='delivered'?'delivered':['ready','to-deliver'].includes(stored?.status)?'ready':stored?.status==='incident'?'incident':'to-compose';
+    }
+    return feed;
+  }
   return {auth,db,
     collective:(header,scope)=>operate(header,scope,(record)=>({record,value:collectiveJourneyView(record.ledger.state,scope,collectiveIdentity(record.ledger.state))})),
-    read:(header,scope)=>operate(header,scope,(record,viewer,teamIdentity)=>({record,value:teamFeed(record.ledger,viewer,publicIdentity(record,teamIdentity,viewer.teamId))})),
-    claim:(header,scope,ids)=>operate(header,scope,(record,viewer,teamIdentity)=>{
+    read:(header,scope)=>operate(header,scope,async(record,viewer,teamIdentity,mode,tx,ref)=>({record,value:await fulfillmentStatus(tx,ref,record,viewer,teamFeed(record.ledger,viewer,publicIdentity(record,teamIdentity,viewer.teamId)))})),
+    claim:(header,scope,ids)=>operate(header,scope,async(record,viewer,teamIdentity,mode,tx,ref)=>{
       const result=claimEvents(record.ledger,viewer,ids),next={...record,ledger:result.ledger};
-      return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,publicIdentity(next,teamIdentity,viewer.teamId))}};
+      return {record:next,value:{events:result.events,feed:await fulfillmentStatus(tx,ref,next,viewer,teamFeed(next.ledger,viewer,publicIdentity(next,teamIdentity,viewer.teamId)))}};
     }),
     // Test-only synthetic closure. No equivalent production endpoint is exposed.
-    simulate:(header,scope,revision)=>operate(header,scope,(record,viewer,teamIdentity,collectionMode)=>{
+    simulate:(header,scope,revision)=>operate(header,scope,async(record,viewer,teamIdentity,collectionMode,tx,ref)=>{
       if(collectionMode==='weekly-questionnaire')throw Object.assign(new Error('Synthetic closure disabled for questionnaire collection'),{status:409});
-      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,publicIdentity(result.record,teamIdentity,viewer.teamId))}};
+      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:await fulfillmentStatus(tx,ref,result.record,viewer,teamFeed(result.record.ledger,viewer,publicIdentity(result.record,teamIdentity,viewer.teamId)))}};
     }),
     close:async()=>{await db.terminate();await deleteApp(app);}
   };

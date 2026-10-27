@@ -33,3 +33,5 @@ export function advance(record,revision){
   return {record:{...record,ledger:{...ledger,revision:ledger.revision+1}},applied:true};
 }
 export function claim(record,ids){const result=claimEvents(record.ledger,viewer(record),ids);return {record:{...record,ledger:result.ledger},events:result.events};}
+
+export function newOperationsDemo(){let record=newDemo();record.ledger.state.config.tenantId='fiction-operations-demo';for(let i=0;i<8;i++)record=advance(record,record.ledger.revision).record;return record;}

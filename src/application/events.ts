@@ -8,7 +8,7 @@ export type Viewer = Scope & { teamId:string; viewerId:string };
 export type Catalog = Readonly<Record<string, Readonly<{title:string; description:string}>>>;
 type Progress = {id:string;kind:'progress';teamId:string;date:string;km:Exact;cumulative:Exact};
 type Convoy = {id:string;kind:'convoy';date:string;km:Exact;cumulative:Exact};
-type Attention = {id:string;kind:'attention';teamId:string;date:string;title:string;description:string;status:'to-compose'};
+type Attention = {id:string;kind:'attention';teamId:string;date:string;title:string;description:string;status:'to-compose'|'ready'|'delivered'|'incident'};
 export type JourneyEvent = Progress | Convoy | Attention;
 export type Ledger = {state:State;revision:number;events:readonly JourneyEvent[];presented:Readonly<Record<string,true>>};
 export function eventId(scope:Scope,kind:string,key:string){return createHash('sha256').update(JSON.stringify([scope.tenantId,scope.campaignId,kind,key])).digest('hex');}

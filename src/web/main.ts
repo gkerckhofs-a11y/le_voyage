@@ -50,7 +50,7 @@ function renderAttentions(){
     if(attention.kind!=='attention')continue;
     const li=document.createElement('li'),title=document.createElement('h3'),description=document.createElement('p'),status=document.createElement('span'),when=document.createElement('small');
     li.className='attention-card';li.dataset.attentionId=attention.id;title.textContent=attention.title;description.textContent=attention.description;
-    status.className='attention-status';status.textContent='À composer';when.textContent=`Découverte le ${date(attention.date)}`;li.append(status,title,description,when);
+    status.className='attention-status';status.textContent=({'to-compose':'À composer',ready:'Prête à remettre',delivered:'Remise confirmée',incident:'Préparation à suivre'})[attention.status];when.textContent=`Découverte le ${date(attention.date)}`;li.append(status,title,description,when);
     if(attention.unread){const button=document.createElement('button');button.textContent='Découvrir cette attention';button.addEventListener('click',()=>void discover(attention.id));li.append(button);}
     $('attention-list').append(li);
   }
