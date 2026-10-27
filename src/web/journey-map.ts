@@ -1,7 +1,7 @@
 import { distanceRatio, positionAt, roadsideMarkers } from '../map/geometry.ts';
 import { journeyRoute as route, landscapeZones } from '../map/route.ts';
 import { MapCamera } from './camera.ts';
-import { landscape, carMarkup } from './landscape.ts';
+import { landscape, carMarkup, minibusMarkup } from './landscape.ts';
 import type { TeamJourneyView } from '../presentation/journey-view.ts';
 const $ = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
 const format = (n:string|number) => Number(n).toLocaleString('fr-BE');
@@ -10,6 +10,7 @@ type Options = { kind:'team'|'collective'; color:string; label:string; decorate?
 /** Shared renderer/camera only. Distances and states are supplied by server projections. */
 export function mountJourneyMap(data:MapData,options:Options){
   if(!/^#[a-fA-F0-9]{6}$/.test(options.color))throw new Error('Invalid vehicle color');
+  const vehicleName=options.kind==='collective'?'Minibus collectif':'Voiture';
   let ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let frame=0,statusTimer=0,finishAnimation:(()=>void)|undefined;
@@ -24,9 +25,9 @@ export function mountJourneyMap(data:MapData,options:Options){
     <g transform="translate(240 2180) rotate(-8)"><path d="M-45 24V58M45 24V58" stroke="#76684c" stroke-width="7"/><rect x="-68" y="-10" width="136" height="42" rx="4" fill="#ecddac" stroke="#887b55" stroke-width="3"/><text text-anchor="middle" y="17" fill="#5d6548" font-family="Georgia" font-size="20">Le départ</text></g>
     <g transform="translate(${positionAt(route,1).x} ${positionAt(route,1).y})"><circle r="34" fill="#355e49"/><text y="6" text-anchor="middle" font-size="18" fill="white">FIN</text></g>
     </g>
-    <g id="${options.kind}-car" data-testid="${options.kind}-car" role="img" aria-label="Notre voiture"><circle class="car-shadow-ring" r="67"/><g id="car-heading">${carMarkup(options.color)}</g><g transform="translate(0 90)"><rect x="-48" y="-17" width="96" height="25" rx="12" fill="#fffbee" stroke="#d0d9b6"/><text class="car-location-label" y="0">Nous sommes ici</text></g></g>`;
+    <g id="${options.kind}-car" data-testid="${options.kind}-car" role="img" aria-label="${vehicleName}"><circle class="car-shadow-ring" r="67"/><g id="car-heading">${options.kind==='collective'?minibusMarkup(options.color):carMarkup(options.color)}</g><g transform="translate(0 90)"><rect x="-48" y="-17" width="96" height="25" rx="12" fill="#fffbee" stroke="#d0d9b6"/><text class="car-location-label" y="0">Nous sommes ici</text></g></g>`;
   const car=document.getElementById(`${options.kind}-car`)!,heading=document.getElementById('car-heading')!;
-  car.setAttribute('aria-label',`Voiture de ${options.label}, ${format(data.displayKm)} kilomètres`);
+  car.setAttribute('aria-label',`${vehicleName} de ${options.label}, ${format(data.displayKm)} kilomètres`);
   options.decorate?.(world);
   let follow=true,visualRatio=ratio,idleTimer=0;
   function scheduleIdle(){clearTimeout(idleTimer);if(!follow&&options.autoRecenter?.())idleTimer=window.setTimeout(recenter,30000);}
@@ -44,7 +45,7 @@ export function mountJourneyMap(data:MapData,options:Options){
   const camera=new MapCamera($('map'),world,route.width,route.height,{x:initial.x,y:initial.y,zoom:innerWidth<=700?.85:.78},manual);
   camera.center(initial);
   function leaveOverview(){const was=$('map').parentElement!.classList.contains('overview');$('map').parentElement!.classList.remove('overview');return was;}
-  function recenter(){clearTimeout(idleTimer);follow=true;const p=positionAt(route,visualRatio);if(leaveOverview())camera.follow(p);else camera.center(p);announce('Vous avez retrouvé votre voiture.');}
+  function recenter(){clearTimeout(idleTimer);follow=true;const p=positionAt(route,visualRatio);if(leaveOverview())camera.follow(p);else camera.center(p);announce(options.kind==='collective'?'Vous avez retrouvé le minibus collectif.':'Vous avez retrouvé votre voiture.');}
   $('fit-route').addEventListener('click',()=>{manual();$('map').parentElement!.classList.add('overview');camera.fit();announce('Tout le parcours, du départ au terminus.');});
   $('recenter').addEventListener('click',recenter);
   $('map').addEventListener('keydown',e=>{if(e.key==='Home'){e.preventDefault();recenter();}});
@@ -91,7 +92,7 @@ export function mountJourneyMap(data:MapData,options:Options){
     update:async(next:MapData,animate=false)=>{
       const target=distanceRatio(next.distance,next.maximumKm);if(target<ratio)throw new Error('Journey cannot move backwards');
       stopReplay();const from=ratio;data=next;ratio=target;last=data.history.at(-1);
-      car.setAttribute('aria-label',`Voiture de ${options.label}, ${format(data.displayKm)} kilomètres`);
+      car.setAttribute('aria-label',`${vehicleName} de ${options.label}, ${format(data.displayKm)} kilomètres`);
       if(animate)await move(from,`Notre équipe avance. ${format(data.displayKm)} kilomètres parcourus.`);else stopReplay();
     },
   };

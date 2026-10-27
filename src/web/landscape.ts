@@ -80,3 +80,24 @@ export function carMarkup(color:string): string {
     <path d="M-25-13L-23 25" stroke="#ed9872" stroke-width="3" opacity=".7"/>
   </g>`;
 }
+
+/** Original top-down retro minibus. Shares the car's origin and forward (-Y) axis. */
+export function minibusMarkup(color:string): string {
+  if(!/^#[a-fA-F0-9]{6}$/.test(color))throw new Error('Invalid vehicle color');
+  return `<g class="minibus-art" data-vehicle="minibus" style="--bus-color:${color}">
+    <ellipse cx="7" cy="8" rx="40" ry="65" fill="#263d30" opacity=".25"/>
+    <g fill="#26352f" stroke="#152720" stroke-width="2"><rect x="-39" y="-39" width="12" height="24" rx="5"/><rect x="27" y="-39" width="12" height="24" rx="5"/><rect x="-39" y="30" width="12" height="24" rx="5"/><rect x="27" y="30" width="12" height="24" rx="5"/></g>
+    <path d="M-32 45V-44Q-32-63 0-65Q32-63 32-44V45Q32 62 0 63Q-32 62-32 45Z" fill="var(--bus-color)" stroke="#254c4d" stroke-width="3"/>
+    <path d="M-31-21V-44Q-31-62 0-63Q31-62 31-44V-21Z" fill="#f3e5c4"/>
+    <path d="M-26-44Q-14-53-2-51V-29H-26Z M2-51Q14-53 26-44V-29H2Z" fill="#426e76" stroke="#e8d9b6" stroke-width="2"/>
+    <path d="M-21-47L-8-48M8-48L21-44" stroke="#b3d0c5" stroke-width="3" stroke-linecap="round"/>
+    <rect x="-21" y="-22" width="42" height="64" rx="12" fill="#f4e7c8" stroke="#d1bf98" stroke-width="2"/>
+    <path d="M-12-10V29M0-12V31M12-10V29" stroke="#e0cfaa" stroke-width="2"/>
+    <g fill="#426e76" stroke="#e8d9b6" stroke-width="2"><path d="M-28-17H-24V-1H-28Z M24-17H28V-1H24Z M-28 4H-24V20H-28Z M24 4H28V20H24Z M-28 25H-24V39H-28Z M24 25H28V39H24Z"/><path d="M-21 46H21V53Q0 58-21 53Z"/></g>
+    <path d="M-26-56Q0-65 26-56M-25 58Q0 65 25 58" stroke="#e9dec3" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <g fill="#fff1b8" stroke="#d7bf8f" stroke-width="1.5"><ellipse cx="-22" cy="-55" rx="5" ry="4"/><ellipse cx="22" cy="-55" rx="5" ry="4"/></g>
+    <path d="M-31-28H-40M31-28H40" stroke="#e6d8b8" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-32-22H32" stroke="#f4e8c9" stroke-width="3"/>
+    <circle cy="-58" r="3" fill="#bd6c43"/>
+  </g>`;
+}
