@@ -48,3 +48,9 @@ Ouvrir `http://localhost:4173`. « Simuler une semaine » fait avancer une campa
 Le serveur local Node conserve l'état dans `.demo-state/`, hors Git et hors des ressources servies. Le cookie de démonstration expire après 24 heures ; les fichiers restent jusqu'au nettoyage manuel de ce dossier de données fictives. Ne pas partager ce dossier, exposer ce serveur sur Internet ou y introduire des données réelles. L'adaptateur ne prend en charge qu'un processus Node et refuse `NODE_ENV=production` ; il ne remplace pas Firebase Auth et les transactions Firestore.
 
 Recette ciblée : `npm run test:events` et `npm run test:visual` après le build ; `npm run test:browser` en CI. Voir [V3-C](docs/V3-C.md), [V3-B](docs/V3-B.md) et [V3-A](docs/V3-A.md) pour les exigences, preuves et limites.
+
+## Mode Firebase local isolé
+
+Avec Java 21 et Node 24 : `npm run build:web`, puis `npm run dev:firebase`. Ouvrir `http://localhost:4173` : la page de connexion propose deux comptes **fictifs**. Les boutons ne sont pas une authentification destinée à de vrais salariés. Auth et Firestore tournent sur émulateurs, projet fictif `demo-rc-voyage` ; aucune connexion au projet Cloud réel n'est autorisée par l'adaptateur. Les campagnes sont partagées par compte fictif pendant cette exécution. L'arrêt des émulateurs sans export perd leurs données ; les sessions serveur ne survivent pas à un redémarrage.
+
+`npm run test:firebase:web` exécute les tests HTTP/intégration puis les parcours navigateur desktop/mobile sur émulateurs. Il requiert Chromium Playwright installé (la CI s'en charge). La démonstration locale initiale reste disponible avec `npm run dev`.

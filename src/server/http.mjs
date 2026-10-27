@@ -14,7 +14,7 @@ function checkOrigin(req){
   if(!host||!['localhost','127.0.0.1','[::1]','terminal.local'].includes(new URL('http://'+host).hostname))throw failure(403);
   if(!req.headers.origin||!['http://'+host,'https://'+host].includes(req.headers.origin)||req.headers['sec-fetch-site']==='cross-site')throw failure(403);
 }
-async function body(req,keys){
+export async function body(req,keys){
   if(req.headers['content-type']!=='application/json')throw failure(415);
   let size=0,text='';for await(const chunk of req){size+=chunk.length;if(size<=4096)text+=chunk;}
   if(size>4096)throw failure(413);
@@ -22,12 +22,12 @@ async function body(req,keys){
   if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).some(k=>!keys.includes(k))||keys.some(k=>!(k in data)))throw failure(400);
   return data;
 }
-function authorized(req,record){
+export function authorized(req,record){
   if(!record)throw failure(401);
   const csrf=req.headers['x-demo-csrf'];
   if(typeof csrf!=='string'||!/^[a-f0-9]{64}$/.test(csrf)||!timingSafeEqual(Buffer.from(csrf),Buffer.from(record.csrf)))throw failure(403);
 }
-export function createDemoServer({root,directory}){
+export function createDemoServer({root,directory,apiHandler}){
   if(process.env.NODE_ENV==='production')throw new Error('Local demo server must not run in production');
   root=resolve(root);directory=resolve(directory);
   if(directory===root||directory.startsWith(root+sep))throw new Error('Private store must be outside public output');
@@ -39,6 +39,7 @@ export function createDemoServer({root,directory}){
       if(path.startsWith('/api/')){
         if(url.search)throw failure(400);
         if(req.method==='POST')checkOrigin(req);
+        if(apiHandler){await apiHandler(req,json,path);return;}
         if(path==='/api/demo/session'&&req.method==='POST'){
           await body(req,[]);let token=sessionToken(req),record=token?await store.read(token):null;
           if(!record){record=newDemo();token=await store.create(record);}

@@ -4,6 +4,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { createAccessBoundary } from './access.mjs';
 import { teamFeed, claimEvents } from '../application/events.ts';
+import { collectiveJourneyView } from '../presentation/collective-view.ts';
+import { collectiveIdentity } from '../../scripts/demo-collective.mjs';
 import { advance, identity } from './demo-service.mjs';
 
 export const projectId='demo-rc-voyage';
@@ -14,6 +16,7 @@ export function assertEmulators(env=process.env){
 export function createFirebaseEmulatorAdapter(){
   assertEmulators();
   const app=initializeApp({projectId},'rc-test-'+randomUUID()),auth=getAuth(app),db=getFirestore(app);
+  const publicIdentity=record=>({...identity,organizationName:collectiveIdentity(record.ledger.state).organizationName});
   const membershipRef=({tenantId,uid})=>db.doc(`tenants/${tenantId}/members/${uid}`);
   const authorize=createAccessBoundary({verifyIdToken:(token,revoked)=>auth.verifyIdToken(token,revoked),readMembership:async scope=>(await membershipRef(scope).get()).data()});
   async function operate(header,scope,operation){
@@ -37,14 +40,15 @@ export function createFirebaseEmulatorAdapter(){
     });
   }
   return {auth,db,
-    read:(header,scope)=>operate(header,scope,(record,viewer)=>({record,value:teamFeed(record.ledger,viewer,identity)})),
+    collective:(header,scope)=>operate(header,scope,(record)=>({record,value:collectiveJourneyView(record.ledger.state,scope,collectiveIdentity(record.ledger.state))})),
+    read:(header,scope)=>operate(header,scope,(record,viewer)=>({record,value:teamFeed(record.ledger,viewer,publicIdentity(record))})),
     claim:(header,scope,ids)=>operate(header,scope,(record,viewer)=>{
       const result=claimEvents(record.ledger,viewer,ids),next={...record,ledger:result.ledger};
-      return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,identity)}};
+      return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,publicIdentity(next))}};
     }),
     // Test-only synthetic closure. No equivalent production endpoint is exposed.
     simulate:(header,scope,revision)=>operate(header,scope,(record,viewer)=>{
-      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,identity)}};
+      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,publicIdentity(result.record))}};
     }),
     close:async()=>{await db.terminate();await deleteApp(app);}
   };
