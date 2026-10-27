@@ -83,7 +83,7 @@ $('advance').addEventListener('click',async()=>{
 $('reload-progress').addEventListener('click',()=>location.reload());
 async function start(){
   await startDemo();feed=await readDemo<TeamFeed>('team');const data=feed.journey;
-  if(data.schemaVersion!==1||data.routeId!==route.id||!/^#[a-fA-F0-9]{6}$/.test(data.team.color)||!data.history.length)throw new Error('Unsupported journey');
+  if(data.schemaVersion!==1||data.routeId!==route.id||!/^#[a-fA-F0-9]{6}$/.test(data.team.color))throw new Error('Unsupported journey');
   renderFeed();map=mountJourneyMap(data,{kind:'team',color:data.team.color,label:data.team.name});
   // Initial reads never replay motion or open a reveal. Unread attentions remain available on demand.
 }
