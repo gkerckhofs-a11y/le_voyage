@@ -11,7 +11,8 @@ test('login, private journey, refresh, logout and another company',async({page},
  const after=await(await page.request.get('/api/demo/team')).json();expect(after.revision).toBe(before.revision+1);
  await page.getByRole('link',{name:'Le collectif',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
  await expect(page.locator('#distance')).toHaveText(Number(after.journey.displayKm).toLocaleString('fr-BE'));
- await page.getByRole('button',{name:'Se déconnecter',exact:true}).click();await expect(page).toHaveURL(/connexion.html/);expect((await page.request.get('/api/demo/team')).status()).toBe(401);
+ await page.route('**/api/auth/logout',async route=>{await route.fetch();await route.abort();},{times:1});
+ await page.getByRole('button',{name:'Se déconnecter',exact:true}).click();await page.getByRole('button',{name:'Réessayer la déconnexion',exact:true}).click();await expect(page).toHaveURL(/connexion.html/);expect((await page.request.get('/api/demo/team')).status()).toBe(401);
  await page.getByRole('button',{name:'Explorer l’Atelier'}).click();await expect(page.locator('#company')).toHaveText('Atelier fictif');
  await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('#distance')).toHaveText('1 680');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
