@@ -1,0 +1,576 @@
+{
+  "disclaimer": "Simulation déterministe fictive; aucun KPI réel, commande, déploiement ni efficacité RH mesurée.",
+  "hypotheses": {
+    "calendar": "12 semaines dont une fermeture; seuils recalculés pour ce pilote court, pas des seuils annuels validés",
+    "regularity": "moyenne des taux de participation des 4 dernières semaines actives, semaine courante incluse",
+    "privacy": "seuil 5, valeur neutre 3; validation vie privée encore requise",
+    "receptionCutoff": "jour inclus, gel le lendemain; rapports clôturés après ce jour exclus de la réception",
+    "giftBudgetCentsPerTeamMilestone": 10000
+  },
+  "clients": [
+    {
+      "client": "TPE fictive",
+      "mode": "autonomous",
+      "fictional": true,
+      "teamSizes": [
+        2
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        570,
+        770,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "3455",
+            "denominator": "4"
+          },
+          "displayed": "864"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "3455",
+        "denominator": "4"
+      },
+      "convoyKmDisplayed": "864",
+      "milestonesEarned": 2,
+      "milestonesAvailable": 3,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 2,
+      "giftBudgetAcquiredCents": 20000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "2465",
+          "denominator": "4"
+        },
+        "frozenOn": "2027-03-09"
+      },
+      "maximumBudgetCents": 200000,
+      "budgetDueCents": 150000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 0
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 0
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 0
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 1
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 1
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 2
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 2
+        }
+      ]
+    },
+    {
+      "client": "PME fictive",
+      "mode": "autonomous",
+      "fictional": true,
+      "teamSizes": [
+        4,
+        10,
+        7,
+        6
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        570,
+        770,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "3455",
+            "denominator": "4"
+          },
+          "displayed": "864"
+        },
+        {
+          "teamId": "team-2",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        },
+        {
+          "teamId": "team-3",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        },
+        {
+          "teamId": "team-4",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "7225",
+        "denominator": "8"
+      },
+      "convoyKmDisplayed": "903",
+      "milestonesEarned": 8,
+      "milestonesAvailable": 12,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 8,
+      "giftBudgetAcquiredCents": 80000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "2555",
+          "denominator": "4"
+        },
+        "frozenOn": "2027-03-09"
+      },
+      "maximumBudgetCents": 290000,
+      "budgetDueCents": 210000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "725",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "91",
+          "giftTasks": 0
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "635",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "79",
+          "giftTasks": 0
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 0
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "185",
+            "denominator": "2"
+          },
+          "convoyKmDisplayed": "93",
+          "giftTasks": 0
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "725",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "91",
+          "giftTasks": 0
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 3
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "605",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "76",
+          "giftTasks": 4
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "185",
+            "denominator": "2"
+          },
+          "convoyKmDisplayed": "93",
+          "giftTasks": 4
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "695",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "87",
+          "giftTasks": 8
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 8
+        }
+      ]
+    },
+    {
+      "client": "Lex EKHO — démonstration fictive",
+      "mode": "kpi",
+      "fictional": true,
+      "teamSizes": [
+        6,
+        8,
+        5
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        570,
+        770,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "785",
+            "denominator": "1"
+          },
+          "displayed": "785"
+        },
+        {
+          "teamId": "team-2",
+          "exact": {
+            "numerator": "815",
+            "denominator": "1"
+          },
+          "displayed": "815"
+        },
+        {
+          "teamId": "team-3",
+          "exact": {
+            "numerator": "815",
+            "denominator": "1"
+          },
+          "displayed": "815"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "805",
+        "denominator": "1"
+      },
+      "convoyKmDisplayed": "805",
+      "milestonesEarned": 6,
+      "milestonesAvailable": 9,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 6,
+      "giftBudgetAcquiredCents": 60000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "550",
+          "denominator": "1"
+        },
+        "frozenOn": "2027-03-09"
+      },
+      "maximumBudgetCents": 260000,
+      "budgetDueCents": 190000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "55",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "55",
+          "giftTasks": 0
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 0
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "90",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "90",
+          "giftTasks": 0
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 0
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 0
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "55",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "55",
+          "giftTasks": 0
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "100",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "100",
+          "giftTasks": 3
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 3
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 6
+        }
+      ]
+    }
+  ]
+}

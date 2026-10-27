@@ -1,0 +1,29 @@
+name: Domain engine
+on:
+  push:
+    branches: ['work/**']
+    paths: ['src/**', 'tests/**', 'scripts/**', 'package*.json', 'tsconfig.json', '.github/workflows/domain.yml']
+  pull_request:
+    paths: ['src/**', 'tests/**', 'scripts/**', 'package*.json', 'tsconfig.json', '.github/workflows/domain.yml']
+permissions:
+  contents: read
+concurrency:
+  group: domain-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - name: Verify deterministic pilot snapshot
+        run: |
+          node scripts/simulate.mjs > /tmp/pilot-result.json
+          diff -u docs/simulation-12-semaines.json /tmp/pilot-result.json
