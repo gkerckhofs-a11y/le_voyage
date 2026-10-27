@@ -82,3 +82,7 @@ En mode Firebase, choisir Administration fictive puis « Piloter les semaines de
 ### TPE autonome V3-D10
 
 Dans la connexion Firebase, ouvrir « TPE autonome fictive ». Le participant possède une seule équipe démarrant à zéro ; l’administration TPE ouvre/clôture ses semaines depuis la coordination et ne compte pas comme participante. Aucun KPI : participation et moyenne sur quatre semaines évaluées sont explicitement configurées. Les valeurs humaines restent neutralisées sous cinq répondants. Les campagnes KPI précédentes sont inchangées. Repartir d’émulateurs vierges pour charger les deux comptes. Voir [V3-D10](docs/V3-D10.md).
+
+## Préproduction de test
+
+La version de test est disponible sur https://rc-voyage-test-20261027.web.app/connexion.html (accès réservé). Voir [le compte rendu, les preuves et le parcours de test](docs/V3-STAGING-02.md). Le cockpit cadeaux P0 reste à développer ; cette préproduction ne publie pas la version production.
