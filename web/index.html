@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Le Voyage de Lex EKHO — démonstration fictive du voyage d'équipe Rouge Clémence.">
+  <meta name="theme-color" content="#f6f2e9"><title>Notre voyage · Rouge Clémence</title>
+  <link rel="stylesheet" href="styles.css"><script type="module" src="assets/web/main.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#map">Aller à la carte</a>
+<header class="header">
+  <div class="wordmark">Rouge Clémence<span>LES PETITES ATTENTIONS. LES GRANDES HISTOIRES.</span></div>
+  <nav aria-label="Navigation principale"><a href="#map" aria-current="page">Notre voyage</a><button id="journal-open">Carnet de bord</button></nav>
+  <span class="demo-label"><span></span> Lex EKHO · Démonstration</span>
+</header>
+<main>
+  <div class="heading"><div><p class="eyebrow">LE VOYAGE DE <span id="company">LEX EKHO</span></p><h1>Les beaux détours.</h1></div><p class="intro-line">Un chemin à nous.<br><em>De belles histoires à partager.</em></p></div>
+  <section class="journey-shell" aria-label="Le voyage de notre équipe">
+    <div id="map" class="map" tabindex="0" role="region" aria-label="Carte du voyage. Flèches pour déplacer, plus et moins pour zoomer, touche Début pour retrouver la voiture." aria-describedby="map-help">
+      <svg id="scene" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" aria-label="Route illustrée de l'équipe"><g id="world"></g></svg>
+    </div>
+    <div class="map-topline"><span class="map-chapter" id="chapter">Au fil de la rivière</span><span class="map-edition">ÉDITION 2026 <i>·</i> UNE ANNÉE ENSEMBLE</span></div>
+    <aside class="journey-card" id="journey-card" aria-label="Notre progression">
+      <div class="team-title"><span class="color-dot" aria-hidden="true"></span><div><p class="eyebrow">NOTRE ÉQUIPE</p><h2 id="team-name">Les Explorateurs</h2></div><button class="collapse" id="collapse" aria-label="Replier le panneau de progression" aria-expanded="true">−</button></div>
+      <div class="card-details" id="card-details">
+        <div class="distance-line"><strong id="distance">—</strong><span>km parcourus</span></div>
+        <div class="progress-track" role="meter" id="distance-meter" aria-label="Distance parcourue" aria-valuemin="0" aria-valuemax="4600" aria-valuenow="0"><span id="progress-fill"></span></div>
+        <div class="progress-caption"><span>Notre chemin</span><span id="maximum">— km</span></div>
+        <div class="week-block"><span class="week-label" id="week">Semaine —</span><span class="week-date" id="week-date"></span><div class="week-km"><span class="sun" aria-hidden="true">☀</span><strong id="week-km">— km</strong><span>cette semaine</span></div></div>
+        <p class="team-note">À notre rythme,<br>le voyage continue.</p>
+        <button class="replay" id="replay"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v6h6M5 11a7 7 0 1 1 1 7"/></svg>Revoir notre avancée</button>
+      </div>
+    </aside>
+    <div class="map-controls" aria-label="Commandes de la carte"><button id="zoom-in" aria-label="Agrandir la carte">+</button><button id="zoom-out" aria-label="Réduire la carte">−</button><span></span><button id="recenter" aria-label="Retrouver ma voiture"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg></button></div>
+    <div class="map-bottom"><p id="map-help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacez la carte, le voyage continue…</span></p><button id="simple-toggle" aria-pressed="false">Vue simplifiée</button></div>
+    <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
+  </section>
+  <div class="page-bottom"><p><span class="small-leaf" aria-hidden="true">❧</span> Le plaisir d’avancer, ensemble.</p><button id="about-open">Données fictives · À propos de la démo</button></div>
+  <section id="fallback" class="fallback" hidden><h2>Votre voyage, en un regard</h2><p id="fallback-text">La carte ne peut pas être chargée. Rechargez la page pour réessayer.</p><button id="retry">Réessayer</button></section>
+</main>
+<dialog id="journal"><button class="dialog-close" aria-label="Fermer le carnet">×</button><p class="eyebrow">LES PETITS PAS FONT LES GRANDES HISTOIRES</p><h2>Notre carnet de bord</h2><p class="dialog-intro">Les semaines déjà parcourues par notre équipe. Tous les chiffres de cette démonstration sont fictifs.</p><ol id="history-list"></ol></dialog>
+<dialog id="about"><button class="dialog-close" aria-label="Fermer les informations">×</button><p class="eyebrow">UNE INVITATION À PRENDRE LA ROUTE</p><h2>Un aperçu du Voyage</h2><p>Lex EKHO et son équipe illustrent ici une campagne entièrement fictive. Ces kilomètres ne représentent aucun résultat réel du cabinet.</p><p>Les bornes sont des repères du paysage : elles ne représentent ni des semaines ni des cadeaux. Explorez la carte, puis retrouvez votre voiture avec le bouton de recentrage.</p><p>Cette première vue permet de découvrir le parcours. Le questionnaire hebdomadaire, la personnalisation par vote et le voyage collectif viendront dans les prochaines étapes.</p></dialog>
+<noscript><div class="noscript">Cette carte demande JavaScript. La démonstration fictive de l'équipe Les Explorateurs totalise 1 680 km après 24 semaines, sur un maximum de 4 600 km. Aucune donnée réelle n'est utilisée.</div></noscript>
+</body></html>

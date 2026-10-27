@@ -1,0 +1,36 @@
+name: Journey map V3
+on:
+  push:
+    branches: ['work/**']
+    paths: ['src/map/**', 'src/web/**', 'src/presentation/**', 'web/**', 'scripts/build-web.mjs', 'scripts/demo-journey.mjs', 'scripts/serve-web.mjs', 'tests/visual/**', 'tests/browser/**', 'playwright.config.mjs', 'package*.json', 'tsconfig*.json', '.github/workflows/visual.yml']
+  pull_request:
+    paths: ['src/map/**', 'src/web/**', 'src/presentation/**', 'web/**', 'scripts/build-web.mjs', 'scripts/demo-journey.mjs', 'scripts/serve-web.mjs', 'tests/visual/**', 'tests/browser/**', 'playwright.config.mjs', 'package*.json', 'tsconfig*.json', '.github/workflows/visual.yml']
+permissions:
+  contents: read
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build:web
+      - run: npm run test:visual
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-map-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
