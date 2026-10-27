@@ -1,3 +1,4 @@
+import {beneficiaryPreferences,preferencesReady} from './beneficiary-data.mjs';
 import {createHash} from 'node:crypto';
 import {assertTestAdapter} from './test-environment.mjs';
 import {eventId} from '../application/events.ts';
@@ -43,6 +44,7 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString()}=
   if(value.status!=='to-select'&&value.status!=='incident'&&(!value.dueDate||value.dueDate<task.entitlement.earnedOn||!value.owner||!value.composition||!value.supplier||!value.alcoholFreeConfirmed))throw fail(422);
   if(['to-receive','to-compose','ready','to-deliver','delivered'].includes(value.status)&&!value.orderReference)throw fail(422);
   if(value.status==='delivered'&&!value.deliveryReference)throw fail(422);
+  if(!['to-select','incident'].includes(value.status)){const beneficiaries=await beneficiaryPreferences(tx,db,scope,task.id);if(!preferencesReady(beneficiaries))throw fail(422);}
   const changes=editable.filter(k=>old[k]!==value[k]).map(field=>({field,before:old[field],after:value[field]}));if(!changes.length)throw fail(400);
   const revision=old.revision+1,at=now(),resumeStatus=value.status==='incident'?(old.status==='incident'?old.resumeStatus:old.status):null;
   tx.set(f,{...value,revision,resumeStatus,updatedAt:at,entitlementId:task.entitlement.id,budgetCents:task.entitlement.budgetCents,lastMutationId:input.mutationId,lastMutationDigest:normalized.digest});tx.create(f.collection('audit').doc(String(revision).padStart(6,'0')),{revision,at,actor:uid,reason:normalized.reason,changes});return {revision,alreadyApplied:false};});}

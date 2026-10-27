@@ -1,3 +1,5 @@
+import {beneficiaryDemo,seedBeneficiaryDemo} from './beneficiary-demo.mjs';
+import {createGiftBeneficiaries} from './gift-beneficiaries.mjs';
 import {createSupplierCatalog,demoSupplierCatalog} from './supplier-catalog.mjs';
 import {randomBytes} from 'node:crypto';
 import {createFirebaseEmulatorAdapter,assertEmulators} from './firebase-emulator.mjs';
@@ -14,6 +16,7 @@ const invitedProfile={uid:'demo-invited-user',email:'camille@example.test'};
 profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@example.test'};
 for(let i=1;i<=3;i++)profiles['team'+i]={uid:'demo-team-'+i,tenantId:'fiction-lex-ekho',email:'team'+i+'@example.test',teamId:'private-collective-team-'+i};
 profiles.operations={uid:'demo-operations-user',tenantId:'fiction-operations-demo',email:'operations@example.test'};
+for(const p of beneficiaryDemo.filter(p=>p.profile))profiles[p.profile]={uid:p.uid,tenantId:'fiction-operations-demo',email:p.uid+'@example.test',teamId:p.teamId};
 profiles.tpe={uid:'demo-tpe-user',tenantId:'fiction-tpe-auto',email:'tpe@example.test'};
 profiles.tpeadmin={uid:'demo-tpe-admin',tenantId:'fiction-tpe-auto',email:'tpe-admin@example.test'};
 
@@ -24,7 +27,7 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
@@ -33,6 +36,7 @@ export async function createFirebaseHttp(options){
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
    await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(profile.tenantId==='fiction-tpe-auto'?{collectionMode:'weekly-questionnaire'}:{})});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
+  await seedBeneficiaryDemo(adapter.db,profiles.operations.scope.campaignId);
   const operationsRef=adapter.db.doc('giftOperators/demo-operations-user');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(operationsRef)).exists)tx.set(operationsRef,{uid:'demo-operations-user',active:true,campaigns:['lex','atelier','tpe','operations'].map(id=>({tenantId:profiles[id].scope.tenantId,campaignId:profiles[id].scope.campaignId}))});});
   const catalogRef=adapter.db.doc('supplierCatalog/main');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(catalogRef)).exists)tx.set(catalogRef,demoSupplierCatalog());});
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
@@ -51,9 +55,10 @@ export async function createFirebaseHttp(options){
    if(scope)await adapter.read(header,scope);
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
    if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,expires:now+3300000});
-   json(200,{connected:true,...(id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
+   json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/gifts/beneficiaries/')&&req.method==='POST'){authorized(req,session);if(path==='/api/gifts/beneficiaries/read'){const i=await body(req,['tenantId','campaignId','id']);json(200,await giftBeneficiaries.read(session.header,i,i.id));return;}if(path==='/api/gifts/beneficiaries/freeze'){const i=await body(req,['tenantId','campaignId','id','people','confirmed','reason','mutationId']);json(200,await giftBeneficiaries.freeze(session.header,i));return;}if(path==='/api/gifts/beneficiaries/review'){const i=await body(req,['tenantId','campaignId','id','digest','revision','contactConfirmed','reason','mutationId']);json(200,await giftBeneficiaries.review(session.header,i));return;}throw failure(404);}
   if(path==='/api/gifts/catalog'&&req.method==='GET'){json(200,await supplierCatalog.read(session.header));return;}
   if(path.startsWith('/api/gifts/catalog/')&&req.method==='POST'){authorized(req,session);if(path==='/api/gifts/catalog/save'){const input=await body(req,['revision','mutationId','reason','product']);json(200,await supplierCatalog.save(session.header,input));return;}if(path==='/api/gifts/catalog/suggest'){const input=await body(req,['tenantId','campaignId','id','categories','dueDate','packagingCents','transportCents']);json(200,await supplierCatalog.suggest(session.header,input,giftOperations));return;}throw failure(404);}
   if(path==='/api/gifts/ops'&&req.method==='GET'){json(200,await giftOperations.list(session.header));return;}
