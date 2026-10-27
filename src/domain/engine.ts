@@ -2,6 +2,8 @@ import { add, compare, exact, mean, sum } from './exact.ts';
 import type { Exact } from './exact.ts';
 import { addDays, civilDate } from './calendar.ts';
 import type { Week } from './calendar.ts';
+import { assertRollingWeeks } from './rolling-calendar.ts';
+import type { RollingCalendar } from './rolling-calendar.ts';
 import { normalizeWeights, scoreWeek } from './scoring.ts';
 import type { PrivacyPolicy, WeeklyInput } from './scoring.ts';
 
@@ -11,6 +13,7 @@ export type Team = Readonly<{ id: string; eligibleWeekIds: readonly string[] }>;
 export type Config = Readonly<Scope & {
   version: string;
   weeks: readonly Week[];
+  calendar?: RollingCalendar;
   teams: readonly Team[];
   mode: 'autonomous' | 'kpi';
   weights: readonly string[];
@@ -63,10 +66,11 @@ export function createCampaign(config: Config): State {
   if (compare(exact(config.privacy.neutralScore), exact('1')) < 0 || compare(exact(config.privacy.neutralScore), exact('5')) > 0) throw new Error('Invalid neutral score');
   unique(config.weeks.map(w => w.id)); unique(config.teams.map(t => t.id));
   if (!config.weeks.length || !config.teams.length) throw new Error('Weeks and teams required');
+  if (config.calendar) assertRollingWeeks(config.calendar, config.weeks);
   let previousEnd = '';
   for (const w of config.weeks) {
     civilDate(w.start); civilDate(w.endExclusive);
-    if (addDays(w.start, 7) !== w.endExclusive || w.start < previousEnd) throw new Error('Invalid/overlapping weekly periods');
+    if ((!config.calendar && addDays(w.start, 7) !== w.endExclusive) || w.start < previousEnd) throw new Error('Invalid/overlapping weekly periods');
     previousEnd = w.endExclusive;
   }
   const weekIds = new Set(config.weeks.map(w => w.id));
