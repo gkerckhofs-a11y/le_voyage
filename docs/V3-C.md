@@ -41,9 +41,21 @@ La campagne démarre à 24 semaines / 1 680 km. Sept simulations de 100 km donne
 
 Exécuté localement : `npm run typecheck`, `npm run build:web`, `npm run test:visual` (**16 réussis**), `npm run test:events` (**12 réussis**) et `git diff --check`. Le nouveau test de campagne complète avait initialement visé un nom de champ erroné dans son assertion ; corrigé sur la projection existante, sans changement métier.
 
-Les tests serveur comprennent concurrence réelle de requêtes HTTP, refus CSRF/origine/portée/corps, cadeau absent avant franchissement, session distincte, reprise du même état dans un nouveau processus Node, transaction interrompue, parcours complet avec gel, report/joker sans doublon. La recette navigateur ajoutée couvre découverte réelle, historique/rechargement, réponse perdue, deux onglets et clavier/mouvement réduit sur les trois profils existants. Ses résultats CI seront ajoutés après exécution.
+Les tests serveur comprennent concurrence réelle de requêtes HTTP, refus CSRF/origine/portée/corps, cadeau absent avant franchissement, session distincte, reprise du même état dans un nouveau processus Node, transaction interrompue, parcours complet avec gel, report/joker sans doublon.
 
-Vérification manuelle locale : huit clics successifs, voiture passant de 1 680 à 2 480 km, puis fenêtre « Une pause gourmande » affichée avec statut « À composer par Rouge Clémence ». Aucune donnée réelle utilisée.
+Au commit fonctionnel `2561af1546e2c0fe1149bc2b61a7ac10116b03ad`, [la CI visuelle 40514225508](https://github.com/gkerckhofs-a11y/le_voyage/actions/runs/40514225508) est réussie : typecheck, build, **12 tests événements/HTTP**, **16 tests géométrie/projections/sortie publique**, **40 tests navigateur réussis et 2 ignorés**. Les deux exclusions concernent le tactile sur desktop ; le scénario tactile mobile réussit. La recette navigateur dure 47,5 secondes, sans retry. Elle comprend les douze nouveaux cas (quatre scénarios sur trois profils) et les 28 cas précédents, dont le kiosque et le gel. [La CI moteur 40514225525](https://github.com/gkerckhofs-a11y/le_voyage/actions/runs/40514225525) est également réussie : 29 tests et instantané de simulation 12 semaines inchangé. Aucune régression constatée dans cette couverture.
+
+Vérification manuelle locale : huit clics successifs, voiture passant de 1 680 à 2 480 km, puis fenêtre « Une pause gourmande » affichée avec statut « À composer par Rouge Clémence ». Après rechargement, même distance, aucune nouvelle fenêtre et attention conservée dans l'historique. Aucune donnée réelle utilisée.
+
+### Captures réelles de la CI inspectées
+
+Captures issues du commit fonctionnel ci-dessus, conservées sans retouche. Viewports 1440×900, 1920×1080 et 390×844. Les captures de révélation en page complète mesurent respectivement 1440×928, 1920×1108 et 390×869 ; le fond modal couvre la hauteur du viewport, d'où la petite bande de bas de page visible dans ces captures complètes. L'écran mobile initial mesure 390×844.
+
+![Révélation après franchissement — desktop](evidence/v3c-reveal-desktop-1440.png)
+
+[Desktop 1920](evidence/v3c-reveal-desktop-1920.png) · [Révélation mobile](evidence/v3c-reveal-mobile-390.png) · [Parcours mobile avant progression](evidence/v3c-team-mobile-390.png)
+
+L'artefact CI `journey-map-evidence`, identifiant `12739925490`, contient aussi les captures collectives/kiosque et le rapport Playwright. Son SHA-256 déclaré est `8d8d64b31be439183dd1cf01cccc6fcdfb40146b9400e3585d59d018910d20d3`. Les captures versionnées survivent à son expiration prévue le 10 novembre 2026. Le commit de preuves ne modifie pas le code fonctionnel ; la PR indique son dernier statut CI.
 
 ## Restant et prochain incrément
 
