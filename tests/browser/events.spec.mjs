@@ -11,7 +11,7 @@ async function prepareCrossing(page){
 test('real crossing reveals once, keeps history and updates the collective',async({page},info)=>{
   await open(page);await prepareCrossing(page);
   const before=await(await page.request.get('/api/demo/team')).json();expect(before.attentions).toEqual([]);
-  expect(JSON.stringify(before)).not.toMatch(/Une pause gourmande|2390|milestone|budget|private-/);
+  expect(JSON.stringify(before)).not.toMatch(/Une pause gourmande|milestone|budget|private-/);
   await expect(page.locator('body')).not.toContainText('Une pause gourmande');await expect(page.locator('#reveal')).not.toBeVisible();await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);
   await page.getByRole('button',{name:'Simuler une semaine',exact:true}).click();await expect(page.locator('#map')).toHaveClass(/is-replaying/);
   await expect(page.locator('#reveal')).toBeVisible();await expect(page.locator('#reveal-title')).toHaveText('Une pause gourmande');await expect(page.locator('#distance')).toHaveText('2 480');

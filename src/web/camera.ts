@@ -1,12 +1,16 @@
 import { clamp } from '../map/geometry.ts';
 import type { Point } from '../map/geometry.ts';
 export type CameraState = { x:number; y:number; zoom:number };
-export function zoomAt(state:CameraState, factor:number, anchor:Point, size:Point):CameraState {
-  const zoom=clamp(state.zoom*factor,.45,1.8);
+export function zoomAt(state:CameraState, factor:number, anchor:Point, size:Point, minimum=.45):CameraState {
+  const zoom=clamp(state.zoom*factor,minimum,1.8);
   return { zoom, x:state.x+(anchor.x-size.x/2)*(1/state.zoom-1/zoom), y:state.y+(anchor.y-size.y/2)*(1/state.zoom-1/zoom) };
+}
+export function fitRoute(size:Point,width:number,height:number):CameraState {
+  return {x:width/2,y:height/2,zoom:Math.min(1.8,Math.max(1,size.x-40)/width,Math.max(1,size.y-140)/height)};
 }
 export class MapCamera {
   state:CameraState;
+  private overview=false;
   private points = new Map<number,Point>();
   private observer:ResizeObserver;
   private manual:()=>void;
@@ -17,7 +21,7 @@ export class MapCamera {
   constructor(viewport:HTMLElement, world:SVGGElement, width:number, height:number, initial:CameraState, onManual:()=>void) {
     this.viewport=viewport;this.world=world;this.width=width;this.height=height;
     this.state=initial;this.manual=onManual;
-    this.observer=new ResizeObserver(()=>this.render());this.observer.observe(viewport);
+    this.observer=new ResizeObserver(()=>{if(this.overview)this.state=this.fitState();this.render();});this.observer.observe(viewport);
     viewport.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
       viewport.setPointerCapture(e.pointerId);this.points.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -46,6 +50,9 @@ export class MapCamera {
     });
   }
   private size(){return {x:this.viewport.clientWidth,y:this.viewport.clientHeight};}
+  private fitState(){return fitRoute(this.size(),this.width,this.height);}
+  minimumZoom(){return this.fitState().zoom;}
+  fit(){this.overview=true;this.state=this.fitState();this.render();}
   render(){
     const size=this.size(),halfX=size.x/(2*this.state.zoom),halfY=size.y/(2*this.state.zoom);
     this.state.x=clamp(this.state.x,Math.min(this.width/2,halfX-130),Math.max(this.width/2,this.width-halfX+130));
@@ -54,12 +61,14 @@ export class MapCamera {
     this.viewport.dataset.zoom=this.state.zoom.toFixed(3);
     this.viewport.dispatchEvent(new CustomEvent('camera-change'));
   }
-  pan(x:number,y:number){this.state.x-=x/this.state.zoom;this.state.y-=y/this.state.zoom;this.render();}
-  zoom(factor:number,anchor:Point={x:this.size().x/2,y:this.size().y/2}){this.state=zoomAt(this.state,factor,anchor,this.size());this.render();}
+  pan(x:number,y:number){this.overview=false;this.state.x-=x/this.state.zoom;this.state.y-=y/this.state.zoom;this.render();}
+  zoom(factor:number,anchor:Point={x:this.size().x/2,y:this.size().y/2}){this.overview=false;this.state=zoomAt(this.state,factor,anchor,this.size(),this.minimumZoom());this.render();}
   center(point:Point){
+    this.overview=false;
     // Keep the vehicle clear of the desktop panel and leave space ahead on mobile.
     this.state.x=point.x-(this.viewport.clientWidth>720?100:0)/this.state.zoom;
     this.state.y=point.y+(this.viewport.clientWidth<=720?105:40)/this.state.zoom;this.render();
   }
+  follow(point:Point){this.state.zoom=this.viewport.clientWidth<=700?.85:.78;this.center(point);}
   destroy(){this.observer.disconnect();}
 }

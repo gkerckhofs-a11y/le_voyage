@@ -43,3 +43,11 @@ test('zoom keeps the world point under the pointer and respects limits',()=>{
   assert.ok(Math.abs(old.y+(anchor.y-size.y/2)/old.zoom-next.y-(anchor.y-size.y/2)/next.zoom)<1e-9);
   assert.equal(zoomAt(old,100,anchor,size).zoom,1.8);assert.equal(zoomAt(old,.001,anchor,size).zoom,.45);
 });
+
+test('V4 fit-to-route fits the same world on desktop and mobile',async()=>{
+ const {fitRoute}=await import('../../src/web/camera.ts');
+ for(const size of [{x:1440,y:620},{x:1920,y:800},{x:370,y:500}]){
+  const c=fitRoute(size,4800,2600);assert.equal(c.x,2400);assert.equal(c.y,1300);
+  assert.ok(4800*c.zoom<=size.x-40+.001);assert.ok(2600*c.zoom<=size.y-140+.001);assert.ok(c.zoom>0&&c.zoom<.45);
+ }
+});

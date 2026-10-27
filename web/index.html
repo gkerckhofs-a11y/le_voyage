@@ -33,9 +33,10 @@
       </div>
     </aside>
     <div class="map-controls" aria-label="Commandes de la carte"><button id="zoom-in" aria-label="Agrandir la carte">+</button><button id="zoom-out" aria-label="Réduire la carte">−</button><span></span><button id="recenter" aria-label="Retrouver ma voiture"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg></button></div>
-    <div class="map-bottom"><p id="map-help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacez la carte, le voyage continue…</span></p><button id="simple-toggle" aria-pressed="false">Vue simplifiée</button></div>
+    <button class="fit-route" id="fit-route">Voir tout le parcours</button><div class="map-bottom"><p id="map-help"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacez la carte, le voyage continue…</span></p><button id="simple-toggle" aria-pressed="false">Vue simplifiée</button></div>
     <div class="map-status" id="map-status" role="status" aria-live="polite"></div>
   </section>
+  <section class="gift-stages" aria-labelledby="stages-title"><h2 id="stages-title">Les étapes de nos attentions</h2><p>Les étapes sont visibles ; Rouge Clémence garde leur contenu secret jusqu’au déblocage.</p><ol id="stage-list"></ol></section>
   <div class="page-bottom"><p><span class="small-leaf" aria-hidden="true">❧</span> Le plaisir d’avancer, ensemble.</p><button id="about-open">Données fictives · À propos de la démo</button></div>
   <section id="fallback" class="fallback" hidden><h2>Votre voyage, en un regard</h2><p id="fallback-text">La carte ne peut pas être chargée. Rechargez la page pour réessayer.</p><button id="retry">Réessayer</button></section>
 </main>

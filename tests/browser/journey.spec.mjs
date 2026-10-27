@@ -5,8 +5,8 @@ test.beforeEach(async({page})=>{await page.goto('/');await expect(page.locator('
 test('one car, neutral markers, no private resources; responsive capture',async({page},info)=>{
   await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('[data-marker]')).toHaveCount(58);
   const dto=(await (await page.request.get('/api/demo/team')).json()).journey;
-  expect(JSON.stringify(dto)).not.toMatch(/gift|budget|autre-equipe|responses|preferences|reception|private-/i);
-  await expect(page.locator('body')).not.toContainText(/encore .*cadeau|classement|prochain cadeau/i);
+  expect(JSON.stringify(dto)).not.toMatch(/budget|autre-equipe|responses|preferences|reception|private-/i);
+  await expect(page.locator('#stage-list')).toContainText('Cadeau mystère');await expect(page.locator('body')).not.toContainText(/classement/i);
   const car=await page.getByTestId('team-car').boundingBox(),map=await page.locator('#map').boundingBox(),card=await page.locator('#journey-card').boundingBox();
   expect(car.x).toBeGreaterThan(map.x);expect(car.y).toBeGreaterThan(map.y);expect(car.x+car.width).toBeLessThan(map.x+map.width);expect(car.y+car.height).toBeLessThan(map.y+map.height);
   expect(car.x+car.width<card.x||car.x>card.x+card.width||car.y+car.height<card.y||car.y>card.y+card.height).toBeTruthy();

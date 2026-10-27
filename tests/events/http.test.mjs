@@ -49,7 +49,7 @@ test('concurrent retries advance exactly one week and claims are atomic',async t
 test('gift is absent before crossing, emitted once, and private files never served',async t=>{
   const {base,directory}=await fixture(t),s=await session(base);
   const before=await advanceN(base,s,7);assert.equal(before.feed.journey.displayKm,'2380');assert.deepEqual(before.feed.attentions,[]);
-  assert.doesNotMatch(JSON.stringify(before),/Une pause gourmande|Le panier des artisans|2390|budget|private-gift|private-person/);
+  assert.doesNotMatch(JSON.stringify(before),/Une pause gourmande|Le panier des artisans|budget|private-gift|private-person/);
   const after=await advanceN(base,s,1,7);assert.equal(after.feed.journey.displayKm,'2480');assert.equal(after.feed.attentions.length,1);assert.equal(after.feed.attentions[0].title,'Une pause gourmande');
   const replay=await post(base,s,'/api/demo/advance',{revision:7}).then(r=>r.json());assert.equal(replay.applied,false);assert.equal(replay.feed.attentions.length,1);
   assert.doesNotMatch(JSON.stringify(after),/Le panier des artisans|milestone|budget|responses|private-/);
@@ -78,7 +78,7 @@ test('complete simulation retains the frozen reception and finishes without dupl
   assert.equal(after.feed.canAdvance,false);assert.equal(after.feed.journey.completedWeeks,46);
   const retry=await post(base,s,'/api/demo/advance',{revision:22}).then(r=>r.json());
   assert.equal(retry.applied,false);assert.deepEqual(retry.feed,after.feed);
-  assert.doesNotMatch(JSON.stringify(after),/Le souvenir du voyage|4050|milestone|private-/);
+  assert.doesNotMatch(JSON.stringify(after),/Le souvenir du voyage|milestone|private-/);
 });
 test('state and presentation receipt survive a real server process restart',async t=>{
   const {base,directory,server}=await fixture(t),s=await session(base),earned=await advanceN(base,s,8);
