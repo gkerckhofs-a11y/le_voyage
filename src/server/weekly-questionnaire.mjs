@@ -5,11 +5,11 @@ import {closeWithEvents} from '../application/events.ts';
 import {postponeWeek,freezeReception} from '../domain/engine.ts';
 import {exact} from '../domain/exact.ts';
 import {catalog} from './demo-service.mjs';
-import {assertEmulators} from './firebase-emulator.mjs';
+import {assertTestAdapter} from './test-environment.mjs';
 const fail=status=>Object.assign(new Error('Questionnaire unavailable'),{status});
 const questions=['Cette semaine, j’ai contribué à l’entraide dans mon équipe.','Cette semaine, j’ai contribué à la qualité de notre service.','Cette semaine, j’ai pris des initiatives utiles.'];
 export function createWeeklyQuestionnaire(adapter){
- assertEmulators();const {auth,db}=adapter;
+ assertTestAdapter(adapter);const {auth,db}=adapter;
  async function operate(header,scope,action,input={},coordination=false){
   const project=m=>coordination?coordinatedMembership(m,scope):m;
   const authorize=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({tenantId,uid})=>project((await db.doc(`tenants/${tenantId}/members/${uid}`).get()).data())});const viewer=await authorize(header,scope);

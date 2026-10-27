@@ -1,10 +1,10 @@
 import {createAccessBoundary} from './access.mjs';
-import {assertEmulators} from './firebase-emulator.mjs';
+import {assertTestAdapter} from './test-environment.mjs';
 const fail=status=>Object.assign(new Error('Vote unavailable'),{status});
 const names=['Les Explorateurs','Les Roues libres','Les Virages heureux'];
 const colors=[{id:'terracotta',label:'Terracotta',hex:'#bf4a32'},{id:'forest',label:'Sapin',hex:'#355e49'},{id:'river',label:'Rivière',hex:'#356d94'}];
 export function createTeamVote(adapter){
- assertEmulators();const {auth,db}=adapter;
+ assertTestAdapter(adapter);const {auth,db}=adapter;
  const ref=s=>db.doc(`tenants/${s.tenantId}/campaigns/${s.campaignId}/teamVotes/${s.teamId}`);
  async function operate(header,scope,fn){
   const authorize=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({tenantId,uid})=>(await db.doc(`tenants/${tenantId}/members/${uid}`).get()).data()});

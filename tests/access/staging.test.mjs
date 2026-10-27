@@ -19,3 +19,10 @@ test('remote server accepts only the exact configured origin and host',async t=>
  const post=origin=>fetch('http://'+host+'/api/check',{method:'POST',headers:{Origin:origin}});
  assert.equal((await post('https://'+host)).status,200);assert.equal((await post('https://foreign.example')).status,403);assert.equal((await post('http://'+host)).status,403);
 });
+import {assertTestAdapter} from '../../src/server/test-environment.mjs';
+test('services reject a production adapter even with a valid staging environment',()=>{
+ const adapter=id=>({auth:{app:{options:{projectId:id}}},db:{projectId:id}});
+ assert.doesNotThrow(()=>assertTestAdapter(adapter(stagingProjectId),valid));
+ assert.throws(()=>assertTestAdapter(adapter('le-voyage-f0ae3'),valid));
+ assert.throws(()=>assertTestAdapter({...adapter(stagingProjectId),db:{projectId:'le-voyage-f0ae3'}},valid));
+});

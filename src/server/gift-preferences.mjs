@@ -1,5 +1,5 @@
 import {createAccessBoundary} from './access.mjs';
-import {assertEmulators} from './firebase-emulator.mjs';
+import {assertTestAdapter} from './test-environment.mjs';
 const fail=status=>Object.assign(new Error('Preferences unavailable'),{status});
 export const categories=['wine','beer','tea','chocolate','delicatessen'];
 const empty=()=>({choices:[],alcoholFree:false,surprise:false,birthday:null,privateContactRequested:false});
@@ -12,7 +12,7 @@ function normalize(input){
  return {choices:categories.filter(c=>choices.includes(c)),alcoholFree,surprise,birthday:birthday===null?null:{day:birthday.day,month:birthday.month},privateContactRequested};
 }
 export function createGiftPreferences(adapter,{now=()=>Date.now()}={}){
- assertEmulators();const {auth,db}=adapter;
+ assertTestAdapter(adapter);const {auth,db}=adapter;
  async function operate(header,scope,fn){
   const authorize=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({tenantId,uid})=>(await db.doc(`tenants/${tenantId}/members/${uid}`).get()).data()});const viewer=await authorize(header,scope);
   return db.runTransaction(async tx=>{

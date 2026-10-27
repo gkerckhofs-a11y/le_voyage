@@ -2,13 +2,13 @@ import {collectionScoring,scoringDescription} from './scoring-policy.mjs';
 import {createAccessBoundary} from './access.mjs';
 import {coordinatedMembership} from './coordination-access.mjs';
 import {createWeeklyQuestionnaire} from './weekly-questionnaire.mjs';
-import {assertEmulators} from './firebase-emulator.mjs';
+import {assertTestAdapter} from './test-environment.mjs';
 import {demoTeamIdentity} from './demo-service.mjs';
 import {convoyDistance} from '../domain/engine.ts';
 import {rounded} from '../domain/exact.ts';
 const fail=status=>Object.assign(new Error('Coordination unavailable'),{status});
 export function createWeekCoordination(adapter){
- assertEmulators();const {auth,db}=adapter,questionnaire=createWeeklyQuestionnaire(adapter);
+ assertTestAdapter(adapter);const {auth,db}=adapter,questionnaire=createWeeklyQuestionnaire(adapter);
  return {async read(header,scope){
   const memberRef=uid=>db.doc(`tenants/${scope.tenantId}/members/${uid}`);
   const access=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({uid})=>coordinatedMembership((await memberRef(uid).get()).data(),scope)});const viewer=await access(header,scope);

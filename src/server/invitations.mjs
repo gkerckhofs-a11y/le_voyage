@@ -1,10 +1,10 @@
 import {randomBytes,createHash} from 'node:crypto';
-import {assertEmulators} from './firebase-emulator.mjs';
+import {assertTestAdapter} from './test-environment.mjs';
 const denied=()=>Object.assign(new Error('Invitation unavailable'),{status:403});
 const hash=token=>{if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))throw denied();return createHash('sha256').update(token).digest('hex');};
 const same=(a,b)=>a.tenantId===b.tenantId&&a.campaignId===b.campaignId&&a.teamId===b.teamId;
 export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=86400000}={}){
- assertEmulators();const {db,auth}=adapter;
+ assertTestAdapter(adapter);const {db,auth}=adapter;
  const member=(scope,uid)=>db.doc(`tenants/${scope.tenantId}/members/${uid}`);
  async function identity(header){try{if(typeof header!=='string'||!header.startsWith('Bearer '))throw denied();return await auth.verifyIdToken(header.slice(7),true);}catch{throw denied();}}
  function allowed(data,scope,uid){if(!data||data.uid!==uid||data.tenantId!==scope.tenantId||data.active!==true||data.canInvite!==true||!Array.isArray(data.assignments)||!data.assignments.some(a=>a.campaignId===scope.campaignId&&a.teamId===scope.teamId))throw denied();}
