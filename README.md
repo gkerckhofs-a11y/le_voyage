@@ -73,4 +73,8 @@ En mode Firebase, l’administration fictive ouvre la semaine depuis `/semaine.h
 
 ### Clôture du questionnaire V3-D8
 
-L’administration fictive peut désormais reporter, clôturer ou utiliser un joker depuis `/semaine.html`. Les deux KPI fictifs à 5/5 sont annoncés ; les détails humains sous le seuil restent neutralisés par le moteur. La clôture avance l’horloge simulée, enregistre les kilomètres et révèle les cadeaux réellement franchis. Sans personne présente, elle exige un joker explicite ou reste en attente. Le convoi attend les autres équipes, dont le pilotage UI reste à construire. Repartir d’émulateurs vierges pour obtenir les nouvelles permissions et paramètres. Voir [V3-D8](docs/V3-D8.md).
+L’administration fictive peut désormais reporter, clôturer ou utiliser un joker depuis `/semaine.html`. Les deux KPI fictifs à 5/5 sont annoncés ; les détails humains sous le seuil restent neutralisés par le moteur. La clôture avance l’horloge simulée, enregistre les kilomètres et révèle les cadeaux réellement franchis. Sans personne présente, elle exige un joker explicite ou reste en attente. Le convoi attend les autres équipes ; leur pilotage est décrit en V3-D9 ci-dessous. Repartir d’émulateurs vierges pour obtenir les nouvelles permissions et paramètres. Voir [V3-D8](docs/V3-D8.md).
+
+### Coordination multiéquipe V3-D9
+
+En mode Firebase, choisir Administration fictive puis « Piloter les semaines des équipes » (`/coordination.html`). Ouvrir les équipes, puis utiliser les comptes fictifs supplémentaires du sélecteur de connexion pour répondre à leur questionnaire. Clôturer chaque équipe depuis la coordination : le convoi avance seulement après la dernière, par moyenne. Les droits de coordination ne rendent pas l’administrateur participant des autres équipes. Repartir d’émulateurs vierges pour charger les nouveaux comptes et permissions. Voir [V3-D9](docs/V3-D9.md).

@@ -1,3 +1,4 @@
+import {coordinatedMembership} from './coordination-access.mjs';
 import {createAccessBoundary} from './access.mjs';
 import {closeWithEvents} from '../application/events.ts';
 import {postponeWeek,freezeReception} from '../domain/engine.ts';
@@ -8,10 +9,11 @@ const fail=status=>Object.assign(new Error('Questionnaire unavailable'),{status}
 const questions=['Cette semaine, j’ai contribué à l’entraide dans mon équipe.','Cette semaine, j’ai contribué à la qualité de notre service.','Cette semaine, j’ai pris des initiatives utiles.'];
 export function createWeeklyQuestionnaire(adapter){
  assertEmulators();const {auth,db}=adapter;
- async function operate(header,scope,action,input={}){
-  const authorize=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({tenantId,uid})=>(await db.doc(`tenants/${tenantId}/members/${uid}`).get()).data()});const viewer=await authorize(header,scope);
+ async function operate(header,scope,action,input={},coordination=false){
+  const project=m=>coordination?coordinatedMembership(m,scope):m;
+  const authorize=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({tenantId,uid})=>project((await db.doc(`tenants/${tenantId}/members/${uid}`).get()).data())});const viewer=await authorize(header,scope);
   return db.runTransaction(async tx=>{
-   let member;const checked=createAccessBoundary({verifyIdToken:async()=>({uid:viewer.viewerId}),readMembership:async()=>member=(await tx.get(db.doc(`tenants/${scope.tenantId}/members/${viewer.viewerId}`))).data()});await checked('Bearer verified',scope);
+   let member;const checked=createAccessBoundary({verifyIdToken:async()=>({uid:viewer.viewerId}),readMembership:async()=>member=project((await tx.get(db.doc(`tenants/${scope.tenantId}/members/${viewer.viewerId}`))).data())});await checked('Bearer verified',scope);
    const campaignRef=db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`),campaign=await tx.get(campaignRef);if(!campaign.exists)throw fail(403);const campaignData=campaign.data(),record=JSON.parse(campaignData.payload),state=record.ledger.state;
    if(state.config.tenantId!==scope.tenantId||state.config.campaignId!==scope.campaignId)throw fail(403);
    const team=state.config.teams.find(t=>t.id===scope.teamId);if(!team)throw fail(403);
@@ -21,6 +23,7 @@ export function createWeeklyQuestionnaire(adapter){
    const canOpen=member.canManageTeam===true;
    if(!week){if(management)throw fail(409);return {status:'finished',canOpen:false,canClose:false};}
    const ref=campaignRef.collection('questionnaires').doc(scope.teamId+'_'+week.id),snapshot=await tx.get(ref);let survey=snapshot.data();
+   if(coordination&&action==='open'&&input.weekId!==week.id)throw fail(409);
    if(action==='open'){
     if(!canOpen)throw fail(403);if(state.config.mode!=='kpi')throw fail(409);
     if(!survey){
@@ -78,5 +81,5 @@ export function createWeeklyQuestionnaire(adapter){
    return {status:survey.status,canOpen,canClose,deadline:deadline(),scoringLabel:'Démonstration KPI : deux notes fictives à 5/5. Valeurs humaines neutralisées sous le seuil configuré.',eligible,week:{id:week.id,start:week.start,endExclusive:week.endExclusive},questions:survey.questions,myAnswers:survey.answers[viewer.viewerId]??null,absent:survey.absent.includes(viewer.viewerId)};
   });
  }
- return {read:(h,s)=>operate(h,s,'read'),open:(h,s)=>operate(h,s,'open'),answer:(h,s,i)=>operate(h,s,'answer',i),absence:(h,s,i)=>operate(h,s,'absence',i),close:(h,s,i)=>operate(h,s,'close',i),postpone:(h,s,i)=>operate(h,s,'postpone',i)};
+ return {coordinate:(h,s,a,i)=>operate(h,s,a,i,true),read:(h,s)=>operate(h,s,'read'),open:(h,s)=>operate(h,s,'open'),answer:(h,s,i)=>operate(h,s,'answer',i),absence:(h,s,i)=>operate(h,s,'absence',i),close:(h,s,i)=>operate(h,s,'close',i),postpone:(h,s,i)=>operate(h,s,'postpone',i)};
 }

@@ -1,5 +1,6 @@
 import {randomBytes} from 'node:crypto';
 import {createFirebaseEmulatorAdapter,assertEmulators} from './firebase-emulator.mjs';
+import {createWeekCoordination} from './week-coordination.mjs';
 import {createWeeklyQuestionnaire} from './weekly-questionnaire.mjs';
 import {createGiftPreferences} from './gift-preferences.mjs';
 import {createTeamVote} from './team-vote.mjs';
@@ -9,17 +10,18 @@ import {body,authorized} from './http.mjs';
 const profiles={lex:{uid:'demo-lex-user',tenantId:'fiction-lex-ekho',email:'lex@example.test'},atelier:{uid:'demo-atelier-user',tenantId:'fiction-atelier',email:'atelier@example.test'}};
 const invitedProfile={uid:'demo-invited-user',email:'camille@example.test'};
 profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@example.test'};
+for(let i=1;i<=3;i++)profiles['team'+i]={uid:'demo-team-'+i,tenantId:'fiction-lex-ekho',email:'team'+i+'@example.test',teamId:'private-collective-team-'+i};
 const password='Fictitious-Emulator-Only-42!';
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(){
- assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter);
+ assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
    const record=newDemo();record.ledger.state.config.tenantId=profile.tenantId;
-   profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:'explorateurs'};
+   profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:profile.teamId??'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true,canCloseWeeks:true}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
  }catch(e){await adapter.close();throw e;}
@@ -40,6 +42,14 @@ export async function createFirebaseHttp(){
    json(200,{connected:true,...(id==='clem'?{destination:'/invitations.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/coordination')){
+   if(!session.scope)throw failure(403);
+   if(req.method==='GET'&&path==='/api/coordination'){json(200,await coordination.read(session.header,session.scope));return;}
+   if(req.method==='POST'&&['/api/coordination/open','/api/coordination/close','/api/coordination/postpone'].includes(path)){
+    authorized(req,session);const action=path.split('/').at(-1),input=await body(req,action==='close'?['teamId','weekId','decision']:['teamId','weekId']);
+    json(200,await coordination.act(session.header,{...session.scope,teamId:input.teamId},action,input));return;
+   }throw failure(404);
+  }
   if(path.startsWith('/api/my-week')){
    if(!session.scope)throw failure(403);
    if(req.method==='GET'&&path==='/api/my-week'){json(200,await questionnaire.read(session.header,session.scope));return;}

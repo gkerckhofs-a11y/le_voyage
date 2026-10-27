@@ -6,7 +6,7 @@ import { createAccessBoundary } from './access.mjs';
 import { teamFeed, claimEvents } from '../application/events.ts';
 import { collectiveJourneyView } from '../presentation/collective-view.ts';
 import { collectiveIdentity } from '../../scripts/demo-collective.mjs';
-import { advance, identity } from './demo-service.mjs';
+import { advance, identity, demoTeamIdentity } from './demo-service.mjs';
 
 export const projectId='demo-rc-voyage';
 export function assertEmulators(env=process.env){
@@ -16,7 +16,7 @@ export function assertEmulators(env=process.env){
 export function createFirebaseEmulatorAdapter(){
   assertEmulators();
   const app=initializeApp({projectId},'rc-test-'+randomUUID()),auth=getAuth(app),db=getFirestore(app);
-  const publicIdentity=(record,teamIdentity)=>({...identity,...teamIdentity,organizationName:collectiveIdentity(record.ledger.state).organizationName});
+  const publicIdentity=(record,teamIdentity,teamId)=>({...identity,...demoTeamIdentity(teamId),...teamIdentity,organizationName:collectiveIdentity(record.ledger.state).organizationName});
   const membershipRef=({tenantId,uid})=>db.doc(`tenants/${tenantId}/members/${uid}`);
   const authorize=createAccessBoundary({verifyIdToken:(token,revoked)=>auth.verifyIdToken(token,revoked),readMembership:async scope=>(await membershipRef(scope).get()).data()});
   async function operate(header,scope,operation){
@@ -42,15 +42,15 @@ export function createFirebaseEmulatorAdapter(){
   }
   return {auth,db,
     collective:(header,scope)=>operate(header,scope,(record)=>({record,value:collectiveJourneyView(record.ledger.state,scope,collectiveIdentity(record.ledger.state))})),
-    read:(header,scope)=>operate(header,scope,(record,viewer,teamIdentity)=>({record,value:teamFeed(record.ledger,viewer,publicIdentity(record,teamIdentity))})),
+    read:(header,scope)=>operate(header,scope,(record,viewer,teamIdentity)=>({record,value:teamFeed(record.ledger,viewer,publicIdentity(record,teamIdentity,viewer.teamId))})),
     claim:(header,scope,ids)=>operate(header,scope,(record,viewer,teamIdentity)=>{
       const result=claimEvents(record.ledger,viewer,ids),next={...record,ledger:result.ledger};
-      return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,publicIdentity(next,teamIdentity))}};
+      return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,publicIdentity(next,teamIdentity,viewer.teamId))}};
     }),
     // Test-only synthetic closure. No equivalent production endpoint is exposed.
     simulate:(header,scope,revision)=>operate(header,scope,(record,viewer,teamIdentity,collectionMode)=>{
       if(collectionMode==='weekly-questionnaire')throw Object.assign(new Error('Synthetic closure disabled for questionnaire collection'),{status:409});
-      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,publicIdentity(result.record,teamIdentity))}};
+      const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,publicIdentity(result.record,teamIdentity,viewer.teamId))}};
     }),
     close:async()=>{await db.terminate();await deleteApp(app);}
   };
