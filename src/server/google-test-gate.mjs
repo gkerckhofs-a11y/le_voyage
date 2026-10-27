@@ -13,7 +13,7 @@ export async function createGoogleTestGate({auth,config,now=Date.now}){
  const allowedClaims=c=>c?.firebase?.sign_in_provider==='google.com'&&c.email_verified===true&&typeof c.email==='string'&&allowed.has(c.email.toLowerCase());
  const tokenOf=req=>req.headers.cookie?.match(/(?:^|;\s*)__session=([a-f0-9]{64})(?:;|$)/)?.[1];
  function fresh(){for(const [key,s] of sessions)if(s.expires<=now())sessions.delete(key);if(sessions.size>=1000)throw fail(503);const token=opaque(),s={csrf:opaque(),expires:now()+600000};sessions.set(token,s);return {token,s};}
- function sameOrigin(req){if(req.headers.origin!==canonical||req.headers.host!==new URL(canonical).host||req.headers['sec-fetch-site']==='cross-site')throw fail(403);}
+ function sameOrigin(req){if(req.headers.origin!==canonical||req.headers['sec-fetch-site']==='cross-site')throw fail(403);}
  return {
  async gate(req,res){
   const send=(status,value,extra={})=>{res.writeHead(status,{...headers,'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(value));};
@@ -22,12 +22,10 @@ export async function createGoogleTestGate({auth,config,now=Date.now}){
    if(!config.origins.some(o=>new URL(o).host===req.headers.host))throw fail(403);
    const token=tokenOf(req),s=sessions.get(token);
    if(assets.has(path)&&['GET','HEAD'].includes(req.method)){
-    if(req.headers.host!==new URL(canonical).host){res.writeHead(303,{...headers,Location:canonical+'/test-access'});res.end();return false;}
     const asset=assets.get(path);res.writeHead(200,{...headers,'Content-Type':asset.type+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:asset.data);return false;
    }
    if(path==='/test-access/config'&&req.method==='GET'&&!url.search){
-    if(req.headers.host!==new URL(canonical).host)throw fail(403);
-    const pending=s&&!s.credential?{token,s}:fresh();send(200,{apiKey:config.apiKey,authDomain:new URL(canonical).host,projectId:config.projectId,csrf:pending.s.csrf},{'Set-Cookie':cookie(pending.token,600)});return false;
+    const pending=s&&!s.credential?{token,s}:fresh();send(200,{canonical,apiKey:config.apiKey,authDomain:new URL(canonical).host,projectId:config.projectId,csrf:pending.s.csrf},{'Set-Cookie':cookie(pending.token,600)});return false;
    }
    if(path==='/test-access/session'&&req.method==='POST'&&!url.search){
     sameOrigin(req);if(!s||s.credential||!equal(req.headers['x-test-csrf'],s.csrf))throw fail(403);
