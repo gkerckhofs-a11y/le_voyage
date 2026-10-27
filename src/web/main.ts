@@ -36,7 +36,7 @@ function renderStages(){
   const ns='http://www.w3.org/2000/svg',group=document.createElementNS(ns,'g');group.id='gift-route-stages';
   for(const [i,stage] of stageData.stages.entries()){
     const state=stage.status==='unlocked'?'Débloqué':feed.closure?'Non atteint':stage.status==='next'?'Prochain':'À venir';
-    const copy=`${i+1}. ${stage.label} · ${format(stage.thresholdKm)} km · ${state}${stage.status==='unlocked'?'':` · encore ${format(stage.remainingKm)} km`}`;
+    const copy=`${i+1}. ${stage.label} · ${format(stage.thresholdKm)} km · ${state}${stage.status==='unlocked'?'':` · ${feed.closure?'il manquait':'encore'} ${format(stage.remainingKm)} km`}`;
     const li=document.createElement('li'),button=document.createElement('button');button.textContent=copy;button.addEventListener('click',()=>map.focusRatio(stage.thresholdKm/stageData.maximumKm));li.append(button);list.append(li);
     const p=positionAt(route,stage.thresholdKm/stageData.maximumKm),marker=document.createElementNS(ns,'g');marker.classList.add('gift-route-marker');marker.dataset.status=stage.status;marker.setAttribute('transform',`translate(${p.x} ${p.y})`);marker.setAttribute('role','img');marker.setAttribute('aria-label',copy);
     marker.innerHTML=`<circle r="28" fill="${stage.status==='unlocked'?'#355e49':'#a94433'}" stroke="#fff8e9" stroke-width="4"/><path d="M-13-5H13V14H-13Z M-16-11H16V-4H-16Z M0-11V14 M0-11C-22-26-18 0 0-11C22-26 18 0 0-11" fill="none" stroke="#fff8e9" stroke-width="2"/><text y="49" text-anchor="middle" fill="#213f30" stroke="#fff8e9" stroke-width="4" paint-order="stroke" font-size="18">${i+1} · ${format(stage.thresholdKm)} km</text>`;group.append(marker);

@@ -1,11 +1,13 @@
 import { createRoute, distanceFromRoute, positionAt } from '../map/geometry.ts';
 import type { Route } from '../map/geometry.ts';
 
+export const landscapeRiver = createRoute('river',4800,2600,[[1860,-160],[1910,310],[2270,600],[2280,1080],[2420,1460],[2210,1940],[2520,2430],[2440,2760]].map(([x,y])=>({x,y})));
+
 /** Original, deterministic vector illustration. No remote graphics or geographical data. */
 export function landscape(route: Route): string {
   let seed = 28491;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  const river = createRoute('river',4800,2600,[[1860,-160],[1910,310],[2270,600],[2280,1080],[2420,1460],[2210,1940],[2520,2430],[2440,2760]].map(([x,y])=>({x,y})));
+  const river = landscapeRiver;
   const decorations: { y:number; html:string }[] = [];
   for(let i=0;i<760;i++) {
     const x=60+random()*4680, y=70+random()*2460;
