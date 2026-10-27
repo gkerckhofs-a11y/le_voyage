@@ -9,7 +9,7 @@ import { addDays } from '../domain/calendar.ts';
 
 // NEVER copied to public output. All contents are fictitious and deliberately without alcohol.
 const titles=['Une pause gourmande','Le panier des artisans','Un moment à savourer','La table des découvertes','Le souvenir du voyage'];
-const catalog=Object.fromEntries(titles.map((title,i)=>[`private-gift-${i}`,{title,description:'Une attention à partager, composée de douceurs et de découvertes du terroir. La composition sera confirmée par Rouge Clémence.'}]));
+export const catalog=Object.fromEntries(titles.map((title,i)=>[`private-gift-${i}`,{title,description:'Une attention à partager, composée de douceurs et de découvertes du terroir. La composition sera confirmée par Rouge Clémence.'}]));
 export const identity={organizationName:'Lex EKHO',teamName:'Les Explorateurs',color:'#bf4a32'};
 export function newDemo(){return {schemaVersion:1,csrf:randomBytes(32).toString('hex'),ledger:{state:collectiveState(),revision:0,events:[],presented:{}}};}
 export function viewer(record){return {...record.ledger.state.config,teamId:'explorateurs',viewerId:'fictitious-viewer'};}

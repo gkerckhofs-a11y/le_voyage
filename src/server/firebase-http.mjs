@@ -19,7 +19,7 @@ export async function createFirebaseHttp(){
    const record=newDemo();record.ledger.state.config.tenantId=profile.tenantId;
    profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record)});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true,canCloseWeeks:true}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
  }catch(e){await adapter.close();throw e;}
@@ -45,6 +45,8 @@ export async function createFirebaseHttp(){
    if(req.method==='GET'&&path==='/api/my-week'){json(200,await questionnaire.read(session.header,session.scope));return;}
    if(req.method==='POST'){authorized(req,session);
     if(path==='/api/my-week/open'){await body(req,[]);json(200,await questionnaire.open(session.header,session.scope));return;}
+    if(path==='/api/my-week/close'){const input=await body(req,['weekId','decision']);json(200,await questionnaire.close(session.header,session.scope,input));return;}
+    if(path==='/api/my-week/postpone'){const input=await body(req,['weekId']);json(200,await questionnaire.postpone(session.header,session.scope,input));return;}
     if(path==='/api/my-week/answer'){const input=await body(req,['weekId','answers']);json(200,await questionnaire.answer(session.header,session.scope,input));return;}
     if(path==='/api/my-week/absence'){const input=await body(req,['weekId','absent']);json(200,await questionnaire.absence(session.header,session.scope,input));return;}
    }throw failure(404);

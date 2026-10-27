@@ -69,4 +69,8 @@ En mode Firebase, ouvrir « Mes goûts » depuis le voyage ou `/preferences.html
 
 ### Questionnaire privé V3-D7
 
-En mode Firebase, l’administration fictive ouvre la semaine depuis `/semaine.html`. Les membres déjà affectés répondent via « Ma semaine » ou déclarent leur absence sans motif. L’ouverture bloque la simulation synthétique de toute la campagne ; la clôture des réponses vers le moteur sera ajoutée séparément. Ce scénario est à essayer après les simulations de progression. Voir [V3-D7](docs/V3-D7.md).
+En mode Firebase, l’administration fictive ouvre la semaine depuis `/semaine.html`. Les membres déjà affectés répondent via « Ma semaine » ou déclarent leur absence sans motif. L’ouverture bloque la simulation synthétique de toute la campagne ; la clôture des réponses est décrite dans la tranche V3-D8 ci-dessous. Ce scénario est à essayer après les simulations de progression. Voir [V3-D7](docs/V3-D7.md).
+
+### Clôture du questionnaire V3-D8
+
+L’administration fictive peut désormais reporter, clôturer ou utiliser un joker depuis `/semaine.html`. Les deux KPI fictifs à 5/5 sont annoncés ; les détails humains sous le seuil restent neutralisés par le moteur. La clôture avance l’horloge simulée, enregistre les kilomètres et révèle les cadeaux réellement franchis. Sans personne présente, elle exige un joker explicite ou reste en attente. Le convoi attend les autres équipes, dont le pilotage UI reste à construire. Repartir d’émulateurs vierges pour obtenir les nouvelles permissions et paramètres. Voir [V3-D8](docs/V3-D8.md).
