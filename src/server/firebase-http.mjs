@@ -1,5 +1,6 @@
 import {randomBytes} from 'node:crypto';
 import {createFirebaseEmulatorAdapter,assertEmulators} from './firebase-emulator.mjs';
+import {createWeeklyQuestionnaire} from './weekly-questionnaire.mjs';
 import {createGiftPreferences} from './gift-preferences.mjs';
 import {createTeamVote} from './team-vote.mjs';
 import {createInvitations} from './invitations.mjs';
@@ -11,7 +12,7 @@ profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@examp
 const password='Fictitious-Emulator-Only-42!';
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(){
- assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter);
+ assertEmulators();const adapter=createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
@@ -39,6 +40,15 @@ export async function createFirebaseHttp(){
    json(200,{connected:true,...(id==='clem'?{destination:'/invitations.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/my-week')){
+   if(!session.scope)throw failure(403);
+   if(req.method==='GET'&&path==='/api/my-week'){json(200,await questionnaire.read(session.header,session.scope));return;}
+   if(req.method==='POST'){authorized(req,session);
+    if(path==='/api/my-week/open'){await body(req,[]);json(200,await questionnaire.open(session.header,session.scope));return;}
+    if(path==='/api/my-week/answer'){const input=await body(req,['weekId','answers']);json(200,await questionnaire.answer(session.header,session.scope,input));return;}
+    if(path==='/api/my-week/absence'){const input=await body(req,['weekId','absent']);json(200,await questionnaire.absence(session.header,session.scope,input));return;}
+   }throw failure(404);
+  }
   if(path==='/api/my-gift-preferences'){
    if(!session.scope)throw failure(403);
    if(req.method==='GET'){json(200,await giftPreferences.read(session.header,session.scope));return;}
@@ -64,7 +74,7 @@ export async function createFirebaseHttp(){
     throw failure(404);
    }
    if(!session.scope&&path!=='/api/auth/logout')throw failure(403);
-   if(path==='/api/demo/session'){await body(req,[]);await adapter.read(session.header,session.scope);json(200,{csrf:session.csrf,authenticated:true});return;}
+   if(path==='/api/demo/session'){await body(req,[]);await adapter.read(session.header,session.scope);const campaign=await adapter.db.doc(`tenants/${session.scope.tenantId}/campaigns/${session.scope.campaignId}`).get();json(200,{csrf:session.csrf,authenticated:true,canSimulate:campaign.data()?.collectionMode!=='weekly-questionnaire'});return;}
    authorized(req,session);
    if(path==='/api/auth/logout'){await body(req,[]);sessions.delete(token);json(200,{disconnected:true},{'Set-Cookie':cookie('',req,0)});return;}
    if(path==='/api/demo/advance'){

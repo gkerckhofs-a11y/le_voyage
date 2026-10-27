@@ -66,3 +66,7 @@ En mode Firebase, ouvrir « Choix de l’équipe » depuis le voyage, ou `/equip
 ### Préférences cadeaux V3-D6
 
 En mode Firebase, ouvrir « Mes goûts » depuis le voyage ou `/preferences.html`. Choisir jusqu’à trois catégories, exclure l’alcool ou demander une surprise ; l’anniversaire jour/mois reste facultatif. Les choix sont modifiables et propres au compte connecté. Après un problème réseau ou une modification concurrente, recharger la version enregistrée avant de sauvegarder. Aucun message de contact ni cadeau n’est déclenché par ce formulaire. Voir [V3-D6](docs/V3-D6.md).
+
+### Questionnaire privé V3-D7
+
+En mode Firebase, l’administration fictive ouvre la semaine depuis `/semaine.html`. Les membres déjà affectés répondent via « Ma semaine » ou déclarent leur absence sans motif. L’ouverture bloque la simulation synthétique de toute la campagne ; la clôture des réponses vers le moteur sera ajoutée séparément. Ce scénario est à essayer après les simulations de progression. Voir [V3-D7](docs/V3-D7.md).

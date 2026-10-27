@@ -31,11 +31,11 @@ export function createFirebaseEmulatorAdapter(){
       const record=JSON.parse(snapshot.data().payload);
       if(record.ledger.state.config.tenantId!==viewer.tenantId||record.ledger.state.config.campaignId!==viewer.campaignId)throw Object.assign(new Error('Access denied'),{status:403});
       const teamIdentity=(await tx.get(db.doc(`tenants/${viewer.tenantId}/campaigns/${viewer.campaignId}/teamIdentities/${viewer.teamId}`))).data();
-      const result=operation(record,viewer,teamIdentity);
+      const result=operation(record,viewer,teamIdentity,snapshot.data().collectionMode);
       if(result.record!==record){
         const payload=JSON.stringify(result.record);
         if(Buffer.byteLength(payload)>800000)throw new Error('Campaign snapshot limit exceeded');
-        tx.set(ref,{payload});
+        tx.update(ref,{payload});
       }
       return result.value;
     });
@@ -48,7 +48,8 @@ export function createFirebaseEmulatorAdapter(){
       return {record:next,value:{events:result.events,feed:teamFeed(next.ledger,viewer,publicIdentity(next,teamIdentity))}};
     }),
     // Test-only synthetic closure. No equivalent production endpoint is exposed.
-    simulate:(header,scope,revision)=>operate(header,scope,(record,viewer,teamIdentity)=>{
+    simulate:(header,scope,revision)=>operate(header,scope,(record,viewer,teamIdentity,collectionMode)=>{
+      if(collectionMode==='weekly-questionnaire')throw Object.assign(new Error('Synthetic closure disabled for questionnaire collection'),{status:409});
       const result=advance(record,revision);return {record:result.record,value:{applied:result.applied,feed:teamFeed(result.record.ledger,viewer,publicIdentity(result.record,teamIdentity))}};
     }),
     close:async()=>{await db.terminate();await deleteApp(app);}
