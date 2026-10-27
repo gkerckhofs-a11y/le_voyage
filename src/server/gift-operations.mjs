@@ -16,7 +16,7 @@ function normalize(input){
  if(typeof input.reason!=='string'||input.reason.trim().length<3||input.reason.length>240)throw fail(400);
  return {value,reason:input.reason.trim(),digest:createHash('sha256').update(JSON.stringify([value,input.reason.trim(),input.revision])).digest('hex')};
 }
-function authorizedGrant(data,uid){
+export function authorizedGrant(data,uid){
  if(!data||data.uid!==uid||data.active!==true||!Array.isArray(data.campaigns)||!data.campaigns.length||data.campaigns.length>20||data.campaigns.some(s=>!identifier(s.tenantId)||!identifier(s.campaignId)))throw fail(403);return data.campaigns;
 }
 function campaign(snapshot,scope){if(!snapshot.exists)throw fail(403);const record=JSON.parse(snapshot.data().payload),state=record.ledger.state;if(state.config.tenantId!==scope.tenantId||state.config.campaignId!==scope.campaignId)throw fail(403);return state;}

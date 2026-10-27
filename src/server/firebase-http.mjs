@@ -1,3 +1,4 @@
+import {createSupplierCatalog,demoSupplierCatalog} from './supplier-catalog.mjs';
 import {randomBytes} from 'node:crypto';
 import {createFirebaseEmulatorAdapter,assertEmulators} from './firebase-emulator.mjs';
 import {createWeekCoordination} from './week-coordination.mjs';
@@ -23,7 +24,7 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
@@ -33,6 +34,7 @@ export async function createFirebaseHttp(options){
    await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(profile.tenantId==='fiction-tpe-auto'?{collectionMode:'weekly-questionnaire'}:{})});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
   const operationsRef=adapter.db.doc('giftOperators/demo-operations-user');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(operationsRef)).exists)tx.set(operationsRef,{uid:'demo-operations-user',active:true,campaigns:['lex','atelier','tpe','operations'].map(id=>({tenantId:profiles[id].scope.tenantId,campaignId:profiles[id].scope.campaignId}))});});
+  const catalogRef=adapter.db.doc('supplierCatalog/main');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(catalogRef)).exists)tx.set(catalogRef,demoSupplierCatalog());});
   try{await adapter.auth.getUser(invitedProfile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({...invitedProfile,password});}
  }catch(e){await adapter.close();throw e;}
  const cookie=(value,req,age=3300)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
@@ -52,6 +54,8 @@ export async function createFirebaseHttp(options){
    json(200,{connected:true,...(id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path==='/api/gifts/catalog'&&req.method==='GET'){json(200,await supplierCatalog.read(session.header));return;}
+  if(path.startsWith('/api/gifts/catalog/')&&req.method==='POST'){authorized(req,session);if(path==='/api/gifts/catalog/save'){const input=await body(req,['revision','mutationId','reason','product']);json(200,await supplierCatalog.save(session.header,input));return;}if(path==='/api/gifts/catalog/suggest'){const input=await body(req,['tenantId','campaignId','id','categories','dueDate','packagingCents','transportCents']);json(200,await supplierCatalog.suggest(session.header,input,giftOperations));return;}throw failure(404);}
   if(path==='/api/gifts/ops'&&req.method==='GET'){json(200,await giftOperations.list(session.header));return;}
   if(path.startsWith('/api/gifts/ops/')&&req.method==='POST'){
    authorized(req,session);
