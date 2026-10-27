@@ -75,20 +75,23 @@ test('complete simulation retains the frozen reception and finishes without dupl
   assert.equal(before.displayKm,'3480');assert.equal(frozen.displayKm,'3880');
   assert.equal(frozen.reception.level,3);assert.equal(frozen.reception.frozen,true);assert.equal(frozen.reception.displayKm,'3480');
   assert.equal(after.feed.attentions.length,4);assert.equal(new Set(after.feed.attentions.map(e=>e.id)).size,4);
+  assert.equal(after.feed.closure.kind,'closure');assert.equal(after.feed.closure.distance.numerator,'3880');assert.equal(after.feed.closure.acquiredThresholds.length,4);
   assert.equal(after.feed.canAdvance,false);assert.equal(after.feed.journey.completedWeeks,46);
   const retry=await post(base,s,'/api/demo/advance',{revision:22}).then(r=>r.json());
   assert.equal(retry.applied,false);assert.deepEqual(retry.feed,after.feed);
   assert.doesNotMatch(JSON.stringify(after),/Le souvenir du voyage|milestone|private-/);
 });
 test('state and presentation receipt survive a real server process restart',async t=>{
-  const {base,directory,server}=await fixture(t),s=await session(base),earned=await advanceN(base,s,8);
+  const {base,directory,server}=await fixture(t),s=await session(base),earned=await advanceN(base,s,22);
   await post(base,s,'/api/demo/claim',{eventIds:earned.feed.unseenEventIds});await new Promise(r=>server.close(r));
   const script=`import {createDemoServer} from './src/server/http.mjs';const s=createDemoServer({root:${JSON.stringify(root)},directory:${JSON.stringify(directory)}});s.listen(0,'127.0.0.1',()=>console.log(s.address().port));`;
   const child=spawn(process.execPath,['--input-type=module','-e',script],{cwd:process.cwd(),stdio:['ignore','pipe','pipe']});
   t.after(()=>child.kill());
   const port=await Promise.race([once(child.stdout,'data').then(([data])=>Number(String(data).trim())),once(child,'exit').then(()=>{throw new Error('Restart failed');})]);
   const restored=await(await get(`http://127.0.0.1:${port}`,s)).json();
-  assert.equal(restored.journey.displayKm,'2480');assert.equal(restored.attentions[0].id,earned.feed.attentions[0].id);assert.equal(restored.attentions[0].unread,false);assert.deepEqual(restored.unseenEventIds,[]);
+  assert.equal(restored.journey.displayKm,'3880');assert.deepEqual(restored.closure,earned.feed.closure);
+  const repeated=await post(`http://127.0.0.1:${port}`,s,'/api/demo/claim',{eventIds:[restored.closure.id]}).then(r=>r.json());assert.deepEqual(repeated.events,[]);
+  assert.equal(restored.attentions[0].id,earned.feed.attentions[0].id);assert.equal(restored.attentions[0].unread,false);assert.deepEqual(restored.unseenEventIds,[]);
   const exited=once(child,'exit');child.kill();await exited;
 });
 test('failed transaction leaves the durable record unchanged and next transaction works',async t=>{

@@ -1,3 +1,5 @@
+import { completedTeamJourney } from './closure.ts';
+import type { Closure } from './closure.ts';
 import { createHash } from 'node:crypto';
 import { closeWeek, teamDistance, convoyDistance } from '../domain/engine.ts';
 import type { State, Scope, Command } from '../domain/engine.ts';
@@ -9,7 +11,7 @@ export type Catalog = Readonly<Record<string, Readonly<{title:string; descriptio
 type Progress = {id:string;kind:'progress';teamId:string;date:string;km:Exact;cumulative:Exact};
 type Convoy = {id:string;kind:'convoy';date:string;km:Exact;cumulative:Exact};
 type Attention = {id:string;kind:'attention';teamId:string;date:string;title:string;description:string;status:'to-compose'|'ready'|'delivered'|'incident'};
-export type JourneyEvent = Progress | Convoy | Attention;
+export type JourneyEvent = Progress | Convoy | Attention | Closure;
 export type Ledger = {state:State;revision:number;events:readonly JourneyEvent[];presented:Readonly<Record<string,true>>};
 export function eventId(scope:Scope,kind:string,key:string){return createHash('sha256').update(JSON.stringify([scope.tenantId,scope.campaignId,kind,key])).digest('hex');}
 function access(ledger:Ledger,viewer:Viewer){
@@ -32,9 +34,12 @@ export function closeWithEvents(ledger:Ledger,command:Command,decision:Parameter
     if(!content?.title.trim()||!content.description.trim())throw new Error('Missing reveal content');
     added.push({id:eventId(command,'attention',id),kind:'attention',teamId:entitlement.teamId,date:entitlement.earnedOn,title:content.title,description:content.description,status:'to-compose'});
   }
+  const closure=completedTeamJourney(state,command,command.teamId);
+  if(closure&&!ledger.events.some(e=>e.id===closure.id))added.push(closure);
   return {...ledger,state,events:[...ledger.events,...added]};
 }
-function publicEvent(event:Progress|Attention){
+function publicEvent(event:Progress|Attention|Closure){
+  if(event.kind==='closure')return {id:event.id,kind:event.kind,date:event.date,distance:{...event.distance},maximumKm:event.maximumKm,acquiredThresholds:[...event.acquiredThresholds]};
   return event.kind==='progress'?{id:event.id,kind:event.kind,date:event.date,km:{...event.km},cumulative:{...event.cumulative}}
     :{id:event.id,kind:event.kind,date:event.date,title:event.title,description:event.description,status:event.status};
 }
@@ -42,7 +47,7 @@ function publicEvent(event:Progress|Attention){
 export function claimEvents(ledger:Ledger,viewer:Viewer,ids:readonly string[]){
   access(ledger,viewer);
   if(!Array.isArray(ids)||ids.length>100||ids.some(id=>typeof id!=='string'))throw new Error('Invalid event ids');
-  const owned=ledger.events.filter((e):e is Progress|Attention=>e.kind!=='convoy'&&e.teamId===viewer.teamId);
+  const owned=ledger.events.filter((e):e is Progress|Attention|Closure=>e.kind!=='convoy'&&e.teamId===viewer.teamId);
   if(ids.some(id=>!owned.some(e=>e.id===id)))throw new Error('Event denied');
   const selected=owned.filter(e=>ids.includes(e.id)&&!ledger.presented[claimKey(viewer,e.id)]),presented={...ledger.presented};
   for(const event of selected)presented[claimKey(viewer,event.id)]=true;
@@ -50,8 +55,9 @@ export function claimEvents(ledger:Ledger,viewer:Viewer,ids:readonly string[]){
 }
 export function teamFeed(ledger:Ledger,viewer:Viewer,identity:Parameters<typeof teamJourneyView>[2]){
   access(ledger,viewer);
-  const owned=ledger.events.filter((e):e is Progress|Attention=>e.kind!=='convoy'&&e.teamId===viewer.teamId);
-  return {revision:ledger.revision,journey:teamJourneyView(ledger.state,viewer,identity),
+  const owned=ledger.events.filter((e):e is Progress|Attention|Closure=>e.kind!=='convoy'&&e.teamId===viewer.teamId);
+  const closure=owned.find((e):e is Closure=>e.kind==='closure');
+  return {closure:closure?publicEvent(closure):null,revision:ledger.revision,journey:teamJourneyView(ledger.state,viewer,identity),
     attentions:owned.filter((e):e is Attention=>e.kind==='attention').map(e=>({...publicEvent(e),unread:!ledger.presented[claimKey(viewer,e.id)]})),
     unseenEventIds:owned.filter(e=>!ledger.presented[claimKey(viewer,e.id)]).map(e=>e.id),
     canAdvance:ledger.state.config.weeks.some(w=>!ledger.state.outcomes[JSON.stringify([viewer.teamId,w.id])]),
