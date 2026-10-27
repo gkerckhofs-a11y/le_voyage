@@ -10,9 +10,9 @@ type Options = { kind:'team'|'collective'; color:string; label:string; decorate?
 /** Shared renderer/camera only. Distances and states are supplied by server projections. */
 export function mountJourneyMap(data:MapData,options:Options){
   if(!/^#[a-fA-F0-9]{6}$/.test(options.color))throw new Error('Invalid vehicle color');
-  const ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
+  let ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  let frame=0,statusTimer=0;
+  let frame=0,statusTimer=0,finishAnimation:(()=>void)|undefined;
   function announce(message:string){$('map-status').textContent=message;$('map-status').classList.add('visible');clearTimeout(statusTimer);statusTimer=window.setTimeout(()=>$('map-status').classList.remove('visible'),2400);}
   const world=document.getElementById('world') as unknown as SVGGElement;
   world.innerHTML=landscape(route)+`
@@ -61,20 +61,35 @@ export function mountJourneyMap(data:MapData,options:Options){
     const simple=$('map').classList.toggle('simplified');$('simple-toggle').setAttribute('aria-pressed',String(simple));
     $('simple-toggle').textContent=simple?'Vue illustrée':'Vue simplifiée';announce(simple?'Les détails du paysage sont masqués.':'Le paysage est de nouveau visible.');
   });
-  function stopReplay(){cancelAnimationFrame(frame);frame=0;position(ratio);if(follow)camera.center(positionAt(route,ratio));$('map').classList.remove('is-replaying');($('replay') as HTMLButtonElement).disabled=false;}
+  function stopReplay(){cancelAnimationFrame(frame);frame=0;position(ratio);if(follow)camera.center(positionAt(route,ratio));$('map').classList.remove('is-replaying');($('replay') as HTMLButtonElement).disabled=!last;const complete=finishAnimation;finishAnimation=undefined;complete?.();}
+  function move(from:number,message:string):Promise<void>{
+    follow=true;
+    if(reduced.matches||from===ratio){stopReplay();announce(message);return Promise.resolve();}
+    ($('replay') as HTMLButtonElement).disabled=true;$('map').classList.add('is-replaying');announce(message);
+    const started=performance.now();
+    return new Promise(resolve=>{
+      finishAnimation=resolve;
+      const animate=(now:number)=>{const t=Math.min(1,(now-started)/2400),eased=t*t*(3-2*t),p=position(from+(ratio-from)*eased);if(follow)camera.center(p);if(t<1)frame=requestAnimationFrame(animate);else stopReplay();};
+      frame=requestAnimationFrame(animate);
+    });
+  }
   reduced.addEventListener('change',()=>{if(reduced.matches&&frame)stopReplay();});
   $('replay').addEventListener('click',()=>{
     if(!last)return;stopReplay();follow=true;
     if(reduced.matches){recenter();announce(`Dernière avancée : ${last.displayKm} kilomètres. Animation désactivée.`);return;}
     const before=data.history.at(-2)?.cumulative??{numerator:'0',denominator:'1'},from=distanceRatio(before,data.maximumKm);
-    ($('replay') as HTMLButtonElement).disabled=true;$('map').classList.add('is-replaying');announce(`Relecture de notre dernière avancée : ${last.displayKm} km.`);
-    const started=performance.now();
-    const animate=(now:number)=>{const t=Math.min(1,(now-started)/2400),eased=t*t*(3-2*t),p=position(from+(ratio-from)*eased);if(follow)camera.center(p);if(t<1)frame=requestAnimationFrame(animate);else stopReplay();};
-    frame=requestAnimationFrame(animate);
+    void move(from,`Relecture de notre dernière avancée : ${last.displayKm} km.`);
   });
   // Resize recenters only while following. Free exploration preserves the user's camera.
   window.addEventListener('resize',()=>{if(follow)camera.center(positionAt(route,visualRatio));});
   ($('replay') as HTMLButtonElement).disabled=!last;
   $('map').dataset.ready='true';
-  return { recenter, focusRatio:(r:number)=>{manual();camera.center(positionAt(route,r));} };
+  return { recenter, focusRatio:(r:number)=>{manual();camera.center(positionAt(route,r));},
+    update:async(next:MapData,animate=false)=>{
+      const target=distanceRatio(next.distance,next.maximumKm);if(target<ratio)throw new Error('Journey cannot move backwards');
+      stopReplay();const from=ratio;data=next;ratio=target;last=data.history.at(-1);
+      car.setAttribute('aria-label',`Voiture de ${options.label}, ${format(data.displayKm)} kilomètres`);
+      if(animate)await move(from,`Notre équipe avance. ${format(data.displayKm)} kilomètres parcourus.`);else stopReplay();
+    },
+  };
 }

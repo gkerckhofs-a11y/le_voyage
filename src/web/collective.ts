@@ -2,6 +2,7 @@ import { distanceRatio } from '../map/geometry.ts';
 import { journeyRoute } from '../map/route.ts';
 import { mountJourneyMap } from './journey-map.ts';
 import { festiveStops, stopStatus } from './festive-stops.ts';
+import { startDemo, readDemo } from './demo-client.ts';
 import type { CollectiveJourneyView } from '../presentation/collective-view.ts';
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const format=(n:string|number)=>Number(n).toLocaleString('fr-BE');
@@ -17,8 +18,9 @@ $('about-open').addEventListener('click',()=>($('about') as HTMLDialogElement).s
 $('about-close').addEventListener('click',()=>($('about') as HTMLDialogElement).close());
 $('retry').addEventListener('click',()=>location.reload());
 async function start(){
-  const response=await fetch(`data/collective-${scenario}.json`);if(!response.ok)throw new Error('Journey unavailable');
-  const data=await response.json() as CollectiveJourneyView;
+  let data:CollectiveJourneyView;
+  if(scenario==='journey'){await startDemo();data=await readDemo<CollectiveJourneyView>('collective');}
+  else{const response=await fetch(`data/collective-${scenario}.json`);if(!response.ok)throw new Error('Journey unavailable');data=await response.json();}
   if(data.schemaVersion!==1||data.routeId!==journeyRoute.id)throw new Error('Unsupported journey');
   const reception=data.reception,last=data.history.at(-1),ratio=distanceRatio(data.distance,data.maximumKm);
   $('company').textContent=data.organizationName;$('demo-company').textContent=data.organizationName;

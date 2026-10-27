@@ -9,3 +9,4 @@ playwright-report/
 test-results/
 .openai/
 .web-compiled/
+.demo-state/

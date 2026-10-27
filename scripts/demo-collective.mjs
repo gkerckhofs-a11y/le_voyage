@@ -12,7 +12,7 @@ export function collectiveState(scenario = 'journey') {
   const scope = { tenantId: tpe ? 'fiction-atelier' : 'fiction-lex-ekho', campaignId: 'fiction-2026' };
   const sizes = tpe ? [2] : [6, 10, 7, 6];
   let state = createCampaign({ ...scope, version: 'demo-only-v3b', weeks,
-    teams: sizes.map((_,i) => ({ id: `private-collective-team-${i}`, eligibleWeekIds: weeks.map(w => w.id) })),
+    teams: sizes.map((_,i) => ({ id: i===0?'explorateurs':`private-collective-team-${i}`, eligibleWeekIds: weeks.map(w => w.id) })),
     mode: 'kpi', weights: DEFAULT_WEIGHTS, privacy: { minimumRespondents: 5, neutralScore: '3' },
     maxJokers: 2, jokerKm: 70, reportDays: 7,
     giftMilestones: thresholds(46,5,'gift').map((km,i) => ({id:`private-gift-${i}`,km,budgetCents:10000})),

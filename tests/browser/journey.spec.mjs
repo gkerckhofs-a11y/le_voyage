@@ -4,7 +4,7 @@ import { positionAt } from '../../src/map/geometry.ts';
 test.beforeEach(async({page})=>{await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');});
 test('one car, neutral markers, no private resources; responsive capture',async({page},info)=>{
   await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('[data-marker]')).toHaveCount(58);
-  const dto=await (await page.request.get('/data/team.json')).json();
+  const dto=(await (await page.request.get('/api/demo/team')).json()).journey;
   expect(JSON.stringify(dto)).not.toMatch(/gift|budget|autre-equipe|responses|preferences|reception|private-/i);
   await expect(page.locator('body')).not.toContainText(/encore .*cadeau|classement|prochain cadeau/i);
   const car=await page.getByTestId('team-car').boundingBox(),map=await page.locator('#map').boundingBox(),card=await page.locator('#journey-card').boundingBox();
@@ -50,7 +50,7 @@ test('reduced motion, dialogs, keyboard close, and loading fallback',async({page
   await page.emulateMedia({reducedMotion:'reduce'});const before=await page.getByTestId('team-car').getAttribute('transform');
   await page.getByRole('button',{name:'Revoir notre avancée'}).click();await expect(page.getByTestId('team-car')).toHaveAttribute('transform',before);await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);
   await page.getByRole('button',{name:'Données fictives · À propos de la démo'}).click();await expect(page.locator('#about')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#about')).not.toBeVisible();
-  await page.route('**/data/team.json',route=>route.abort());await page.reload();await expect(page.locator('#fallback')).toBeVisible();await expect(page.locator('.journey-shell')).toBeHidden();
+  await page.route('**/api/demo/team',route=>route.abort());await page.reload();await expect(page.locator('#fallback')).toBeVisible();await expect(page.locator('.journey-shell')).toBeHidden();
 });
 test('real touch drag and pinch preserve a single car',async({page,context},info)=>{
   test.skip(!info.project.use.hasTouch,'Touch device only');

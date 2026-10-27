@@ -1,7 +1,7 @@
 name: Journey map V3
 on:
   pull_request:
-    paths: ['src/map/**', 'src/web/**', 'src/presentation/**', 'web/**', 'scripts/build-web.mjs', 'scripts/demo-*.mjs', 'scripts/serve-web.mjs', 'tests/visual/**', 'tests/browser/**', 'playwright.config.mjs', 'package*.json', 'tsconfig*.json', '.github/workflows/visual.yml']
+    paths: ['src/map/**', 'src/web/**', 'src/presentation/**', 'src/application/**', 'src/server/**', 'web/**', 'scripts/build-web.mjs', 'scripts/demo-*.mjs', 'scripts/serve-web.mjs', 'tests/visual/**', 'tests/browser/**', 'tests/events/**', 'playwright.config.mjs', 'package*.json', 'tsconfig*.json', '.github/workflows/visual.yml']
 permissions:
   contents: read
 concurrency:
@@ -20,6 +20,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm run build:web
+      - run: npm run test:events
       - run: npm run test:visual
       # The standard runner already supplies Chromium's system libraries.
       # Avoid unrelated font/system upgrades through slow Ubuntu mirrors.

@@ -6,15 +6,16 @@
   <meta name="theme-color" content="#f6f2e9"><title>Notre voyage · Rouge Clémence</title>
   <link rel="stylesheet" href="styles.css"><script type="module" src="assets/web/main.js"></script>
 </head>
-<body>
+<body class="team-page">
 <a class="skip-link" href="#map">Aller à la carte</a>
 <header class="header">
   <div class="wordmark">Rouge Clémence<span>LES PETITES ATTENTIONS. LES GRANDES HISTOIRES.</span></div>
-  <nav aria-label="Navigation principale"><a href="index.html" aria-current="page">Notre voyage</a><a href="collectif.html">Le collectif</a><button id="journal-open">Carnet de bord</button></nav>
+  <nav aria-label="Navigation principale"><a href="index.html" aria-current="page">Notre voyage</a><a href="collectif.html">Le collectif</a><button id="journal-open">Carnet de bord</button><button id="attentions-open">Mes attentions</button></nav>
   <span class="demo-label"><span></span> Lex EKHO · Démonstration</span>
 </header>
 <main>
-  <div class="heading"><div><p class="eyebrow">LE VOYAGE DE <span id="company">LEX EKHO</span></p><h1>Les beaux détours.</h1></div><p class="intro-line">Un chemin à nous.<br><em>De belles histoires à partager.</em></p></div>
+  <div class="heading"><div><p class="eyebrow">LE VOYAGE DE <span id="company">LEX EKHO</span></p><h1>Les beaux détours.</h1></div><div class="demo-actions"><span>SIMULATION FICTIVE</span><button id="advance" disabled>Simuler une semaine</button></div></div>
+  <p id="advance-status" class="advance-status" role="status"></p><button id="reload-progress" class="reload-progress" hidden>Retrouver ma progression</button>
   <section class="journey-shell" aria-label="Le voyage de notre équipe">
     <div id="map" class="map" tabindex="0" role="region" aria-label="Carte du voyage. Flèches pour déplacer, plus et moins pour zoomer, touche Début pour retrouver la voiture." aria-describedby="map-help">
       <svg id="scene" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" aria-label="Route illustrée de l'équipe"><g id="world"></g></svg>
@@ -39,6 +40,8 @@
   <section id="fallback" class="fallback" hidden><h2>Votre voyage, en un regard</h2><p id="fallback-text">La carte ne peut pas être chargée. Rechargez la page pour réessayer.</p><button id="retry">Réessayer</button></section>
 </main>
 <dialog id="journal"><button class="dialog-close" aria-label="Fermer le carnet">×</button><p class="eyebrow">LES PETITS PAS FONT LES GRANDES HISTOIRES</p><h2>Notre carnet de bord</h2><p class="dialog-intro">Les semaines déjà parcourues par notre équipe. Tous les chiffres de cette démonstration sont fictifs.</p><ol id="history-list"></ol></dialog>
-<dialog id="about"><button class="dialog-close" aria-label="Fermer les informations">×</button><p class="eyebrow">UNE INVITATION À PRENDRE LA ROUTE</p><h2>Un aperçu du Voyage</h2><p>Lex EKHO et son équipe illustrent ici une campagne entièrement fictive. Ces kilomètres ne représentent aucun résultat réel du cabinet.</p><p>Les bornes sont des repères du paysage : elles ne représentent ni des semaines ni des cadeaux. Explorez la carte, puis retrouvez votre voiture avec le bouton de recentrage.</p><p>Cette première vue permet de découvrir le parcours. Le voyage collectif dispose de sa propre carte. Le questionnaire hebdomadaire et la personnalisation par vote viendront dans les prochaines étapes.</p></dialog>
-<noscript><div class="noscript">Cette carte demande JavaScript. La démonstration fictive de l'équipe Les Explorateurs totalise 1 680 km après 24 semaines, sur un maximum de 4 600 km. Aucune donnée réelle n'est utilisée.</div></noscript>
+<dialog id="attentions"><button class="dialog-close" aria-label="Fermer les attentions">×</button><p class="eyebrow">LES PETITES ATTENTIONS</p><h2>Nos découvertes</h2><p id="attention-empty">Les attentions déjà découvertes par votre équipe seront réunies ici.</p><p id="attention-error" role="status"></p><ol id="attention-list"></ol></dialog>
+<dialog id="reveal" class="reveal-dialog" aria-labelledby="reveal-title"><button class="dialog-close" aria-label="Fermer la découverte">×</button><div class="reveal-ornament" aria-hidden="true">❧</div><p class="eyebrow">UNE ATTENTION POUR NOTRE ÉQUIPE</p><h2 id="reveal-title"></h2><p id="reveal-description"></p><span class="attention-status">À composer par Rouge Clémence</span><p class="reveal-note">Cette attention est acquise. Sa composition et sa remise restent à organiser.</p><small id="reveal-date"></small></dialog>
+<dialog id="about"><button class="dialog-close" aria-label="Fermer les informations">×</button><p class="eyebrow">UNE INVITATION À PRENDRE LA ROUTE</p><h2>Un aperçu du Voyage</h2><p>Lex EKHO et son équipe illustrent ici une campagne entièrement fictive. Ces kilomètres ne représentent aucun résultat réel du cabinet.</p><p>Les bornes sont des repères du paysage : elles ne représentent ni des semaines ni des cadeaux. Explorez la carte, puis retrouvez votre voiture avec le bouton de recentrage.</p><p>Cette première vue permet de découvrir le parcours. Le bouton de simulation clôt une semaine fictive à 100 km pour chaque équipe. Il ne valide aucune réponse réelle. Le voyage collectif reprend cette progression ; les autres scénarios du collectif sont des exemples indépendants. Le questionnaire et le vote restent à réaliser.</p><p>La progression de démonstration est conservée sur ce serveur et retrouvée grâce à un cookie pendant 24 heures. Les découvertes restent dans votre historique ; un rafraîchissement ne rejoue pas leur animation. Ce fonctionnement ne remplace pas une connexion sécurisée pour un usage réel.</p></dialog>
+<noscript><div class="noscript">Cette carte demande JavaScript. Au départ, la démonstration fictive de l'équipe Les Explorateurs totalise 1 680 km après 24 semaines, sur un maximum de 4 600 km. Aucune donnée réelle n'est utilisée.</div></noscript>
 </body></html>
