@@ -78,3 +78,7 @@ L’administration fictive peut désormais reporter, clôturer ou utiliser un jo
 ### Coordination multiéquipe V3-D9
 
 En mode Firebase, choisir Administration fictive puis « Piloter les semaines des équipes » (`/coordination.html`). Ouvrir les équipes, puis utiliser les comptes fictifs supplémentaires du sélecteur de connexion pour répondre à leur questionnaire. Clôturer chaque équipe depuis la coordination : le convoi avance seulement après la dernière, par moyenne. Les droits de coordination ne rendent pas l’administrateur participant des autres équipes. Repartir d’émulateurs vierges pour charger les nouveaux comptes et permissions. Voir [V3-D9](docs/V3-D9.md).
+
+### TPE autonome V3-D10
+
+Dans la connexion Firebase, ouvrir « TPE autonome fictive ». Le participant possède une seule équipe démarrant à zéro ; l’administration TPE ouvre/clôture ses semaines depuis la coordination et ne compte pas comme participante. Aucun KPI : participation et moyenne sur quatre semaines évaluées sont explicitement configurées. Les valeurs humaines restent neutralisées sous cinq répondants. Les campagnes KPI précédentes sont inchangées. Repartir d’émulateurs vierges pour charger les deux comptes. Voir [V3-D10](docs/V3-D10.md).

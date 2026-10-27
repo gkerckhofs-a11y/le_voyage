@@ -1,3 +1,4 @@
+import {collectionScoring,scoringDescription} from './scoring-policy.mjs';
 import {createAccessBoundary} from './access.mjs';
 import {coordinatedMembership} from './coordination-access.mjs';
 import {createWeeklyQuestionnaire} from './weekly-questionnaire.mjs';
@@ -13,9 +14,9 @@ export function createWeekCoordination(adapter){
   const access=createAccessBoundary({verifyIdToken:(t,r)=>auth.verifyIdToken(t,r),readMembership:async({uid})=>coordinatedMembership((await memberRef(uid).get()).data(),scope)});const viewer=await access(header,scope);
   return db.runTransaction(async tx=>{
    let member;const checked=createAccessBoundary({verifyIdToken:async()=>({uid:viewer.viewerId}),readMembership:async()=>member=coordinatedMembership((await tx.get(memberRef(viewer.viewerId))).data(),scope)});await checked('Bearer verified',scope);
-   const ref=db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`),snapshot=await tx.get(ref);if(!snapshot.exists)throw fail(403);const state=JSON.parse(snapshot.data().payload).ledger.state;if(state.config.tenantId!==scope.tenantId||state.config.campaignId!==scope.campaignId)throw fail(403);
+   const ref=db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`),snapshot=await tx.get(ref);if(!snapshot.exists)throw fail(403);const record=JSON.parse(snapshot.data().payload),state=record.ledger.state;if(state.config.tenantId!==scope.tenantId||state.config.campaignId!==scope.campaignId)throw fail(403);
    const week=state.config.weeks.find(w=>w.active&&state.config.teams.some(t=>t.eligibleWeekIds.includes(w.id)&&!state.outcomes[JSON.stringify([t.id,w.id])]));
-   const summary={convoyKm:rounded(convoyDistance(state)),lastConvoyWeek:Object.values(state.convoys).at(-1)?.weekId??null};if(!week)return {...summary,status:'finished',teams:[]};
+   const summary={scoringLabel:scoringDescription(collectionScoring(record)),convoyKm:rounded(convoyDistance(state)),lastConvoyWeek:Object.values(state.convoys).at(-1)?.weekId??null};if(!week)return {...summary,status:'finished',teams:[]};
    const teams=[];const logicalDate=[...Object.values(state.outcomes).map(o=>o.closedOn),state.freeze?.frozenOn??''].sort().at(-1)??'';
    for(const team of state.config.teams){
     if(!team.eligibleWeekIds.includes(week.id)||!member.assignments.some(a=>a.campaignId===scope.campaignId&&a.teamId===team.id))continue;

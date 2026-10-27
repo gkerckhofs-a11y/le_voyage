@@ -1,3 +1,4 @@
+import {collectionScoring,scoringDescription,autonomousEvaluation} from './scoring-policy.mjs';
 import {coordinatedMembership} from './coordination-access.mjs';
 import {createAccessBoundary} from './access.mjs';
 import {closeWithEvents} from '../application/events.ts';
@@ -25,12 +26,12 @@ export function createWeeklyQuestionnaire(adapter){
    const ref=campaignRef.collection('questionnaires').doc(scope.teamId+'_'+week.id),snapshot=await tx.get(ref);let survey=snapshot.data();
    if(coordination&&action==='open'&&input.weekId!==week.id)throw fail(409);
    if(action==='open'){
-    if(!canOpen)throw fail(403);if(state.config.mode!=='kpi')throw fail(409);
+    if(!canOpen)throw fail(403);const scoring=collectionScoring(record);
     if(!survey){
      const members=await tx.get(db.collection(`tenants/${scope.tenantId}/members`).where('active','==',true).limit(101));if(members.size>100)throw fail(409);
-     const eligible=members.docs.map(d=>d.data()).filter(m=>m.tenantId===scope.tenantId&&Array.isArray(m.assignments)&&m.assignments.some(a=>a.campaignId===scope.campaignId&&a.teamId===scope.teamId)).map(m=>m.uid);
+     const eligible=members.docs.map(d=>d.data()).filter(m=>m.participationEnabled!==false&&m.tenantId===scope.tenantId&&Array.isArray(m.assignments)&&m.assignments.some(a=>a.campaignId===scope.campaignId&&a.teamId===scope.teamId)).map(m=>m.uid);
      if(!eligible.length||new Set(eligible).size!==eligible.length)throw fail(409);
-     survey={teamId:scope.teamId,weekId:week.id,status:'open',eligible,answers:{},absent:[],openedAt:Date.now(),questions,scoring:{mode:'kpi',kpis:['5','5'],source:'fictitious'}};
+     survey={teamId:scope.teamId,weekId:week.id,status:'open',eligible,answers:{},absent:[],openedAt:Date.now(),questions,scoring};
      tx.set(ref,survey);tx.update(campaignRef,{collectionMode:'weekly-questionnaire'});
     }
    }
@@ -50,15 +51,20 @@ export function createWeeklyQuestionnaire(adapter){
       if(next!==state){ledger={...ledger,state:next,revision:ledger.revision+1};const payload=JSON.stringify({...record,ledger});if(Buffer.byteLength(payload)>800000)throw fail(409);tx.update(campaignRef,{payload});}
       return {status:'postponed',week:{id:week.id,start:week.start,endExclusive:week.endExclusive},deadline:next.reports[outcomeKey],canOpen,canClose};
      }
-     if(survey.scoring?.mode!=='kpi'||survey.scoring.source!=='fictitious'||state.config.mode!=='kpi')throw fail(409);
+     if(survey.scoring?.mode!==state.config.mode||survey.scoring.source!=='fictitious')throw fail(409);
      const roster=survey.eligible.map(id=>({id,eligible:true,absent:survey.absent.includes(id)}));
      if(input.decision==='evaluate'&&!roster.some(m=>!m.absent))throw fail(409);
      // Logical simulation clock; never accept a date or score supplied by the browser.
      const today=[deadline(),state.freeze?.frozenOn??'',...Object.values(state.outcomes).map(o=>o.closedOn)].sort().at(-1);
      if(today>state.config.reception.cutoffDate&&!state.freeze)ledger={...ledger,state:freezeReception(state,scope,today)};
-     const decision=input.decision==='joker'?{kind:'joker'}:{kind:'evaluate',input:{mode:'kpi',roster,responses:Object.entries(survey.answers).map(([participantId,answers])=>({participantId,answers:answers.map(String)})),kpis:survey.scoring.kpis.map(exact)}};
+     const responses=Object.entries(survey.answers).map(([participantId,answers])=>({participantId,answers:answers.map(String)}));
+     let nextRecord=record,decision={kind:'joker'};
+     if(input.decision==='evaluate'){
+      if(state.config.mode==='autonomous'){const result=autonomousEvaluation(record,survey,roster,responses);decision={kind:'evaluate',input:result.input};nextRecord={...record,participationHistory:result.history};}
+      else decision={kind:'evaluate',input:{mode:'kpi',roster,responses,kpis:survey.scoring.kpis.map(exact)}};
+     }
      ledger=closeWithEvents(ledger,{...scope,weekId:week.id,today},decision,catalog);ledger={...ledger,revision:ledger.revision+1};
-     const payload=JSON.stringify({...record,ledger});if(Buffer.byteLength(payload)>800000)throw fail(409);
+     const payload=JSON.stringify({...nextRecord,ledger});if(Buffer.byteLength(payload)>800000)throw fail(409);
      tx.update(campaignRef,{payload});tx.update(ref,{status:'closed',closedOn:today,closedBy:viewer.viewerId,decision:input.decision});
      return {status:'closed',week:{id:week.id,start:week.start,endExclusive:week.endExclusive},canOpen,canClose,alreadyClosed:false};
     }catch(e){if(e.status)throw e;throw fail(409);}
@@ -78,7 +84,7 @@ export function createWeeklyQuestionnaire(adapter){
     }
    }
    // Only the caller's response. No roster, counts, scores or answers of colleagues.
-   return {status:survey.status,canOpen,canClose,deadline:deadline(),scoringLabel:'Démonstration KPI : deux notes fictives à 5/5. Valeurs humaines neutralisées sous le seuil configuré.',eligible,week:{id:week.id,start:week.start,endExclusive:week.endExclusive},questions:survey.questions,myAnswers:survey.answers[viewer.viewerId]??null,absent:survey.absent.includes(viewer.viewerId)};
+   return {status:survey.status,canOpen,canClose,deadline:deadline(),scoringLabel:scoringDescription(survey.scoring),eligible,week:{id:week.id,start:week.start,endExclusive:week.endExclusive},questions:survey.questions,myAnswers:survey.answers[viewer.viewerId]??null,absent:survey.absent.includes(viewer.viewerId)};
   });
  }
  return {coordinate:(h,s,a,i)=>operate(h,s,a,i,true),read:(h,s)=>operate(h,s,'read'),open:(h,s)=>operate(h,s,'open'),answer:(h,s,i)=>operate(h,s,'answer',i),absence:(h,s,i)=>operate(h,s,'absence',i),close:(h,s,i)=>operate(h,s,'close',i),postpone:(h,s,i)=>operate(h,s,'postpone',i)};

@@ -30,14 +30,13 @@ function showReveals(events:PublicEvent[]){
   if(revealQueue.length){($('attentions') as HTMLDialogElement).close();showNextReveal();}
 }
 function renderJourney(data:TeamJourneyView){
-  const ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1)!;
+  const ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
   $('team-name').textContent=data.team.name;$('company').textContent=data.organizationName;
   $('distance').textContent=format(data.displayKm);$('maximum').textContent=`${format(data.maximumKm)} km`;
   $('distance-meter').setAttribute('aria-valuemax',String(data.maximumKm));$('distance-meter').setAttribute('aria-valuenow',data.displayKm);
   $('distance-meter').setAttribute('aria-valuetext',`${format(data.displayKm)} kilomètres parcourus sur ${format(data.maximumKm)}`);
   $('progress-fill').style.width=`${ratio*100}%`;$('week').textContent=`Semaine ${data.completedWeeks} / ${data.activeWeeks}`;
-  const end=new Date(last.endExclusive+'T12:00:00Z');end.setUTCDate(end.getUTCDate()-1);
-  $('week-date').textContent=`Du ${date(last.start)} au ${date(end.toISOString().slice(0,10))}`;$('week-km').textContent=`${format(last.displayKm)} km`;
+  if(last){const end=new Date(last.endExclusive+'T12:00:00Z');end.setUTCDate(end.getUTCDate()-1);$('week-date').textContent=`Du ${date(last.start)} au ${date(end.toISOString().slice(0,10))}`;$('week-km').textContent=`${format(last.displayKm)} km`;}else{$('week-date').textContent='Le voyage commence';$('week-km').textContent='— km';}
   document.querySelector<HTMLElement>('.color-dot')!.style.background=data.team.color;
   $('history-list').replaceChildren();
   for(const w of [...data.history].reverse()){

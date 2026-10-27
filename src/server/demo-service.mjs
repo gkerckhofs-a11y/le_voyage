@@ -4,7 +4,7 @@ import { collectiveState, collectiveIdentity } from '../../scripts/demo-collecti
 import { closeWithEvents, claimEvents, teamFeed } from '../application/events.ts';
 import { collectiveJourneyView } from '../presentation/collective-view.ts';
 import { exact } from '../domain/exact.ts';
-import { freezeReception } from '../domain/engine.ts';
+import { createCampaign, freezeReception } from '../domain/engine.ts';
 import { addDays } from '../domain/calendar.ts';
 
 // NEVER copied to public output. All contents are fictitious and deliberately without alcohol.
@@ -13,6 +13,7 @@ export const catalog=Object.fromEntries(titles.map((title,i)=>[`private-gift-${i
 export function demoTeamIdentity(teamId){const choices={'private-collective-team-1':{teamName:'Les Hirondelles',color:'#356d94'},'private-collective-team-2':{teamName:'Les Chemins verts',color:'#355e49'},'private-collective-team-3':{teamName:'Les Champs dorés',color:'#b98a32'}};return choices[teamId]??{teamName:'Les Explorateurs',color:'#bf4a32'};}
 export const identity={organizationName:'Lex EKHO',teamName:'Les Explorateurs',color:'#bf4a32'};
 export function newDemo(){return {schemaVersion:1,csrf:randomBytes(32).toString('hex'),ledger:{state:collectiveState(),revision:0,events:[],presented:{}}};}
+export function newAutonomousTpeDemo(){const record=newDemo(),base=collectiveState('tpe').config;return {...record,autonomousPolicy:{kind:'participation-mean',windowWeeks:4,includeCurrent:true},participationHistory:{},ledger:{...record.ledger,state:createCampaign({...base,tenantId:'fiction-tpe-auto',campaignId:'fiction-autonomous-2026',version:'demo-autonomous-tpe',mode:'autonomous'})}};}
 export function viewer(record){return {...record.ledger.state.config,teamId:'explorateurs',viewerId:'fictitious-viewer'};}
 export function readTeam(record){return teamFeed(record.ledger,viewer(record),identity);}
 export function readCollective(record){return collectiveJourneyView(record.ledger.state,record.ledger.state.config,collectiveIdentity(record.ledger.state));}
