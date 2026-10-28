@@ -42,6 +42,18 @@ export function parseMasterCsv(csv,delimiter=';'){
 }
 export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
  return {
+ async listImports(header,input){
+  if(!input||Object.keys(input).join(',')!=='beforeRevision'||(input.beforeRevision!==null&&(!Number.isSafeInteger(input.beforeRevision)||input.beforeRevision<1||input.beforeRevision>10001)))throw fail(400);
+  const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);let query=ref.collection('audit').orderBy('revision','desc');if(input.beforeRevision!==null)query=query.where('revision','<',input.beforeRevision);const rows=(await tx.get(query.limit(21))).docs.map(d=>d.data()),page=rows.slice(0,20);
+   return {imports:page.filter(a=>a.kind==='csv-import').map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
+  });
+ },
+ async readImport(header,input){
+  if(!input||Object.keys(input).join(',')!=='importId'||typeof input.importId!=='string'||!/^[a-f0-9-]{36}$/.test(input.importId))throw fail(400);
+  const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(ref.collection('imports').doc(input.importId))).data();if(!d||d.status!=='applied')throw fail(404);
+   return {id:input.importId,revision:d.appliedRevision,previousRevision:d.revision,at:d.appliedAt,actor:d.actor,sourceName:d.sourceName,sourceDigest:d.sourceDigest,reason:d.reason,changes:d.changes,products:d.products,masterById:d.masterById};
+  });
+ },
  async previewImport(header,input){
   if(!input||Object.keys(input).sort().join(',')!=='csv,delimiter,sourceName')throw fail(400);const uid=await actor(header),sourceName=inputText(input.sourceName,120),parsed=parseMasterCsv(input.csv,input.delimiter);
   return db.runTransaction(async tx=>{await check(tx,uid);const c=(await tx.get(ref)).data();if(!c)throw fail(503);if(parsed.errors.length)return {errors:parsed.errors,changes:[],missing:[],draftId:null,revision:c.revision};
