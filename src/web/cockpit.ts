@@ -1,25 +1,30 @@
 import {startDemo} from './demo-client.js';
-const labels:Record<string,string>={'to-select':'À sélectionner','to-order':'À commander','to-receive':'À réceptionner','to-compose':'À composer',ready:'Prêt','to-deliver':'À expédier / remettre',delivered:'Remis',incident:'Incident'};
+import {agendaCsv,giftStatusLabels as labels} from './cockpit-export.js';
 type Row={id:string;tenantId:string;campaignId:string;client:string;team:string;title:string;earnedOn:string;allocatedCents:number;totalCostCents:number;marginCents:number;revision:number;resumeStatus:string|null;status:string;dueDate:string;owner:string;composition:string;supplier:string;orderReference:string;deliveryReference:string;purchaseCents:number;packagingCents:number;transportCents:number;alcoholFreeConfirmed:boolean};
 type Snapshot={clients:{tenantId:string;campaignId:string;name:string}[];rows:Row[];generatedAt:string};
 const el=(id:string)=>document.getElementById(id)!,form=el('gift-form') as HTMLFormElement,fields=el('gift-fields') as HTMLFieldSetElement,notice=el('cockpit-status');
 const control=(name:string)=>form.elements.namedItem(name) as HTMLInputElement;
 const money=(cents:number)=>new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(cents/100);
 const option=(value:string,text:string)=>{const o=document.createElement('option');o.value=value;o.textContent=text;return o;};
+let exporting=false;
 let snapshot:Snapshot,selected:Row|null=null,csrf='',busy=false,uncertain=false,request=0;
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(snapshot.generatedAt));
 function cents(name:string){const s=control(name).value.trim().replace(',','.');if(!/^\d{1,7}(\.\d{1,2})?$/.test(s))throw new Error('Montant invalide. Utilisez deux décimales au maximum.');const [a,b='']=s.split('.');return Number(a)*100+Number(b.padEnd(2,'0'));}
 function totals(){if(!selected)return;try{const cost=cents('purchase')+cents('packaging')+cents('transport');el('cost-summary').textContent=`Budget ${money(selected.allocatedCents)} · coûts ${money(cost)} · écart ${money(selected.allocatedCents-cost)}`;el('cost-summary').classList.toggle('over',cost>selected.allocatedCents);}catch{el('cost-summary').textContent='Vérifiez les montants : deux décimales au maximum.';}}
 for(const name of ['purchase','packaging','transport'])control(name).addEventListener('input',totals);
-function renderList(){
+function filteredRows(){
  const client=(el('client-filter') as HTMLSelectElement).value,status=(el('status-filter') as HTMLSelectElement).value,team=(el('team-filter') as HTMLInputElement).value.toLocaleLowerCase('fr'),horizon=(el('horizon-filter') as HTMLSelectElement).value;
  const end=new Date(today()+'T12:00:00Z');if(horizon!=='all')end.setUTCDate(end.getUTCDate()+Number(horizon)-1);
- const rows=snapshot.rows.filter(r=>(!client||r.tenantId===client)&&(!status||r.status===status)&&r.team.toLocaleLowerCase('fr').includes(team)&&(horizon==='all'||!r.dueDate||r.dueDate<=end.toISOString().slice(0,10)));
+ return snapshot.rows.filter(r=>(!client||r.tenantId===client)&&(!status||r.status===status)&&r.team.toLocaleLowerCase('fr').includes(team)&&(horizon==='all'||!r.dueDate||r.dueDate<=end.toISOString().slice(0,10)));
+}
+function renderList(){
+ const rows=filteredRows();
+ (el('export-gifts') as HTMLButtonElement).disabled=busy||exporting||!rows.length;
  el('total-open').textContent=String(rows.filter(r=>r.status!=='delivered').length);for(const [id,key] of [['total-budget','allocatedCents'],['total-cost','totalCostCents'],['total-margin','marginCents']] as const)el(id).textContent=money(rows.reduce((sum,r)=>sum+r[key],0));
  const list=el('gift-list');list.replaceChildren();el('gift-empty').hidden=rows.length>0;
  for(const row of rows){const b=document.createElement('button');b.type='button';b.className='gift-row';b.dataset.id=row.id;b.disabled=busy;b.setAttribute('aria-pressed',String(row.id===selected?.id&&row.tenantId===selected?.tenantId));for(const [text,tag,cls] of [[row.client+' · '+row.team,'span','gift-client'],[row.title,'strong',''],[`Acquis le ${row.earnedOn} · budget ${money(row.allocatedCents)}`,'span','gift-meta'],[row.dueDate?`Échéance ${row.dueDate}${row.dueDate<today()&&row.status!=='delivered'?' · En retard':''}`:'À planifier','span','gift-meta'+(row.dueDate&&row.dueDate<today()&&row.status!=='delivered'?' late':'')],[labels[row.status],'span','gift-status']]){const item=document.createElement(tag);item.textContent=text;item.className=cls;b.append(item);}b.addEventListener('click',()=>void detail(row));list.append(b);}
 }
-async function list(){const r=await fetch('/api/gifts/ops');if(!r.ok)throw new Error('Accès opérations refusé ou lecture indisponible.');snapshot=await r.json();const filter=el('client-filter') as HTMLSelectElement,value=filter.value;filter.replaceChildren(option('','Tous les clients autorisés'));const seen=new Set<string>();for(const c of snapshot.clients)if(!seen.has(c.tenantId)){filter.append(option(c.tenantId,c.name));seen.add(c.tenantId);}filter.value=value;renderList();}
+async function list(){const r=await fetch('/api/gifts/ops');if(!r.ok)throw new Error('Accès opérations refusé ou lecture indisponible.');snapshot=await r.json();const filter=el('client-filter') as HTMLSelectElement,value=filter.value;filter.replaceChildren(option('','Tous les clients autorisés'));const seen=new Set<string>();for(const c of snapshot.clients)if(!seen.has(c.tenantId)){filter.append(option(c.tenantId,c.name));seen.add(c.tenantId);}if(value&&!seen.has(value))filter.append(option(value,'Client devenu indisponible'));filter.value=value;renderList();}
 async function detail(row:Row){if(busy)return;const current=++request;fields.disabled=true;(el('reload-gift') as HTMLButtonElement).disabled=true;selected=null;resetBeneficiaries();el('composition-proposal').textContent='';el('use-composition').hidden=true;try{const r=await fetch('/api/gifts/ops/detail',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify({tenantId:row.tenantId,campaignId:row.campaignId,id:row.id})});if(!r.ok)throw new Error('Fiche refusée ou indisponible.');const result:{row:Row;history:{revision:number;at:string;actor:string;reason:string;changes:{field:string;before:unknown;after:unknown}[]}[]}=await r.json();if(current!==request)return;selected=result.row;uncertain=false;el('detail-title').textContent=selected.title;el('detail-meta').textContent=`${selected.client} · ${selected.team} · droit acquis le ${selected.earnedOn}`;
  for(const name of ['dueDate','owner','composition','supplier','orderReference','deliveryReference'] as const)control(name).value=selected[name];for(const [name,key] of [['purchase','purchaseCents'],['packaging','packagingCents'],['transport','transportCents']] as const)control(name).value=(selected[key]/100).toFixed(2).replace('.',',');control('alcoholFreeConfirmed').checked=selected.alcoholFreeConfirmed;control('reason').value='';
  const statuses=Object.keys(labels),allowed=selected.status==='delivered'?['delivered']:selected.status==='incident'?['incident',selected.resumeStatus!]:[selected.status,statuses[statuses.indexOf(selected.status)+1],'incident'];const select=el('gift-next-status') as HTMLSelectElement;select.replaceChildren(...allowed.map(s=>option(s,labels[s])));select.value=selected.status;
@@ -29,6 +34,21 @@ form.addEventListener('submit',async event=>{event.preventDefault();if(!selected
  const value=Object.fromEntries(['dueDate','owner','composition','supplier','orderReference','deliveryReference','status','reason'].map(k=>[k,control(k).value]));const input={tenantId:row.tenantId,campaignId:row.campaignId,id:row.id,revision:row.revision,mutationId:crypto.randomUUID(),...costs,...value,alcoholFreeConfirmed:control('alcoholFreeConfirmed').checked};busy=true;fields.disabled=true;renderList();notice.textContent='Enregistrement du suivi…';
  try{const r=await fetch('/api/gifts/ops/save',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(input)});if(!r.ok){if(r.status===422)throw new Error('Vérifiez le budget, l’échéance, la composition sans alcool les références nécessaires et la revue des préférences.');if(r.status===409)throw new Error('La fiche a changé ou cette transition est refusée. Rechargez avant de poursuivre.');throw new Error('Enregistrement refusé ou non confirmé. Rechargez la fiche.');}notice.textContent='Suivi enregistré. Aucun achat ni envoi déclenché.';busy=false;await list();await detail(row);
  }catch(e){uncertain=true;notice.textContent=e instanceof TypeError?'Enregistrement non confirmé. Rechargez la fiche avant de poursuivre.':(e as Error).message;}finally{busy=false;renderList();(el('reload-gift') as HTMLButtonElement).disabled=false;}});
+el('export-gifts').addEventListener('click',async()=>{
+ if(busy||exporting||!snapshot)return;
+ exporting=true;renderList();
+ const status=el('export-status');status.textContent='Actualisation des droits et de la liste…';
+ try{
+  // Reuse the authenticated feed: a revoked session cannot export a cached list.
+  await list();const rows=filteredRows();
+  if(!rows.length){status.textContent='Aucun cadeau à exporter pour ces filtres.';return;}
+  const url=URL.createObjectURL(new Blob([agendaCsv(rows,snapshot.generatedAt)],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download='le-voyage-cadeaux-'+snapshot.generatedAt.slice(0,10)+'.csv';
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  status.textContent=`Export préparé : ${rows.length} cadeau${rows.length>1?'x':''}. Liste actualisée, filtres appliqués. Les saisies non enregistrées ne sont pas incluses.`;
+ }catch{status.textContent='Export impossible : accès refusé ou actualisation indisponible. Aucun fichier créé.';}
+ finally{exporting=false;renderList();}
+});
 el('reload-gift').addEventListener('click',()=>{if(selected&&!busy)void detail(selected);});el('refresh-gifts').addEventListener('click',()=>{if(!busy)void list().catch(e=>{notice.textContent=e.message;});});for(const id of ['client-filter','status-filter','horizon-filter'])el(id).addEventListener('change',()=>snapshot&&renderList());el('team-filter').addEventListener('input',()=>snapshot&&renderList());for(const [value,label] of Object.entries(labels))(el('status-filter') as HTMLSelectElement).append(option(value,label));
 void(async()=>{try{await startDemo();const r=await fetch('/api/demo/session',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw new Error('Connexion requise.');csrf=(await r.json()).csrf;await list();notice.textContent='Seuls les cadeaux réellement acquis des campagnes autorisées sont affichés.';}catch(e){notice.textContent=(e as Error).message;}})();
 
