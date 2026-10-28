@@ -8,6 +8,13 @@ test('annual calendar draft previews, saves and reloads without altering current
  const pause=await page.locator('#annual-weeks tr').nth(2).locator('td').first().textContent();await page.locator('#closedStarts').fill(pause);await page.getByRole('button',{name:'Calculer l’aperçu',exact:true}).click();await expect(page.locator('#annual-totals')).not.toHaveText(initial);
  await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('Brouillon enregistré');await page.reload();await expect(page.locator('#annual-fields')).toBeEnabled();await expect(page.locator('#start')).toHaveValue('2028-02-29');await expect(page.locator('#closedStarts')).toHaveValue(pause);await expect(page.locator('#annual-dates')).toContainText('2029-03-01');
  const after=await(await page.request.get('/api/demo/team')).json();expect(after).toEqual(before);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:info.outputPath(`annual-plan-${info.project.name}.png`),fullPage:true});
+ await page.locator('#funding-enabled').check();await page.locator('#funding-basis').selectOption('TTC');
+ for(const [i,amount] of ['125,50','200','300','400','500'].entries())await page.locator('#gift-funding-'+i).fill(amount);
+ for(const [i,amount] of ['1000','1300','1600','2000','2500'].entries())await page.locator('#reception-funding-'+i).fill(amount);
+ await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('Brouillon enregistré');await page.reload();await expect(page.locator('#annual-fields')).toBeEnabled();await expect(page.locator('#gift-funding-0')).toHaveValue('125,50');await expect(page.locator('#annual-funding-preview')).toContainText('2 500,00 €');await expect(page.locator('#annual-funding-preview')).toContainText('1 525,50 €');expect(await(await page.request.get('/api/demo/team')).json()).toEqual(before);
+ await page.locator('.annual-funding-form').screenshot({path:info.outputPath(`annual-funding-form-${info.project.name}.png`)});
+ await page.locator('#annual-funding-preview').screenshot({path:info.outputPath(`annual-funding-preview-${info.project.name}.png`)});
+ await page.locator('#giftCount').fill('6');await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#gift-funding-5')).toBeFocused();const stored=await(await page.request.get('/api/annual-plan')).json();expect(stored.input.giftCount).toBe(5);
+
  const rejected=await page.request.post('/api/annual-plan/save',{headers:{Origin:new URL(page.url()).origin},data:{input:{},revision:0,mutationId:'forbidden'}});expect(rejected.status()).toBe(403);
 });
