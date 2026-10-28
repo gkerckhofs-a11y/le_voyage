@@ -15,12 +15,12 @@ function checkOrigin(req,remoteOrigins=[]){
   if(!host||!['localhost','127.0.0.1','[::1]','terminal.local'].includes(new URL('http://'+host).hostname))throw failure(403);
   if(!req.headers.origin||!['http://'+host,'https://'+host].includes(req.headers.origin)||req.headers['sec-fetch-site']==='cross-site')throw failure(403);
 }
-export async function body(req,keys,maxBytes=4096){
+export async function body(req,keys,maxBytes=4096,optionalKeys=[]){
   if(req.headers['content-type']!=='application/json')throw failure(415);
   let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size<=maxBytes)chunks.push(chunk);}
   if(size>maxBytes)throw failure(413);
   let data;try{data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw failure(400);}
-  if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).some(k=>!keys.includes(k))||keys.some(k=>!(k in data)))throw failure(400);
+  if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).some(k=>!keys.includes(k)&&!optionalKeys.includes(k))||keys.some(k=>!(k in data)))throw failure(400);
   return data;
 }
 export function authorized(req,record){

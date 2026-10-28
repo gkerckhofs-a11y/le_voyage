@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 export async function beneficiaryPreferences(tx,db,scope,id){
- const ref=db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}/giftBeneficiaries/${id}`),snapshot=await tx.get(ref);if(!snapshot.exists)return null;const record=snapshot.data(),people=[];
- for(const person of record.people){const p=(await tx.get(db.doc(`tenants/${scope.tenantId}/giftPreferences/${person.uid}`))).data(),v=p?.value;people.push({uid:person.uid,displayName:person.displayName,choices:v?.choices??[],alcoholFree:v?.alcoholFree??false,surprise:v?.surprise??false,privateContactRequested:v?.privateContactRequested??false,hasPreferences:!!p,preferenceRevision:p?.revision??0});}
- const digest=createHash('sha256').update(JSON.stringify(people)).digest('hex');return {ref,record,people,digest,reviewCurrent:record.review?.digest===digest,contactRequired:people.some(p=>p.privateContactRequested)};
+ const ref=db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}/giftBeneficiaries/${id}`),snapshot=await tx.get(ref);if(!snapshot.exists)return null;const record=snapshot.data(),frozen=record.preferenceSnapshot,people=frozen?.people??[];
+ if(!frozen)for(const person of record.people){const p=(await tx.get(db.doc(`tenants/${scope.tenantId}/giftPreferences/${person.uid}`))).data(),v=p?.value;people.push({uid:person.uid,displayName:person.displayName,choices:v?.choices??[],alcoholFree:v?.alcoholFree??false,surprise:v?.surprise??false,privateContactRequested:v?.privateContactRequested??false,hasPreferences:!!p,preferenceRevision:p?.revision??0});}
+ const digest=createHash('sha256').update(JSON.stringify(people)).digest('hex');return {ref,record,people,digest,preferencesFrozen:!!frozen,preferencesFrozenAt:frozen?.at??null,reviewCurrent:record.review?.digest===digest,contactRequired:people.some(p=>p.privateContactRequested)};
 }
 export function preferencesReady(data){return !data||(data.reviewCurrent&&(!data.contactRequired||data.record.review?.contactConfirmed===true));}
 export function preferredCategories(people){

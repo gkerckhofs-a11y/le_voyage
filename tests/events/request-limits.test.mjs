@@ -11,3 +11,12 @@ test('multibyte names survive a network chunk boundary',async()=>{
  const r=Readable.from([bytes.subarray(0,boundary),bytes.subarray(boundary)]);r.headers={'content-type':'application/json'};
  assert.deepEqual(await body(r,['input'],131072),value);
 });
+
+test('optional signup preferences preserve old payloads without allowing scope injection or missing identity',async()=>{
+ const keys=['token','displayName'],optional=['preferences'],base={token:'example',displayName:'Camille'};
+ assert.deepEqual(await body(request(base),keys,4096,optional),base);
+ assert.deepEqual(await body(request({...base,preferences:null}),keys,4096,optional),{...base,preferences:null});
+ await assert.rejects(body(request({...base,tenantId:'foreign'}),keys,4096,optional),{status:400});
+ await assert.rejects(body(request({preferences:null}),keys,4096,optional),{status:400});
+ await assert.rejects(body(request({...base,preferences:null}),keys),{status:400});
+});

@@ -1,3 +1,4 @@
+import {normalizeGiftPreferences} from './gift-preferences.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {assertTestAdapter} from './test-environment.mjs';
 const denied=()=>Object.assign(new Error('Invitation unavailable'),{status:403});
@@ -28,8 +29,9 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
    const user=await identity(header);if(!/^[a-f0-9]{64}$/.test(id))throw denied();
    return db.runTransaction(async tx=>{allowed((await tx.get(member(scope,user.uid))).data(),scope,user.uid);const ref=db.doc(`invitations/${id}`),invite=(await tx.get(ref)).data();if(!invite||invite.issuerUid!==user.uid||!same(invite.scope,scope)||invite.status==='accepted')throw denied();tx.update(ref,{status:'revoked',revokedAt:now()});return {revoked:true};});
   },
-  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);const teamIdentity=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/campaigns/${invite.scope.campaignId}/teamIdentities/${invite.scope.teamId}`))).data();return {status:invite.status,expiresAt:invite.expiresAt,organizationName:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:teamIdentity?.teamName??'Les Explorateurs'};});},
-  async accept(header,token,displayName){
+  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);const teamIdentity=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/campaigns/${invite.scope.campaignId}/teamIdentities/${invite.scope.teamId}`))).data();const hasGiftPreferences=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/giftPreferences/${user.uid}`))).exists;return {hasGiftPreferences,status:invite.status,expiresAt:invite.expiresAt,organizationName:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:teamIdentity?.teamName??'Les Explorateurs'};});},
+  async accept(header,token,displayName,preferences=null){
+   const value=normalizeGiftPreferences(preferences??{choices:[],alcoholFree:false,surprise:true,birthday:null,privateContactRequested:false,revision:0});
    if(typeof displayName!=='string'||displayName.trim().length<2||displayName.trim().length>60||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Object.assign(new Error('Invalid display name'),{status:400});
    const user=await identity(header),ref=db.doc(`invitations/${hash(token)}`);
    return db.runTransaction(async tx=>{
@@ -42,6 +44,8 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
      if(invite.acceptedBy!==user.uid||!assignments.some(a=>a.campaignId===assignment.campaignId&&a.teamId===assignment.teamId))throw denied();
      return {scope:invite.scope,alreadyAccepted:true};
     }
+    const preferenceRef=db.doc(`tenants/${invite.scope.tenantId}/giftPreferences/${user.uid}`),existingPreferences=await tx.get(preferenceRef);
+    if(!existingPreferences.exists){const at=now();tx.create(preferenceRef,{value,revision:1,updatedAt:at,history:[{revision:1,at}]});}
     tx.set(membershipRef,{...(membership??{}),uid:user.uid,tenantId:invite.scope.tenantId,active:true,assignments:assignments.some(a=>a.campaignId===assignment.campaignId&&a.teamId===assignment.teamId)?assignments:[...assignments,assignment]});
     tx.set(db.doc(`tenants/${invite.scope.tenantId}/profiles/${user.uid}`),{displayName:displayName.trim(),updatedAt:now()},{merge:true});
     tx.update(ref,{status:'accepted',acceptedBy:user.uid,acceptedAt:now()});

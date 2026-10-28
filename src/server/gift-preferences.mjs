@@ -3,7 +3,7 @@ import {assertTestAdapter} from './test-environment.mjs';
 const fail=status=>Object.assign(new Error('Preferences unavailable'),{status});
 export const categories=['wine','beer','tea','chocolate','delicatessen'];
 const empty=()=>({choices:[],alcoholFree:false,surprise:false,birthday:null,privateContactRequested:false});
-function normalize(input){
+export function normalizeGiftPreferences(input){
  if(!input||typeof input!=='object'||Object.keys(input).some(k=>!['choices','alcoholFree','surprise','birthday','privateContactRequested','revision'].includes(k)))throw fail(400);
  const {choices,alcoholFree,surprise,birthday,privateContactRequested,revision}=input;
  if(!Number.isSafeInteger(revision)||revision<0||!Array.isArray(choices)||choices.length>3||new Set(choices).size!==choices.length||choices.some(c=>!categories.includes(c))||[alcoholFree,surprise,privateContactRequested].some(v=>typeof v!=='boolean'))throw fail(400);
@@ -21,7 +21,7 @@ export function createGiftPreferences(adapter,{now=()=>Date.now()}={}){
   });
  }
  const view=r=>({...r.value,revision:r.revision,updatedAt:r.updatedAt});
- return {read:(h,s)=>operate(h,s,(_tx,_ref,r)=>view(r)),save:async(h,s,input)=>{const value=normalize(input);return operate(h,s,(tx,ref,r)=>{
+ return {read:(h,s)=>operate(h,s,(_tx,_ref,r)=>view(r)),save:async(h,s,input)=>{const value=normalizeGiftPreferences(input);return operate(h,s,(tx,ref,r)=>{
   if(JSON.stringify(value)===JSON.stringify(r.value))return view(r);
   if(input.revision!==r.revision)throw fail(409);
   const updatedAt=now(),revision=r.revision+1,next={value,revision,updatedAt,history:[...r.history,{revision,at:updatedAt}].slice(-20)};tx.set(ref,next);return view(next);

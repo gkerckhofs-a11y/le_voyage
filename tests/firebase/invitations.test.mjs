@@ -30,3 +30,21 @@ test('expired, revoked, foreign scope and withdrawn issuer permission are refuse
  const withdrawn=await service.issue(issuer.header,scope,recipient.uid);await owner.update({canInvite:false});await assert.rejects(service.accept(recipient.header,withdrawn.token,'Camille'),{status:403});
  assert.equal((await a.db.doc(`tenants/${scope.tenantId}/members/${recipient.uid}`).get()).exists,false);
 });
+test('signup creates a single optional gourmand profile and never overwrites existing tastes',async t=>{
+ const {a,issuer,recipient,scope}=await setup(t),service=createInvitations(a),invite=await service.issue(issuer.header,scope,recipient.uid),ref=a.db.doc(`tenants/${scope.tenantId}/giftPreferences/${recipient.uid}`);
+ assert.equal((await service.preview(recipient.header,invite.token)).hasGiftPreferences,false);
+ const preferences={choices:['tea','chocolate'],surprise:false,alcoholFree:true,birthday:null,privateContactRequested:false,revision:0};
+ await assert.rejects(service.accept(recipient.header,invite.token,'Camille',{...preferences,choices:['wine']}),{status:400});
+ assert.equal((await ref.get()).exists,false);assert.equal((await a.db.doc(`tenants/${scope.tenantId}/members/${recipient.uid}`).get()).exists,false);
+ await service.accept(recipient.header,invite.token,'Camille',preferences);
+ const saved=(await ref.get()).data();assert.equal(saved.revision,1);assert.deepEqual(saved.value.choices,['tea','chocolate']);
+ const second=await service.issue(issuer.header,scope,recipient.uid);assert.equal((await service.preview(recipient.header,second.token)).hasGiftPreferences,true);
+ await service.accept(recipient.header,second.token,'Camille',{...preferences,choices:['delicatessen']});
+ await service.accept(recipient.header,invite.token,'Camille',null);
+ assert.deepEqual((await ref.get()).data(),saved);
+});
+test('absence of tastes never prevents signup and explicitly leaves the surprise to Clem',async t=>{
+ const {a,issuer,recipient,scope}=await setup(t),service=createInvitations(a),invite=await service.issue(issuer.header,scope,recipient.uid);
+ await service.accept(recipient.header,invite.token,'Camille');
+ const p=(await a.db.doc(`tenants/${scope.tenantId}/giftPreferences/${recipient.uid}`).get()).data();assert.equal(p.value.surprise,true);assert.deepEqual(p.value.choices,[]);assert.equal(p.revision,1);
+});
