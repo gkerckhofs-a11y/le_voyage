@@ -42,3 +42,9 @@ Captures inspectées : [desktop](evidence/v5-r4a-team-desktop-1440.png), [mobile
 R4 reste en cours : enrichissement des zones et cohérence ambiance/nom, animaux et éléments de paysage, lisibilité des cadeaux au dézoom et recette de l'arrivée restent à traiter dans R4B. La navigation ne constitue pas une nouvelle barrière d'autorisation : les permissions serveur existantes restent l'autorité.
 
 Aucun déploiement, aucune nouvelle URL de test, aucune modification de production. Le staging antérieur n'est pas revalidé. Ce n'est pas la dernière tranche du projet.
+
+## Correctif après première CI
+
+Le commit initial `ae73921` a réussi les workflows moteur, accès et carte, mais Firebase a échoué sur trois scénarios : le retour organisateur absent pour le profil historique (desktop/mobile), et un historique cockpit mobile de cinq entrées au lieu de quatre à une étape du test. La navigation est désormais créée à la demande avant d'ajouter un lien, même lorsqu'aucun sélecteur d'espaces n'est actif. Cela rétablit le retour organisateur dans les anciennes pages sans menu initial.
+
+Vérification ciblée après correction : typecheck/build réussis ; sous émulateurs, `npx playwright test --config playwright.local-check.config.mjs organizer.spec.mjs gift-operations.spec.mjs` → **4/4 réussis** (desktop/mobile). Soit **15 scénarios ciblés distincts** réussis dans la tranche. L'écart d'historique cockpit n'a pas été reproduit localement ; aucune cause ni correction métier ne lui est attribuée. La nouvelle CI intégrée doit confirmer le résultat ; son statut final est lié dans la PR. Aucun test n'est affaibli, aucun scénario supprimé.
