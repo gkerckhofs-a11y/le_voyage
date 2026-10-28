@@ -3,20 +3,54 @@ import type { Route } from '../map/geometry.ts';
 
 export const landscapeRiver = createRoute('river',4800,2600,[[1860,-160],[1910,310],[2270,600],[2280,1080],[2420,1460],[2210,1940],[2520,2430],[2440,2760]].map(([x,y])=>({x,y})));
 
+/** Scenic anchors follow route progress, independently of campaign time or reward thresholds. */
+export function scenicFeatures(route:Route){
+ const result:{kind:string;ratio:number;x:number;y:number;radius:number}[]=[];
+ const plans:[string,number,number][]=[['hamlet',.08,110],['orchard',.19,100],['sheep',.12,45],['sheep',.22,45],['hamlet',.39,110],['castle',.67,130],['deer',.57,45],['deer',.72,45],['hill',.79,150],['hill',.85,150],['hill',.93,150],['sheep',.89,45]];
+ for(const [kind,ratio,radius] of plans){
+  const p=positionAt(route,ratio),a=p.angle*Math.PI/180;
+  for(const offset of [radius+105,-radius-105,radius+190,-radius-190,radius+270,-radius-270]){
+   const x=p.x-Math.sin(a)*offset,y=p.y+Math.cos(a)*offset;
+   if(x<radius||y<radius||x>route.width-radius||y>route.height-radius||distanceFromRoute(route,{x,y})<radius+45||distanceFromRoute(landscapeRiver,{x,y})<radius+80||result.some(f=>Math.hypot(f.x-x,f.y-y)<f.radius+radius+25))continue;
+   result.push({kind,ratio,x,y,radius});break;
+  }
+ }
+ return result;
+}
+function scenicMarkup(f:ReturnType<typeof scenicFeatures>[number]){
+ const sheep='<ellipse rx="15" ry="10" fill="#faf1d7" stroke="#8c8a72" stroke-width="2"/><ellipse cx="17" rx="6" ry="5" fill="#696751"/>';
+ const house=(x:number,y:number,angle:number)=>`<g transform="translate(${x} ${y}) rotate(${angle})"><rect x="-25" y="-19" width="58" height="45" rx="3" fill="#344b3830"/><rect x="-30" y="-25" width="60" height="45" fill="#e4d4b3" stroke="#8b795f" stroke-width="3"/><path d="M-33-28H33V17H-33Z" fill="#8c6854"/><path d="M0-28V17M-33-5H33" stroke="#d9b68d" stroke-width="3"/><rect x="16" y="-34" width="8" height="13" fill="#c3a582"/></g>`;
+ const art=f.kind==='hill'?'<ellipse rx="145" ry="105" fill="var(--season-meadow,#9fb67d)" stroke="#81956a" stroke-width="3"/><path d="M-127 16C-103-86 105-96 127 6M-109 30C-82-64 82-73 109 16M-85 38C-62-39 62-52 85 24M-55 43C-38-17 37-30 55 30" fill="none" stroke="#e1dfb3" stroke-width="4" opacity=".7"/><ellipse cx="18" cy="-18" rx="29" ry="16" fill="#c3cc9a"/>':
+ f.kind==='hamlet'?`<path d="M-100 55Q0 5 100 70" fill="none" stroke="#d9c99d" stroke-width="18"/>${house(-55,-33,-12)}${house(48,-20,15)}${house(0,65,-5)}`:
+ f.kind==='castle'?'<rect x="-105" y="-85" width="210" height="170" rx="20" fill="#536c3930"/><rect x="-88" y="-72" width="176" height="144" fill="#c1b99b" stroke="#7f8376" stroke-width="10"/><rect x="-52" y="-37" width="104" height="84" fill="#d7c9a6"/><path d="M-74-62H74V-38H-74Z" fill="#5b6c6b"/><path d="M-45 76H45V108H-45" fill="#c6b18d"/><g fill="#596c6a" stroke="#d8d3b9" stroke-width="6"><circle cx="-86" cy="-70" r="27"/><circle cx="86" cy="-70" r="27"/><circle cx="-86" cy="70" r="27"/><circle cx="86" cy="70" r="27"/></g><g fill="#e2d6b2"><circle cx="-86" cy="-70" r="6"/><circle cx="86" cy="-70" r="6"/><circle cx="-86" cy="70" r="6"/><circle cx="86" cy="70" r="6"/></g>':
+ f.kind==='orchard'?Array.from({length:9},(_,i)=>`<use href="#fruit" x="${(i%3-1)*55}" y="${(Math.floor(i/3)-1)*55}"/>`).join(''):
+ f.kind==='deer'?'<ellipse rx="21" ry="11" fill="#ac7950"/><path d="M-14 6L-24 16M8 7L14 17M19-3L27-15" stroke="#745338" stroke-width="5"/><ellipse cx="28" cy="-15" rx="9" ry="5" fill="#b8875a"/><path d="M30-19L28-30M28-25L21-29M28-27L34-32" fill="none" stroke="#745338" stroke-width="2"/>':`<g transform="translate(-17 -18)">${sheep}</g><g transform="translate(12 12) rotate(30)">${sheep}</g>`;
+ return `<g class="scenic-feature" data-scenery="${f.kind}" data-route-ratio="${f.ratio}" transform="translate(${f.x.toFixed(1)} ${f.y.toFixed(1)})">${art}</g>`;
+}
+
 /** Original, deterministic vector illustration. No remote graphics or geographical data. */
 export function landscape(route: Route): string {
   let seed = 28491;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   const river = landscapeRiver;
+  const features=scenicFeatures(route);
   const decorations: { y:number; html:string }[] = [];
   for(let i=0;i<760;i++) {
     const x=60+random()*4680, y=70+random()*2460;
     if(distanceFromRoute(route,{x,y})<94 || distanceFromRoute(river,{x,y})<85) continue;
+    if(features.some(f=>Math.hypot(f.x-x,f.y-y)<f.radius+45))continue;
     const scale=.65+random()*.75;
     const symbol=x>2750&&x<3800 ? (random()>.3?'fir':'oak') : random()>.84?'fir':'oak';
     // Leave room for generous meadows and fields, denser woods in the eastern zone.
     if(x<1450 && random()>.48) continue;
     decorations.push({y,html:`<use href="#${symbol}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(2)})"/>`});
+  }
+  // Dense canopy follows the forest portion, rather than a rectangular x-coordinate band.
+  for(let i=0;i<75;i++)for(const side of [-1,1]){
+   const p=positionAt(route,.505+i*.0032),a=p.angle*Math.PI/180,offset=side*(120+(i%4)*48);
+   const x=p.x-Math.sin(a)*offset,y=p.y+Math.cos(a)*offset;
+   if(distanceFromRoute(route,{x,y})<90||distanceFromRoute(river,{x,y})<110||features.some(f=>Math.hypot(f.x-x,f.y-y)<f.radius+50))continue;
+   decorations.push({y,html:`<use data-scenery="forest" href="#${i%3?'fir':'oak'}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(1.15)"/>`});
   }
   const farms=[[700,580],[1250,1450],[2830,640],[4070,1930],[650,2320]];
   farms.forEach(([x,y])=>decorations.push({y,html:`<g transform="translate(${x} ${y})"><ellipse cx="4" cy="26" rx="116" ry="65" fill="#b2b778"/><path d="M-80 28L100 49" stroke="#d6c398" stroke-width="24"/><use href="#farm"/><use href="#barn" x="90" y="-38" transform="rotate(9 90 -38)"/><use href="#oak" x="-88" y="-60"/><use href="#oak" x="103" y="58"/></g>`}));
@@ -60,7 +94,7 @@ export function landscape(route: Route): string {
   <g fill="var(--season-rock,#a6ad84)" stroke="#889a77" stroke-width="4"><path d="M4050 110L4380 70L4630 280L4560 425L4290 280Z"/><path d="M4055 122L4270 300L4350 330L4380 460L4530 467L4560 425L4290 280Z" fill="#84967e"/><path d="M3850 1500L4070 1580L4230 1840L4130 1970L3930 1760Z"/><path d="M3850 1500L3855 1630L3910 1840L4100 2080L4130 1970L3930 1760Z" fill="#81927a"/></g>
   <path d="${river.path}" stroke="#8fa685" stroke-width="143" fill="none"/><path d="${river.path}" stroke="#c8c89f" stroke-width="123" fill="none"/><path d="${river.path}" stroke="url(#water)" stroke-width="99" fill="none"/>
   <path d="${river.path}" stroke="#cae0d2" stroke-width="2" stroke-dasharray="35 46 13 98" fill="none" opacity=".7"/>
-  <g class="map-details">${decorations.sort((a,b)=>a.y-b.y).map(d=>d.html).join('')}</g>
+  <g class="map-details">${features.map(scenicMarkup).join('')}${decorations.sort((a,b)=>a.y-b.y).map(d=>d.html).join('')}</g>
   <rect x="0" y="0" width="4800" height="2600" fill="url(#paper)" pointer-events="none"/>
   ${bridgeMarkup}
   </g>`;
