@@ -1,3 +1,4 @@
+import {createKioskProgress} from './kiosk-progress.mjs';
 import {createWorkspaces} from './workspaces.mjs';
 import {createOrganizerDashboard} from './organizer-dashboard.mjs';
 import {createDirectorProgress} from './director-progress.mjs';
@@ -20,6 +21,7 @@ import {newDemo,newAutonomousTpeDemo,newOperationsDemo} from './demo-service.mjs
 import {body,authorized} from './http.mjs';
 const profiles={lex:{uid:'demo-lex-user',tenantId:'fiction-lex-ekho',email:'lex@example.test'},atelier:{uid:'demo-atelier-user',tenantId:'fiction-atelier',email:'atelier@example.test'}};
 const invitedProfile={uid:'demo-invited-user',email:'camille@example.test'};
+profiles.limited={uid:'demo-limited-user',tenantId:'fiction-limited-modes',email:'limited@example.test',workspaces:true};
 profiles.fourspaces={uid:'demo-fourspaces-user',tenantId:'fiction-four-spaces',email:'fourspaces@example.test',workspaces:true};
 profiles.multispace={uid:'demo-multispace-user',tenantId:'fiction-workspaces-a',email:'multispace@example.test',workspaces:true};
 profiles.organizer={uid:'demo-organizer-user',tenantId:'fiction-lex-ekho',email:'organizer@example.test'};
@@ -46,12 +48,13 @@ async function ensureFixtureUser(auth,profile,password){
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(options){
  if(!options)assertEmulators();
+ const clock=options?.now??Date.now;
  const cookieName=options?.cookieName??'rc_auth';
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
- const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress});
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
   for(const profile of Object.values(profiles)){
    await ensureFixtureUser(adapter.auth,profile,password);
@@ -76,6 +79,12 @@ export async function createFirebaseHttp(options){
    if(!g.exists)tx.set(grant,{uid:four.uid,active:true,campaigns:[{tenantId:scope.tenantId,campaignId:scope.campaignId}]});
    if(!d.exists)tx.set(fourDirectory,{uid:four.uid,active:true,entries:[...['organizer','director','team'].map(space=>({id:space,space,...scope,label:'Entreprise des quatre espaces · '+scope.campaignId})),{id:'gifts',space:'gifts',label:'Cadeaux · toutes mes campagnes autorisées'}]});
   });
+  const limited=profiles.limited,limitedScope=limited.scope,limitedMember=adapter.db.doc(`tenants/${limitedScope.tenantId}/members/${limited.uid}`),limitedDirectory=adapter.db.doc(`workspaceDirectories/${limited.uid}`),period=adapter.db.doc(`tenants/${limitedScope.tenantId}/campaigns/${limitedScope.campaignId}/kpiPeriods/limited-month`);
+  await adapter.db.runTransaction(async tx=>{const m=await tx.get(limitedMember),d=await tx.get(limitedDirectory),p=await tx.get(period);
+   if(!m.exists)tx.set(limitedMember,{uid:limited.uid,tenantId:limitedScope.tenantId,active:true,participationEnabled:false,assignments:[{campaignId:limitedScope.campaignId,teamId:limitedScope.teamId}],kpiAssignments:[{campaignId:limitedScope.campaignId,teamId:limitedScope.teamId}],kioskCampaigns:[limitedScope.campaignId],directorCampaigns:[limitedScope.campaignId]});
+   if(!d.exists)tx.set(limitedDirectory,{uid:limited.uid,active:true,entries:['director','kpi','kiosk'].map(space=>({id:space,space,...limitedScope,label:'Entreprise des modes limités · '+limitedScope.campaignId}))});
+   if(!p.exists)tx.set(period,{teamId:limitedScope.teamId,start:'2026-10-01',endExclusive:'2026-11-01',state:'open',definitionVersion:'fiction-v1',definitions:[{id:'quantity',label:'Livraisons fictives',unit:'unités'},{id:'delay',label:'Délai moyen fictif',unit:'jours'}]});
+  });
   for(const [id,start,endExclusive,state] of [['october-test','2026-10-01','2026-11-01','open'],['september-test','2026-09-01','2026-10-01','frozen']]){
    const ref=adapter.db.doc(`tenants/${profiles.kpi.scope.tenantId}/campaigns/${profiles.kpi.scope.campaignId}/kpiPeriods/${id}`);
    await adapter.db.runTransaction(async tx=>{if(!(await tx.get(ref)).exists)tx.set(ref,{teamId:profiles.kpi.scope.teamId,start,endExclusive,state,definitionVersion:'fiction-v1',definitions:[{id:'quantity',label:'Livraisons fictives',unit:'unités'},{id:'delay',label:'Délai moyen fictif',unit:'jours'}]});});
@@ -87,7 +96,7 @@ export async function createFirebaseHttp(options){
  }catch(e){await adapter.close();throw e;}
  const cookie=(value,req,age=3300)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
  async function handler(req,json,path){
-  const now=Date.now();for(const [key,s] of sessions)if(s.expires<=now)sessions.delete(key);
+  const now=clock();for(const [key,s] of sessions)if(s.expires<=now)sessions.delete(key);
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
   if(path==='/api/auth/login'&&req.method==='POST'){
    const {profile:id}=await body(req,['profile']);if(id!=='camille'&&!Object.hasOwn(profiles,id))throw failure(400);
@@ -97,12 +106,15 @@ export async function createFirebaseHttp(options){
    let scope=profile.workspaces?null:profile.scope??null;
    if(profile.workspaces)await workspaces.list(header);
    if(id==='camille'){const m=(await adapter.db.doc(`tenants/fiction-lex-ekho/members/${profile.uid}`).get()).data();if(m?.active&&m.assignments?.length)scope={tenantId:'fiction-lex-ekho',...m.assignments[0]};}
-   if(scope){if(id==='director')await directorProgress.read(header,scope);else if(id==='organizer')await organizerDashboard.read(header,scope);else await adapter.read(header,scope);}
+   if(scope){if(id==='kpi')await kpiCollection.list(header,scope);else if(id==='director')await directorProgress.read(header,scope);else if(id==='organizer')await organizerDashboard.read(header,scope);else await adapter.read(header,scope);}
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
-   if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,workspaceEnabled:profile.workspaces===true,directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
+   if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,workspaceEnabled:profile.workspaces===true,...(id==='kpi'?{workspaceSpace:'kpi'}:{}),directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
    json(200,{connected:true,...(profile.workspaces?{destination:'/espaces.html'}:id==='organizer'?{destination:'/organisateur.html'}:id==='director'?{destination:'/entreprise.html'}:['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  // Once handed to a shared display, this session cannot reopen the role selector.
+  if(session.workspaceSpace==='kiosk'&&!((req.method==='GET'&&path==='/api/kiosk/progress')||(req.method==='POST'&&['/api/demo/session','/api/auth/logout'].includes(path))))throw failure(403);
+  if(session.workspaceSpace==='kpi'&&!((req.method==='GET'&&path==='/api/workspaces')||(req.method==='POST'&&['/api/workspaces/select','/api/demo/session','/api/auth/logout','/api/kpi/list','/api/kpi/read','/api/kpi/submit'].includes(path))))throw failure(403);
   if(path==='/api/workspaces'&&req.method==='GET'){
    if(!session.workspaceEnabled)throw failure(403);
    json(200,{entries:await workspaces.list(session.header),selected:session.workspaceId??null,csrf:session.csrf});return;
@@ -132,6 +144,8 @@ export async function createFirebaseHttp(options){
    };
    if(!routes[req.method]?.includes(path))throw failure(403);
   }
+  if(path==='/api/kiosk/progress'&&req.method==='GET'){if(session.workspaceSpace!=='kiosk')throw failure(403);json(200,await kioskProgress.read(session.header,session.scope));return;}
+  if(session.workspaceSpace==='kpi'&&!session.workspaceEnabled&&path!=='/api/auth/logout')await kpiCollection.list(session.header,session.scope);
   // Strip administrative controls from team responses even for explicitly multi-role accounts.
   const teamView=value=>session.workspaceSpace==='team'?{...value,canOpen:false,canClose:false,...(Object.hasOwn(value,'leaders')?{leaders:null}:{})}:value;
   if(session.organizerOnly&&path!=='/api/auth/logout'){
@@ -222,7 +236,7 @@ export async function createFirebaseHttp(options){
     if(path==='/api/invitation/accept'){const {token,displayName}=await body(req,['token','displayName']);const result=await invitations.accept(session.header,token,displayName);session.scope=result.scope;json(200,{accepted:true,alreadyAccepted:result.alreadyAccepted});return;}
     throw failure(404);
    }
-   if(path==='/api/demo/session'&&session.workspaceSpace){await body(req,[]);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:session.workspaceSpace,workspaceEnabled:true});return;}
+   if(path==='/api/demo/session'&&session.workspaceSpace){await body(req,[]);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:session.workspaceSpace,workspaceEnabled:session.workspaceEnabled===true&&session.workspaceSpace!=='kiosk'});return;}
    if(!session.scope&&path!=='/api/auth/logout')throw failure(403);
    if(path==='/api/demo/session'){await body(req,[]);if(session.organizerOnly){json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:'organizer',workspaceEnabled:session.workspaceEnabled===true});return;}if(session.directorOnly){await directorProgress.read(session.header,session.scope);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:'director',workspaceEnabled:session.workspaceEnabled===true});return;}await adapter.read(session.header,session.scope);const campaign=await adapter.db.doc(`tenants/${session.scope.tenantId}/campaigns/${session.scope.campaignId}`).get();json(200,{csrf:session.csrf,authenticated:true,canSimulate:campaign.data()?.collectionMode!=='weekly-questionnaire'});return;}
    authorized(req,session);

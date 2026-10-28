@@ -3,9 +3,9 @@ import {authorizedGrant} from './gift-operations.mjs';
 import {assertTestAdapter} from './test-environment.mjs';
 const denied=()=>Object.assign(new Error('Workspace access denied'),{status:403});
 const identifier=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
-export const workspaceDestinations=Object.freeze({organizer:'/organisateur.html',director:'/entreprise.html',team:'/index.html',gifts:'/cockpit.html'});
+export const workspaceDestinations=Object.freeze({organizer:'/organisateur.html',director:'/entreprise.html',team:'/index.html',gifts:'/cockpit.html',kpi:'/kpi.html',kiosk:'/kiosque.html'});
 /** Directory entries are references, never grants. Each selection rechecks the underlying service. */
-export function createWorkspaces(adapter,{organizer,director}){
+export function createWorkspaces(adapter,{organizer,director,kiosk}){
  assertTestAdapter(adapter);
  async function directory(header){
   if(typeof header!=='string'||!/^Bearer [^\s]{1,8192}$/.test(header))throw denied();
@@ -22,12 +22,13 @@ export function createWorkspaces(adapter,{organizer,director}){
   if(e.space==='gifts'){
    // The gift cockpit is global over its independent, explicit client grants.
    await adapter.db.runTransaction(async tx=>authorizedGrant((await tx.get(adapter.db.doc(`giftOperators/${uid}`))).data(),uid));
-  }else if(e.space==='team'){
+  }else if(e.space==='kiosk'){await kiosk.read(header,scope);
+  }else if(['team','kpi'].includes(e.space)){
    await adapter.db.runTransaction(async tx=>{
-    const authorize=createAccessBoundary({verifyIdToken:async()=>({uid}),readMembership:async()=>{const m=(await tx.get(adapter.db.doc(`tenants/${scope.tenantId}/members/${uid}`))).data();if(m?.participationEnabled!==true)throw denied();return m;}});
+    const authorize=createAccessBoundary({verifyIdToken:async()=>({uid}),readMembership:async()=>{const m=(await tx.get(adapter.db.doc(`tenants/${scope.tenantId}/members/${uid}`))).data();if(e.space==='team'&&m?.participationEnabled!==true)throw denied();if(e.space==='kpi'&&(!Array.isArray(m?.kpiAssignments)||!m.kpiAssignments.some(a=>a.campaignId===scope.campaignId&&a.teamId===scope.teamId)))throw denied();return m;}});
     await authorize('Bearer verified',scope);
     const c=(await tx.get(adapter.db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`))).data();if(!c)throw denied();const config=JSON.parse(c.payload).ledger.state.config;
-    if(config.tenantId!==scope.tenantId||config.campaignId!==scope.campaignId||!config.teams.some(t=>t.id===scope.teamId))throw denied();
+    if(config.tenantId!==scope.tenantId||config.campaignId!==scope.campaignId||!config.teams.some(t=>t.id===scope.teamId)||(e.space==='kpi'&&config.mode!=='kpi'))throw denied();
    });
   }else await (e.space==='organizer'?organizer:director).read(header,scope);
   return {id:e.id,space:e.space,label:e.label,scope,destination:workspaceDestinations[e.space]};

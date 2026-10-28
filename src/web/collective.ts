@@ -7,9 +7,10 @@ import type { CollectiveJourneyView } from '../presentation/collective-view.ts';
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const format=(n:string|number)=>Number(n).toLocaleString('fr-BE');
 const date=(s:string)=>new Intl.DateTimeFormat('fr-BE',{day:'numeric',month:'long',timeZone:'Europe/Brussels'}).format(new Date(s+'T12:00:00Z'));
+const limitedKioskPage=document.body.hasAttribute('data-limited-kiosk');
 const params=new URLSearchParams(location.search),scenarios=['journey','before-freeze','frozen','tpe'];
 const scenario=scenarios.includes(params.get('scenario')??'')?params.get('scenario')!:'journey';
-let kiosk=params.get('kiosk')==='1';
+let kiosk=limitedKioskPage||params.get('kiosk')==='1',lockedKiosk=limitedKioskPage;
 function kioskStyle(){document.body.classList.toggle('kiosk',kiosk);$('kiosk-toggle').textContent=kiosk?'Quitter l’écran collectif':'Écran collectif';$('kiosk-toggle').setAttribute('aria-pressed',String(kiosk));$('kiosk-note').hidden=!kiosk;}
 kioskStyle();
 ($('scenario') as HTMLSelectElement).value=scenario;
@@ -19,7 +20,12 @@ $('about-close').addEventListener('click',()=>($('about') as HTMLDialogElement).
 $('retry').addEventListener('click',()=>location.reload());
 async function start(){
   let data:CollectiveJourneyView;
-  if(scenario==='journey'){await startDemo();data=await readDemo<CollectiveJourneyView>('collective');}
+  if(limitedKioskPage||scenario==='journey'){
+    const session=await startDemo();lockedKiosk=session.workspace==='kiosk';if(limitedKioskPage&&!lockedKiosk)throw Error('Limited session required');
+    if(lockedKiosk){kiosk=true;kioskStyle();$('kiosk-toggle').hidden=true;$('scenario').hidden=true;document.querySelector('label[for="scenario"]')?.setAttribute('hidden','');
+      const response=await fetch('/api/kiosk/progress',{cache:'no-store'});if(!response.ok)throw Error('Kiosk unavailable');data=await response.json();
+    }else data=await readDemo<CollectiveJourneyView>('collective');
+  }
   else{const response=await fetch(`data/collective-${scenario}.json`);if(!response.ok)throw new Error('Journey unavailable');data=await response.json();}
   if(data.schemaVersion!==1||data.routeId!==journeyRoute.id)throw new Error('Unsupported journey');
   const reception=data.reception,last=data.history.at(-1),ratio=distanceRatio(data.distance,data.maximumKm);
@@ -49,7 +55,7 @@ async function start(){
       try{await map.park(true);}finally{button.disabled=false;}
     });
   }
-  $('kiosk-toggle').addEventListener('click',()=>{kiosk=!kiosk;kioskStyle();const url=new URL(location.href);if(kiosk)url.searchParams.set('kiosk','1');else url.searchParams.delete('kiosk');history.replaceState(null,'',url);map.recenter();});
+  $('kiosk-toggle').addEventListener('click',()=>{if(lockedKiosk)return;kiosk=!kiosk;kioskStyle();const url=new URL(location.href);if(kiosk)url.searchParams.set('kiosk','1');else url.searchParams.delete('kiosk');history.replaceState(null,'',url);map.recenter();});
   for(const tier of reception.tiers){
     const li=document.createElement('li'),button=document.createElement('button'),number=document.createElement('span'),copy=document.createElement('span'),title=document.createElement('strong'),state=document.createElement('span'),detail=document.createElement('span');
     button.className='tier-card';button.dataset.level=String(tier.level);button.dataset.status=tier.status;
@@ -59,5 +65,6 @@ async function start(){
     button.addEventListener('click',()=>{map.focusRatio(tier.km/data.maximumKm);$('map-status').textContent=`${tier.title}. ${stopStatus(tier,reception.frozen)}.`;});
   }
   $('collective-content').dataset.ready='true';
+  if(lockedKiosk)window.setTimeout(()=>location.reload(),60000);
 }
 start().catch(()=>{$('fallback').hidden=false;$('collective-content').hidden=true;($('kiosk-toggle') as HTMLButtonElement).disabled=true;});

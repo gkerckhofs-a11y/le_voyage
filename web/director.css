@@ -9,3 +9,6 @@
 #workspace-list{gap:16px;background:transparent;padding:0}
 #workspace-list .gift-row{margin:0;min-width:0}
 @media(max-width:600px){.director-page #workspace-list{grid-template-columns:1fr}}
+#workspace-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#workspace-modes .gift-row{margin:0;min-width:0}
+@media(max-width:600px){#workspace-modes{grid-template-columns:1fr}}
