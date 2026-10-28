@@ -52,3 +52,11 @@ test('amendments reject negative totals, overruns, stale revisions, legacy confi
  const competing=await Promise.allSettled([service.amend(operator.header,amendment(row)),service.amend(operator.header,amendment(row))]);assert.equal(competing.filter(r=>r.status==='fulfilled').length,1);assert.equal(competing.find(r=>r.status==='rejected').reason.status,409);row=(await service.detail(operator.header,row,row.id)).row;
  const ref=a.db.doc(`tenants/${row.tenantId}/campaigns/${row.campaignId}/giftFulfillments/${row.id}`);const old=(await ref.get()).data();delete old.confirmation;await ref.set(old);await assert.rejects(service.amend(operator.header,amendment(row)),{status:409});await grant.update({active:false});await assert.rejects(service.amend(operator.header,amendment(row)),{status:403});
 });
+
+test('forecast reads only granted campaigns, leaves ledger and commands untouched and observes revocation',async t=>{
+ const {a,scopes,users:[operator,client],grant}=await setup(t),service=createGiftOperations(a,{now:()=> '2026-08-16T22:15:00Z'});
+ const refs=scopes.map(s=>a.db.doc(`tenants/${s.tenantId}/campaigns/${s.campaignId}`)),before=await Promise.all(refs.map(async r=>(await r.get()).data()));
+ const result=await service.forecasts(operator.header);assert.equal(result.rows.length,8);assert.ok(result.rows.every(r=>r.asOf==='2026-08-17'&&r.status==='estimated'&&r.estimatedDate==='2026-09-14'));assert.equal(new Set(result.rows.map(r=>r.tenantId)).size,2);assert.ok(result.rows.every(r=>r.budgetCents===10000));assert.doesNotMatch(JSON.stringify(result),/answers|responses|scores|roster|giftPreferences|supplier|purchaseCents/);
+ assert.deepEqual(await Promise.all(refs.map(async r=>(await r.get()).data())),before);for(const r of refs)assert.equal((await r.collection('giftFulfillments').get()).size,0);
+ await assert.rejects(service.forecasts(client.header),{status:403});await grant.update({campaigns:[{tenantId:scopes[0].tenantId,campaignId:scopes[0].campaignId}]});assert.ok((await service.forecasts(operator.header)).rows.every(r=>r.tenantId===scopes[0].tenantId));await grant.update({active:false});await assert.rejects(service.forecasts(operator.header),{status:403});
+});
