@@ -5,6 +5,7 @@ export type AnnualQuestionnaire = {
   values: readonly {label: string; question: string}[];
   weights: readonly string[];
   minimumRespondents: number;
+  kpiReferent?: string;
   kpis?: readonly {definition: string; source: string; frequency: string; target: string; unit: string; direction: 'higher' | 'lower'}[];
 };
 const record = (value: unknown, keys: readonly string[]): void => {
@@ -16,7 +17,7 @@ const text = (value: unknown, limit: number): void => {
 /** Future campaign draft only. Never supplies live questions or changes scoring. */
 export function previewAnnualQuestionnaire(input: AnnualQuestionnaire | undefined): AnnualQuestionnaire | null {
   if (input === undefined) return null;
-  record(input, ['mode', 'values', 'weights', 'minimumRespondents', 'kpis']);
+  record(input, ['mode', 'values', 'weights', 'minimumRespondents', 'kpis', 'kpiReferent']);
   if (!['autonomous', 'kpi'].includes(input.mode)) throw new Error('Explicit questionnaire mode required');
   if (!Array.isArray(input.values) || input.values.length !== 3) throw new Error('Exactly three human values required');
   for (const value of input.values) {
@@ -26,8 +27,9 @@ export function previewAnnualQuestionnaire(input: AnnualQuestionnaire | undefine
   // Same lower bound as the existing human-score engine; no commercial default.
   if (!Number.isSafeInteger(input.minimumRespondents) || input.minimumRespondents < 2) throw new Error('Confidentiality threshold must be at least two');
   if (input.mode === 'autonomous') {
-    if (input.kpis !== undefined) throw new Error('Autonomous mode cannot retain KPI settings');
+    if (input.kpis !== undefined || input.kpiReferent !== undefined) throw new Error('Autonomous mode cannot retain KPI settings');
   } else {
+    if (input.kpiReferent !== undefined) text(input.kpiReferent, 500);
     if (!Array.isArray(input.kpis) || input.kpis.length !== 2) throw new Error('Exactly two KPI definitions required');
     for (const kpi of input.kpis) {
       record(kpi, ['definition', 'source', 'frequency', 'target', 'unit', 'direction']);
@@ -36,5 +38,7 @@ export function previewAnnualQuestionnaire(input: AnnualQuestionnaire | undefine
       if (!['higher', 'lower'].includes(kpi.direction)) throw new Error('Explicit KPI direction required');
     }
   }
-  return structuredClone(input);
+  const result = structuredClone(input);
+  if (result.kpiReferent !== undefined) result.kpiReferent = result.kpiReferent.trim();
+  return result;
 }

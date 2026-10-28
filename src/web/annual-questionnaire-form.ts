@@ -43,11 +43,12 @@ export function initializeQuestionnaire() {
 export function readQuestionnaire(): AnnualQuestionnaire | undefined {
   if (!field('questionnaire-enabled').checked) return undefined;
   const mode = field('questionnaire-mode').value as AnnualQuestionnaire['mode'];
-  return {mode, minimumRespondents: Number(field('minimumRespondents').value), weights: Array.from({length: 5}, (_, i) => decimal(field(`weight-${i}`).value)), values: Array.from({length: 3}, (_, i) => ({label: field(`value-${i}`).value.trim(), question: field(`question-${i}`).value.trim()})), ...(mode === 'kpi' ? {kpis: Array.from({length: 2}, (_, i) => ({definition: field(`kpi-${i}-definition`).value.trim(), source: field(`kpi-${i}-source`).value.trim(), frequency: field(`kpi-${i}-frequency`).value.trim(), target: decimal(field(`kpi-${i}-target`).value), unit: field(`kpi-${i}-unit`).value.trim(), direction: field(`kpi-${i}-direction`).value as 'higher' | 'lower'}))} : {})};
+  return {mode, minimumRespondents: Number(field('minimumRespondents').value), weights: Array.from({length: 5}, (_, i) => decimal(field(`weight-${i}`).value)), values: Array.from({length: 3}, (_, i) => ({label: field(`value-${i}`).value.trim(), question: field(`question-${i}`).value.trim()})), ...(mode === 'kpi' ? {...(field('kpi-referent').value.trim() ? {kpiReferent: field('kpi-referent').value.trim()} : {}), kpis: Array.from({length: 2}, (_, i) => ({definition: field(`kpi-${i}-definition`).value.trim(), source: field(`kpi-${i}-source`).value.trim(), frequency: field(`kpi-${i}-frequency`).value.trim(), target: decimal(field(`kpi-${i}-target`).value), unit: field(`kpi-${i}-unit`).value.trim(), direction: field(`kpi-${i}-direction`).value as 'higher' | 'lower'}))} : {})};
 }
 export function restoreQuestionnaire(saved?: AnnualQuestionnaire) {
   field('questionnaire-enabled').checked = !!saved;
   field('questionnaire-mode').value = saved?.mode ?? '';
+  field('kpi-referent').value = saved?.kpiReferent ?? '';
   field('minimumRespondents').value = saved ? String(saved.minimumRespondents) : '';
   for (let i = 0; i < 3; i++) {field(`value-${i}`).value = saved?.values[i].label ?? ''; field(`question-${i}`).value = saved?.values[i].question ?? '';}
   for (let i = 0; i < 5; i++) field(`weight-${i}`).value = saved?.weights[i] ?? '';
@@ -59,5 +60,9 @@ export function renderQuestionnaire(saved: AnnualQuestionnaire | null) {
   const heading = document.createElement('h3'); heading.textContent = `Questionnaire proposé · ${saved.mode === 'kpi' ? 'deux objectifs professionnels' : 'mode autonome'}`; box.append(heading);
   const p = document.createElement('p'); p.textContent = `Pondérations : ${saved.weights.join(' / ')} % (total 100 %). Seuil de confidentialité : ${saved.minimumRespondents} répondants. Réponses hebdomadaires sur l’échelle existante de 1 à 5.`; box.append(p);
   const list = document.createElement('ol'); for (const value of saved.values) {const li = document.createElement('li'); li.textContent = `${value.label} — ${value.question}`; list.append(li);} box.append(list);
+  if (saved.mode === 'kpi') {
+    const referent = document.createElement('p'); referent.id = 'annual-kpi-referent-preview';
+    referent.textContent = `Référent KPI proposé : ${saved.kpiReferent ?? 'Non renseigné (facultatif)'}. Cette indication ne crée ni compte ni accès.`; box.append(referent);
+  }
   for (const kpi of saved.kpis ?? []) {const p = document.createElement('p'); p.textContent = `${kpi.definition} · source : ${kpi.source} · ${kpi.frequency} · cible : ${kpi.target} ${kpi.unit} · ${kpi.direction === 'lower' ? 'moins est mieux' : 'plus est mieux'}.`; box.append(p);}
 }

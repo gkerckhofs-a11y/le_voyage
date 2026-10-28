@@ -16,3 +16,17 @@ test('questionnaire does not recalculate calendar, gifts, reception or funding',
  const input={start:'2027-11-15',evaluationWeekday:7,partialWeeks:'exclude',leapDayAnniversary:'february-28',freezeDate:'2028-09-01',receptionDate:'2028-10-20',giftCount:2,receptionTierCount:2};
  const old=previewAnnualPlan(input),next=previewAnnualPlan({...input,questionnaire:q});const {questionnaire,...rest}=next;assert.deepEqual(rest,(({questionnaire,...rest})=>rest)(old));assert.deepEqual(questionnaire,q);
 });
+
+test('KPI referent is optional private draft text, bounded and exclusive to KPI mode',()=>{
+ const base={...q,mode:'kpi',kpis:[kpi,kpi]};
+ assert.equal(previewAnnualQuestionnaire(base).kpiReferent,undefined);
+ const input={...base,kpiReferent:'  Référent fictif  '};
+ assert.equal(previewAnnualQuestionnaire(input).kpiReferent,'Référent fictif');
+ assert.equal(input.kpiReferent,'  Référent fictif  ');
+ assert.equal(previewAnnualQuestionnaire({...base,kpiReferent:'x'.repeat(500)}).kpiReferent.length,500);
+ for(const value of ['', '  ', null, 123, {}, 'x'.repeat(501)])assert.throws(()=>previewAnnualQuestionnaire({...base,kpiReferent:value}));
+ assert.throws(()=>previewAnnualQuestionnaire({...q,kpiReferent:'Fictif'}));
+ const calendar={start:'2027-11-15',evaluationWeekday:7,partialWeeks:'exclude',leapDayAnniversary:'february-28',freezeDate:'2028-09-01',receptionDate:'2028-10-20',giftCount:2,receptionTierCount:2};
+ const before=previewAnnualPlan({...calendar,questionnaire:base}),after=previewAnnualPlan({...calendar,questionnaire:input});
+ delete after.questionnaire.kpiReferent;assert.deepEqual(after,before);
+});
