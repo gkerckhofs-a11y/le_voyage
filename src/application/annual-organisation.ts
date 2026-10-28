@@ -1,0 +1,47 @@
+import type {previewAnnualFunding} from './annual-funding.ts';
+
+export type AnnualOrganisation = {
+  companyName: string;
+  teams: readonly {name: string; headcount: number}[];
+  receptionGuests: number;
+};
+const record = (value: unknown, keys: readonly string[]) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key))) throw new Error('Invalid organisation fields');
+};
+const text = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim() || value.length > 160) throw new Error('Organisation name required');
+};
+const safe = (value: bigint) => {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Organisation total exceeds exact range');
+  return Number(value);
+};
+/** Planned counts only, not a roster or membership change. */
+export function previewAnnualOrganisation(input: AnnualOrganisation | undefined) {
+  if (input === undefined) return null;
+  record(input, ['companyName', 'teams', 'receptionGuests']); text(input.companyName);
+  // Technical payload limit for this prototype, not a commercial team limit.
+  if (!Array.isArray(input.teams) || input.teams.length < 1 || input.teams.length > 100) throw new Error('One to 100 planned teams required');
+  const names = new Set<string>(); let people = 0n;
+  for (const team of input.teams) {
+    record(team, ['name', 'headcount']); text(team.name);
+    const name = team.name.trim().normalize('NFKC').toLocaleLowerCase('fr');
+    if (names.has(name)) throw new Error('Distinct planned team names required');
+    names.add(name);
+    if (!Number.isSafeInteger(team.headcount) || team.headcount < 1) throw new Error('Positive exact team headcount required');
+    people += BigInt(team.headcount);
+  }
+  if (!Number.isSafeInteger(input.receptionGuests) || input.receptionGuests < 0) throw new Error('Exact reception guest count required');
+  return {...structuredClone(input), teamCount: input.teams.length, totalHeadcount: safe(people)};
+}
+/** Sum only the configured team-gift and reception envelopes, never an all-in quote. */
+export function previewEnterpriseFunding(
+  organisation: ReturnType<typeof previewAnnualOrganisation>,
+  funding: ReturnType<typeof previewAnnualFunding>,
+) {
+  if (!organisation || !funding) return null;
+  const gifts = BigInt(funding.giftMaximumPerTeamCents) * BigInt(organisation.teamCount);
+  return {currency: funding.currency, basis: funding.basis, teamCount: organisation.teamCount,
+    giftMaximumPerTeamCents: funding.giftMaximumPerTeamCents, giftMaximumCents: safe(gifts),
+    receptionMaximumCents: funding.receptionMaximumCents,
+    configuredMaximumCents: safe(gifts + BigInt(funding.receptionMaximumCents))};
+}

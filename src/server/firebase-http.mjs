@@ -62,8 +62,8 @@ export async function createFirebaseHttp(options){
   if(path==='/api/annual-plan'&&req.method==='GET'){json(200,await annualPlanning.read(session.header,session.scope));return;}
   if(path.startsWith('/api/annual-plan/')&&req.method==='POST'){
    authorized(req,session);
-   if(path==='/api/annual-plan/preview'){const i=await body(req,['input']);json(200,await annualPlanning.preview(session.header,session.scope,i.input));return;}
-   if(path==='/api/annual-plan/save'){const i=await body(req,['input','revision','mutationId']);json(200,await annualPlanning.save(session.header,session.scope,i));return;}
+   if(path==='/api/annual-plan/preview'){const i=await body(req,['input'],131072);json(200,await annualPlanning.preview(session.header,session.scope,i.input));return;}
+   if(path==='/api/annual-plan/save'){const i=await body(req,['input','revision','mutationId'],131072);json(200,await annualPlanning.save(session.header,session.scope,i));return;}
    throw failure(404);
   }
   if(path.startsWith('/api/gifts/beneficiaries/')&&req.method==='POST'){authorized(req,session);if(path==='/api/gifts/beneficiaries/read'){const i=await body(req,['tenantId','campaignId','id']);json(200,await giftBeneficiaries.read(session.header,i,i.id));return;}if(path==='/api/gifts/beneficiaries/freeze'){const i=await body(req,['tenantId','campaignId','id','people','confirmed','reason','mutationId']);json(200,await giftBeneficiaries.freeze(session.header,i));return;}if(path==='/api/gifts/beneficiaries/review'){const i=await body(req,['tenantId','campaignId','id','digest','revision','contactConfirmed','reason','mutationId']);json(200,await giftBeneficiaries.review(session.header,i));return;}throw failure(404);}
