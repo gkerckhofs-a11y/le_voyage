@@ -32,10 +32,13 @@ export function rollingRegularity(history: readonly { responded: number; present
 }
 export function kpiScore(actual: string, target: string, direction: 'higher' | 'lower'): Exact {
   if (direction !== 'higher') throw new Error('Inverse KPI scale requires a configured and validated rule');
-  const a = bounded(exact(actual), '0', '99999999999999999999');
+  const a = exact(actual);
   const t = exact(target);
   if (compare(t, exact('0')) <= 0) throw new Error('KPI target must be positive');
-  const rate = compare(a, t) >= 0 ? exact('1') : divide(a, t);
+  // V4: clamp(actual / target, 0, 1), with a positive target.
+  // Clamp before dividing; neither negative results nor overachievement add bonuses.
+  const rate = compare(a, exact('0')) <= 0 ? exact('0')
+    : compare(a, t) >= 0 ? exact('1') : divide(a, t);
   return add(exact('1'), multiply(exact('4'), rate));
 }
 export type RosterMember = Readonly<{ id: string; eligible: boolean; absent: boolean }>;

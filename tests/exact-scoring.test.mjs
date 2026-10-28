@@ -56,7 +56,7 @@ test('KPI higher-is-better clamps overachievement and rejects unconfigured inver
   assert.deepEqual(kpiScore('50','100','higher'),exact('3'));
   assert.deepEqual(kpiScore('200','100','higher'),exact('5'));
   assert.throws(()=>kpiScore('1','0','higher'));
-  assert.throws(()=>kpiScore('-1','100','higher'));
+  assert.deepEqual(kpiScore('-1','100','higher'),exact('1'));
   assert.throws(()=>kpiScore('10','100','lower'));
 });
 test('Absent and ineligible people are excluded from participation; duplicates rejected', () => {
@@ -80,4 +80,41 @@ test('No response uses floor; missing KPI or regularity and all-absent remain ex
   assert.throws(()=>scoreWeek({...input(),regularityScore:undefined},privacy,DEFAULT_WEIGHTS));
   assert.throws(()=>scoreWeek({...input({mode:'kpi'}),kpis:undefined},privacy,DEFAULT_WEIGHTS));
   assert.throws(()=>scoreWeek(input({size:2,absent:[0,1]}),privacy,DEFAULT_WEIGHTS));
+});
+
+
+test('KPI V4 clamps negative and zero actuals to 1, and target/overachievement to 5', () => {
+  for (const target of ['0.00000001', '3', '100', '999999999999999999999999999999']) {
+    for (const actual of ['-99999999999999999999999999999', '-0.00000001', '-0', '0']) {
+      assert.deepEqual(kpiScore(actual, target, 'higher'), exact('1'));
+    }
+    assert.deepEqual(kpiScore(target, target, 'higher'), exact('5'));
+    assert.deepEqual(kpiScore('999999999999999999999999999999', target, 'higher'), exact('5'));
+  }
+});
+test('KPI fractional achievement remains exact through scoring and JSON persistence', () => {
+  const third = kpiScore('0.00000001', '0.00000003', 'higher');
+  assert.deepEqual(third, { numerator: '7', denominator: '3' });
+  assert.deepEqual(weeklyKm(Array(5).fill(JSON.parse(JSON.stringify(third)))), exact('60'));
+  assert.deepEqual(kpiScore('0.1', '0.3', 'higher'), third);
+});
+test('KPI score is monotone and bounded over negative, partial and excess achievement', () => {
+  let previous = exact('1');
+  for (let actual = -200; actual <= 400; actual++) {
+    const score = kpiScore(String(actual), '100', 'higher');
+    assert.ok(compare(score, previous) >= 0);
+    assert.ok(compare(score, exact('1')) >= 0 && compare(score, exact('5')) <= 0);
+    previous = score;
+  }
+});
+test('KPI clamping never conceals invalid input, unsupported direction or target policy', () => {
+  for (const actual of ['NaN', 'Infinity', '1e3', '', '0.123456789', '1'.repeat(31)]) {
+    assert.throws(() => kpiScore(actual, '100', 'higher'));
+  }
+  for (const target of ['0', '-0', '-1', '-0.00000001', 'NaN', '1e3']) {
+    assert.throws(() => kpiScore('-1', target, 'higher'));
+  }
+  for (const direction of ['lower', 'unknown', undefined]) {
+    assert.throws(() => kpiScore('-1', '100', direction));
+  }
 });
