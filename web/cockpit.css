@@ -3,3 +3,5 @@
 #beneficiary-panel{border:1px solid #d9ddce;border-radius:10px;padding:16px;margin:20px 0}#beneficiary-panel summary{font-weight:600;cursor:pointer}#beneficiary-panel button{margin:12px 0}#beneficiary-panel label{margin:12px 0}#beneficiary-list p{font-size:13px;line-height:1.6;padding:10px;background:#f1f2e8;border-radius:8px}
 
 #catalog-import{margin:24px 0;overflow-wrap:anywhere}#catalog-import summary{cursor:pointer;font-weight:bold}#catalog-import label{display:block;margin:16px 0}#catalog-import input,#catalog-import select{max-width:100%}#import-preview pre{white-space:pre-wrap;overflow-wrap:anywhere}#import-preview details{border-bottom:1px solid var(--line);padding:12px 0}
+
+.catalog-order-line{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.catalog-order-line label{display:block}.catalog-order-line input{max-width:120px}#catalog-order-lines{margin:20px 0}

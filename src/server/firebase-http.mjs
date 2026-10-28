@@ -190,7 +190,7 @@ export async function createFirebaseHttp(options){
   if(path.startsWith('/api/gifts/ops/')&&req.method==='POST'){
    authorized(req,session);
    if(path==='/api/gifts/ops/detail'){const input=await body(req,['tenantId','campaignId','id']);json(200,await giftOperations.detail(session.header,input,input.id));return;}
-   if(path==='/api/gifts/ops/save'){const input=await body(req,['tenantId','campaignId','id','revision','mutationId','reason','dueDate','owner','composition','supplier','orderReference','deliveryReference','purchaseCents','packagingCents','transportCents','alcoholFreeConfirmed','status']);json(200,await giftOperations.save(session.header,input));return;}
+   if(path==='/api/gifts/ops/save'){const input=await body(req,['tenantId','campaignId','id','revision','mutationId','reason','dueDate','owner','composition','supplier','orderReference','deliveryReference','purchaseCents','packagingCents','transportCents','alcoholFreeConfirmed','status'],4096,['catalogSelection']);json(200,await giftOperations.save(session.header,input));return;}
    throw failure(404);
   }
   if(path.startsWith('/api/coordination')){

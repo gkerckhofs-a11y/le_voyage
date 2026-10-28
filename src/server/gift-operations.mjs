@@ -1,3 +1,4 @@
+import {normalizeCatalogSelection,resolveCatalogLines,selectionKey} from './catalog-lines.mjs';
 import {beneficiaryPreferences,preferencesReady} from './beneficiary-data.mjs';
 import {createHash} from 'node:crypto';
 import {assertTestAdapter} from './test-environment.mjs';
@@ -12,12 +13,13 @@ const financiallyLocked=r=>!!r?.confirmation||['to-receive','to-compose','ready'
 const editable=['dueDate','owner','composition','supplier','orderReference','deliveryReference','purchaseCents','packagingCents','transportCents','alcoholFreeConfirmed','status'];
 const defaults=()=>({dueDate:'',owner:'',composition:'',supplier:'',orderReference:'',deliveryReference:'',purchaseCents:0,packagingCents:0,transportCents:0,alcoholFreeConfirmed:false,status:'to-select',revision:0,resumeStatus:null});
 function normalize(input){
- if(!input||Object.keys(input).sort().join(',')!==[...editable,'revision','mutationId','reason','tenantId','campaignId','id'].sort().join(','))throw fail(400);
+ if(!input||Object.keys(input).filter(k=>k!=='catalogSelection').sort().join(',')!==[...editable,'revision','mutationId','reason','tenantId','campaignId','id'].sort().join(','))throw fail(400);
  if(!identifier(input.tenantId)||!identifier(input.campaignId)||!/^[a-f0-9]{64}$/.test(input.id)||!Number.isSafeInteger(input.revision)||input.revision<0||!(/^[a-f0-9-]{36}$/).test(input.mutationId)||!giftStatuses.includes(input.status)||typeof input.alcoholFreeConfirmed!=='boolean')throw fail(400);
  const value={};for(const key of editable){const x=input[key];if(key.endsWith('Cents')){if(!Number.isSafeInteger(x)||x<0||x>100000000)throw fail(400);value[key]=x;}else if(key==='alcoholFreeConfirmed'||key==='status')value[key]=x;else{if(typeof x!=='string'||x.length>(key==='composition'?600:120)||/[\u0000-\u001f]/.test(x))throw fail(400);value[key]=x.trim();}}
  const d=value.dueDate;if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!Number.isFinite(Date.parse(d))||new Date(d).toISOString().slice(0,10)!==d))throw fail(400);
  if(typeof input.reason!=='string'||input.reason.trim().length<3||input.reason.length>240)throw fail(400);
- return {value,reason:input.reason.trim(),digest:createHash('sha256').update(JSON.stringify([value,input.reason.trim(),input.revision])).digest('hex')};
+ const hasSelection=Object.hasOwn(input,'catalogSelection'),selection=hasSelection?normalizeCatalogSelection(input.catalogSelection):undefined;
+ return {value,selection,hasSelection,reason:input.reason.trim(),digest:createHash('sha256').update(JSON.stringify([value,input.reason.trim(),input.revision,...(hasSelection?[selection]:[])])).digest('hex')};
 }
 export function authorizedGrant(data,uid){
  if(!data||data.uid!==uid||data.active!==true||!Array.isArray(data.campaigns)||!data.campaigns.length||data.campaigns.length>20||data.campaigns.some(s=>!identifier(s.tenantId)||!identifier(s.campaignId)))throw fail(403);return data.campaigns;
@@ -26,9 +28,9 @@ function campaign(snapshot,scope){if(!snapshot.exists)throw fail(403);const reco
 function tasks(state,scope){return Object.values(state.tasks).map(task=>{const e=state.entitlements[task.entitlementId];if(!e)throw fail(409);return {id:eventId(scope,'fulfillment',e.id),entitlement:e};});}
 function project(state,scope,task,stored,teamIdentity){
  const value=stored??defaults(),e=task.entitlement,total=value.purchaseCents+value.packagingCents+value.transportCents,allocatedCents=value.confirmation?.allocatedCents??e.budgetCents;
- return {id:task.id,tenantId:scope.tenantId,campaignId:scope.campaignId,client:collectiveIdentity(state).organizationName,team:teamIdentity?.teamName??demoTeamIdentity(e.teamId).teamName,title:catalog[e.milestoneId]?.title??'Attention acquise',earnedOn:e.earnedOn,allocatedCents,financialLocked:financiallyLocked(value),confirmation:value.confirmation??null,...Object.fromEntries(editable.map(k=>[k,value[k]])),revision:value.revision,resumeStatus:value.resumeStatus??null,totalCostCents:total,marginCents:allocatedCents-total,updatedAt:value.updatedAt??null};
+ return {id:task.id,tenantId:scope.tenantId,campaignId:scope.campaignId,client:collectiveIdentity(state).organizationName,team:teamIdentity?.teamName??demoTeamIdentity(e.teamId).teamName,title:catalog[e.milestoneId]?.title??'Attention acquise',earnedOn:e.earnedOn,allocatedCents,financialLocked:financiallyLocked(value),confirmation:value.confirmation??null,catalogSelection:value.catalogSelection??null,catalogLines:value.catalogLines??[],...Object.fromEntries(editable.map(k=>[k,value[k]])),revision:value.revision,resumeStatus:value.resumeStatus??null,totalCostCents:total,marginCents:allocatedCents-total,updatedAt:value.updatedAt??null};
 }
-export function createGiftOperations(adapter,{now=()=>new Date().toISOString()}={}){
+export function createGiftOperations(adapter,{now=()=>new Date().toISOString(),catalogDocument='supplierCatalog/main'}={}){
  assertTestAdapter(adapter);const {auth,db}=adapter;
  async function actor(header){try{if(typeof header!=='string'||!header.startsWith('Bearer '))throw fail(403);const t=await auth.verifyIdToken(header.slice(7),true);if(!identifier(t.uid))throw fail(403);return t.uid;}catch{throw fail(403);}}
  const grantRef=uid=>db.doc(`giftOperators/${uid}`),campaignRef=s=>db.doc(`tenants/${s.tenantId}/campaigns/${s.campaignId}`);
@@ -41,7 +43,15 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString()}=
  async save(header,input){const normalized=normalize(input),uid=await actor(header),scope={tenantId:input.tenantId,campaignId:input.campaignId};return db.runTransaction(async tx=>{await check(tx,uid,scope);const ref=campaignRef(scope),state=campaign(await tx.get(ref),scope),task=tasks(state,scope).find(t=>t.id===input.id);if(!task)throw fail(404);const f=ref.collection('giftFulfillments').doc(task.id),old=(await tx.get(f)).data()??defaults();
   if(old.lastMutationId===input.mutationId){if(old.lastMutationDigest!==normalized.digest)throw fail(409);return {revision:old.revision,alreadyApplied:true};}
   if(old.revision!==input.revision||old.status==='delivered'||old.revision>=1000)throw fail(409);
-  const value=normalized.value,total=value.purchaseCents+value.packagingCents+value.transportCents;if(financiallyLocked(old)&&confirmedFields.some(k=>value[k]!==old[k]))throw fail(409);
+  const selection=normalized.hasSelection?normalized.selection:old.catalogSelection??null;
+  if(financiallyLocked(old)&&selectionKey(selection)!==selectionKey(old.catalogSelection))throw fail(409);
+  const value=normalized.value;let catalogLines=old.catalogLines??[];
+  if(!financiallyLocked(old)){
+   if(selection){const c=(await tx.get(db.doc(catalogDocument))).data(),asOf=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now())),resolved=resolveCatalogLines(c,selection,{dueDate:value.dueDate,asOf});
+    if(['purchaseCents','composition','supplier'].some(k=>value[k]!==resolved[k]))throw fail(409);catalogLines=resolved.lines;
+   }else catalogLines=[];
+  }
+  const total=value.purchaseCents+value.packagingCents+value.transportCents;if(financiallyLocked(old)&&confirmedFields.some(k=>value[k]!==old[k]))throw fail(409);
   const allocatedCents=old.confirmation?.allocatedCents??task.entitlement.budgetCents;if(total>allocatedCents)throw fail(422);
   const next=giftStatuses[giftStatuses.indexOf(old.status)+1],allowed=[old.status,...(old.status==='incident'?[old.resumeStatus]:[next,'incident'])];if(!allowed.includes(value.status))throw fail(409);
   if(value.status!=='to-select'&&value.status!=='incident'&&(!value.dueDate||value.dueDate<task.entitlement.earnedOn||!value.owner||!value.composition||!value.supplier||!value.alcoholFreeConfirmed))throw fail(422);
@@ -49,10 +59,10 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString()}=
   if(value.status==='delivered'&&!value.deliveryReference)throw fail(422);
   const beneficiaries=!['to-select','incident'].includes(value.status)?await beneficiaryPreferences(tx,db,scope,task.id):null;
   if(beneficiaries&&!preferencesReady(beneficiaries))throw fail(422);
-  const changes=editable.filter(k=>old[k]!==value[k]).map(field=>({field,before:old[field],after:value[field]}));if(!changes.length)throw fail(400);
+  const changes=editable.filter(k=>old[k]!==value[k]).map(field=>({field,before:old[field],after:value[field]}));if(selectionKey(selection)!==selectionKey(old.catalogSelection))changes.push({field:'catalogSelection',before:old.catalogSelection??null,after:selection});if(!changes.length)throw fail(400);
   const revision=old.revision+1,at=now(),resumeStatus=value.status==='incident'?(old.status==='incident'?old.resumeStatus:old.status):null;
   if(value.status==='to-receive'&&old.status==='to-order'&&beneficiaries&&!beneficiaries.preferencesFrozen)tx.update(beneficiaries.ref,{preferenceSnapshot:{people:beneficiaries.people,at,actor:uid,fulfillmentRevision:revision}});
-  const confirmation=old.confirmation??(old.status==='to-order'&&value.status==='to-receive'?{version:1,source:'operator-confirmed',at,actor:uid,revision,allocatedCents,totalCostCents:total,marginCents:allocatedCents-total,...Object.fromEntries(confirmedFields.map(k=>[k,value[k]]))}:null);
-  tx.set(f,{...value,...(confirmation?{confirmation}:{}),revision,resumeStatus,updatedAt:at,entitlementId:task.entitlement.id,budgetCents:allocatedCents,lastMutationId:input.mutationId,lastMutationDigest:normalized.digest});tx.create(f.collection('audit').doc(String(revision).padStart(6,'0')),{revision,at,actor:uid,reason:normalized.reason,changes});return {revision,alreadyApplied:false};});}
+  const confirmation=old.confirmation??(old.status==='to-order'&&value.status==='to-receive'?{version:selection?2:1,source:selection?'catalog-confirmed':'operator-confirmed',...(selection?{catalog:{revision:selection.revision,lines:catalogLines}}:{}),at,actor:uid,revision,allocatedCents,totalCostCents:total,marginCents:allocatedCents-total,...Object.fromEntries(confirmedFields.map(k=>[k,value[k]]))}:null);
+  tx.set(f,{...value,...(selection?{catalogSelection:selection,catalogLines}:{}),...(confirmation?{confirmation}:{}),revision,resumeStatus,updatedAt:at,entitlementId:task.entitlement.id,budgetCents:allocatedCents,lastMutationId:input.mutationId,lastMutationDigest:normalized.digest});tx.create(f.collection('audit').doc(String(revision).padStart(6,'0')),{revision,at,actor:uid,reason:normalized.reason,changes});return {revision,alreadyApplied:false};});}
  };
 }
