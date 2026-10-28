@@ -1,3 +1,4 @@
+import {createGiftReservations} from './gift-reservations.mjs';
 import {createGiftProposals,acquiredProposal} from './gift-proposals.mjs';
 import {anticipatedComposition} from '../operations/anticipated-composition.mjs';
 import {preferredCategories} from './beneficiary-data.mjs';
@@ -52,6 +53,7 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString(),c
 
  return {
  ...createGiftProposals({db,actor,check,campaignRef,build:buildAnticipation,now}),
+ ...createGiftReservations({db,actor,check,campaignRef,build:buildAnticipation,now,catalogDocument}),
  async list(header){const uid=await actor(header);return db.runTransaction(async tx=>{const scopes=await check(tx,uid),rows=[],clients=[];
   for(const scope of scopes){const ref=campaignRef(scope),state=campaign(await tx.get(ref),scope);clients.push({tenantId:scope.tenantId,campaignId:scope.campaignId,name:collectiveIdentity(state).organizationName});for(const task of tasks(state,scope)){if(rows.length>=200)throw fail(409);const current=(await tx.get(ref.collection('giftFulfillments').doc(task.id))).data(),identity=(await tx.get(ref.collection('teamIdentities').doc(task.entitlement.teamId))).data();rows.push(project(state,scope,task,current,identity));}}
   return {clients,rows:rows.sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999')||a.client.localeCompare(b.client)||a.team.localeCompare(b.team)),generatedAt:now()};});},
