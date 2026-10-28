@@ -15,3 +15,5 @@
 #annual-kpi-referent-preview{overflow-wrap:anywhere}
 
 #annual-review{margin:24px 0;background:#edf2e6}#annual-review h3{font:26px Georgia,serif;margin-top:0}#annual-review dt{font-weight:600;margin-top:16px}#annual-review dd{margin:6px 0;overflow-wrap:anywhere}#annual-review-version{font-weight:600}#annual-review-contract{border-top:1px solid #aebba8;padding-top:16px}
+
+.annual-contract-form{margin-top:24px}.annual-contract-form label{margin:18px 0}#annual-contract-preview{border-left:3px solid #8ca77e;padding:0 16px;margin:24px 0}#annual-contract-preview dt{font-weight:600;margin-top:16px}#annual-contract-preview dd{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}

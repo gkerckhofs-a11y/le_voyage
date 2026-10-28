@@ -31,5 +31,8 @@ test('annual draft is scoped, persistent, revision checked and cannot mutate act
  await service.save(header,scope,{input:withReferent,revision:7,mutationId:randomUUID()});assert.deepEqual((await createAnnualPlanning(a).read(header,scope)).input,withReferent);
  await assert.rejects(service.save(header,scope,{input:{...withReferent,questionnaire:{...withReferent.questionnaire,kpiReferent:{uid}}},revision:8,mutationId:randomUUID()}),{status:400});assert.equal((await service.read(header,scope)).revision,8);assert.equal((await ref.get()).data().payload,payload);
  assert.equal((await member.get()).data().assignments.length,1);assert.equal((await a.db.collection(`tenants/${tenantId}/members`).get()).size,1);
+ const withContract={...withReferent,contract:{privacyNotice:'Mentions fictives privées',clauses:'Clauses fictives privées',versionReference:'Projet fictif A'}};
+ await service.save(header,scope,{input:withContract,revision:8,mutationId:randomUUID()});assert.deepEqual((await createAnnualPlanning(a).read(header,scope)).input,withContract);
+ await assert.rejects(service.save(header,scope,{input:{...withContract,contract:{...withContract.contract,accepted:true}},revision:9,mutationId:randomUUID()}),{status:400});assert.equal((await service.read(header,scope)).revision,9);assert.equal((await ref.get()).data().payload,payload);
  await assert.rejects(service.read(header,{...scope,tenantId:'foreign'}),{status:403});await assert.rejects(service.preview(header,scope,{...input,tenantId:'foreign'}),{status:400});await member.update({canPlanCampaign:false});await assert.rejects(service.read(header,scope),{status:403});await assert.rejects(service.save(header,scope,{...command,revision:1,mutationId:randomUUID()}),{status:403});
 });
