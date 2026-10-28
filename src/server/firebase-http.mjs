@@ -140,7 +140,7 @@ export async function createFirebaseHttp(options){
     POST:['/api/demo/session','/api/demo/claim','/api/my-week/answer','/api/my-week/absence','/api/my-gift-preferences','/api/team-vote/cast']
    }:{
     GET:['/api/gifts/ops','/api/gifts/catalog'],
-    POST:['/api/demo/session','/api/gifts/ops/detail','/api/gifts/ops/save','/api/gifts/catalog/save','/api/gifts/catalog/import/preview','/api/gifts/catalog/import/xlsx-preview','/api/gifts/catalog/import/sheets-preview','/api/gifts/catalog/import/history','/api/gifts/catalog/import/restore-preview','/api/gifts/catalog/import/read','/api/gifts/catalog/import/confirm','/api/gifts/catalog/suggest','/api/gifts/beneficiaries/read','/api/gifts/beneficiaries/freeze','/api/gifts/beneficiaries/review']
+    POST:['/api/demo/session','/api/gifts/ops/detail','/api/gifts/ops/amend','/api/gifts/ops/save','/api/gifts/catalog/save','/api/gifts/catalog/import/preview','/api/gifts/catalog/import/xlsx-preview','/api/gifts/catalog/import/sheets-preview','/api/gifts/catalog/import/history','/api/gifts/catalog/import/restore-preview','/api/gifts/catalog/import/read','/api/gifts/catalog/import/confirm','/api/gifts/catalog/suggest','/api/gifts/beneficiaries/read','/api/gifts/beneficiaries/freeze','/api/gifts/beneficiaries/review']
    };
    if(!routes[req.method]?.includes(path))throw failure(403);
   }
@@ -190,6 +190,7 @@ export async function createFirebaseHttp(options){
   if(path.startsWith('/api/gifts/ops/')&&req.method==='POST'){
    authorized(req,session);
    if(path==='/api/gifts/ops/detail'){const input=await body(req,['tenantId','campaignId','id']);json(200,await giftOperations.detail(session.header,input,input.id));return;}
+   if(path==='/api/gifts/ops/amend'){json(200,await giftOperations.amend(session.header,await body(req,['tenantId','campaignId','id','revision','mutationId','reference','reason','purchaseCents','packagingCents','transportCents'])));return;}
    if(path==='/api/gifts/ops/save'){const input=await body(req,['tenantId','campaignId','id','revision','mutationId','reason','dueDate','owner','composition','supplier','orderReference','deliveryReference','purchaseCents','packagingCents','transportCents','alcoholFreeConfirmed','status'],4096,['catalogSelection']);json(200,await giftOperations.save(session.header,input));return;}
    throw failure(404);
   }
