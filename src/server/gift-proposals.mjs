@@ -18,7 +18,7 @@ export function createGiftProposals({db,actor,check,campaignRef,build,now}){
  async function write(header,input,action){validate(input,action);const uid=await actor(header);return db.runTransaction(async tx=>{
   await check(tx,uid,input);const ref=refFor(input),old=(await tx.get(ref)).data(),auditRef=ref.collection('history').doc(input.mutationId),prior=(await tx.get(auditRef)).data(),digest=hash([action,Object.keys(input).sort().map(k=>[k,input[k]])]);
   if(prior){if(prior.digest!==digest)throw fail(409);return {revision:prior.record.revision,alreadyApplied:true};}
-  if(['reserved','authorized'].includes((await tx.get(campaignRef(input).collection('giftReservations').doc(proposalDocumentId(input.teamId,input.milestoneNumber)))).data()?.status))throw fail(409);
+  if(['reserved','authorized','ordered'].includes((await tx.get(campaignRef(input).collection('giftReservations').doc(proposalDocumentId(input.teamId,input.milestoneNumber)))).data()?.status))throw fail(409);
   if((old?.revision??0)!==input.revision||(old?.revision??0)>=20||action==='review'&&!old)throw fail(409);
   const fees=action==='save'?input:old.proposal,current=await build(tx,{...Object.fromEntries(baseKeys.map(k=>[k,input[k]])),packagingCents:fees.packagingCents,transportCents:fees.transportCents});
   if(current.fingerprint!==(action==='save'?input.fingerprint:old.proposal.fingerprint))throw fail(409);
