@@ -4,15 +4,16 @@ const fail=status=>Object.assign(Error('Reservation unavailable'),{status});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
- const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:['revision'])];
+ const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:['revision'])];
  if(!input||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw fail(400);
  for(const key of scopeKeys.slice(0,3))if(typeof input[key]!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input[key]))throw fail(400);
  for(const key of ['milestoneNumber',action==='reserve'?'proposalRevision':'revision'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>1000)throw fail(400);
  if(['authorize','confirm'].includes(action)&&((action==='authorize'?input.riskAccepted:input.confirmationAccepted)!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
+ if(action==='consume'&&input.consumptionAccepted!==true)throw fail(400);
  if(input.milestoneNumber>100||typeof input.mutationId!=='string'||!/^[a-f0-9-]{36}$/.test(input.mutationId))throw fail(400);
  for(const key of action==='reserve'?['reason','conditions']:['reason'])if(typeof input[key]!=='string'||input[key].trim().length<3||input[key].length>(key==='conditions'?600:240)||/[\u0000-\u001f]/.test(input[key]))throw fail(400);
 }
-// A separate ledger: Master stock is a declared ceiling, never decremented here.
+// counts includes held and declared consumed units pending reconciliation; Master is never decremented here.
 export function createGiftReservations({db,actor,check,campaignRef,build,now,catalogDocument}){
  const ledgerRef=db.doc(catalogDocument).collection('reservationLedger').doc('main');
  async function write(header,input,action){validate(input,action);const uid=await actor(header);return db.runTransaction(async tx=>{
@@ -45,11 +46,23 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    if(action==='confirm'){
     if(await acquiredAnticipatedOrder(tx,campaignRef(input),{teamId:input.teamId,milestoneId:current.milestoneId}))throw fail(409);
     if(!old.authorization||old.authorization.revokedAt||old.authorization.amountCents!==current.totalCostCents||old.authorization.allocatedCents!==current.allocatedCents)throw fail(409);
-    const committed={...ledger.committed};for(const line of current.lines){const key=hash(line.sku),quantity=committed[key]??0;if(!Number.isSafeInteger(quantity)||quantity<0||quantity+line.quantity>counts[key])throw fail(409);committed[key]=quantity+line.quantity;}ledger.committed=committed;
+    const committed={...ledger.committed};for(const line of current.lines){const key=hash(line.sku),quantity=committed[key]??0;if(!Number.isSafeInteger(quantity)||quantity<0||quantity+line.quantity+(ledger.consumed?.[key]??0)>counts[key])throw fail(409);committed[key]=quantity+line.quantity;}ledger.committed=committed;
     record={...old,status:'ordered',order:{version:1,source:'operator-confirmed-anticipation',reference:input.reference.trim(),at:now(),actor:uid,authorizationReference:old.authorization.reference,authorizationRevision:old.revision,proposalRevision:old.proposalRevision,catalogRevision:current.catalogRevision,dueDate:current.dueDate,allocatedCents:current.allocatedCents,purchaseCents:current.purchaseCents,packagingCents:current.packagingCents,transportCents:current.transportCents,totalCostCents:current.totalCostCents,conditions:old.conditions,lines:current.lines.map(l=>Object.fromEntries(['sku','name','supplier','quantity','unitPurchaseCents','priceBasis','vatBasisPoints','restrictions'].map(k=>[k,l[k]])))}};
    }else{
    record={...old,status:'authorized',authorization:{reference:input.reference.trim(),at:now(),actor:uid,reservationRevision:old.revision,proposalRevision:old.proposalRevision,amountCents:current.totalCostCents,allocatedCents:current.allocatedCents,riskAccepted:true}};
    }
+  }else if(action==='consume'){
+   if(!old||old.status!=='ordered'||old.revision!==input.revision||old.consumption||!old.fulfillmentLink||!old.order)throw fail(409);
+   const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);
+   const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();
+   if(fulfillment?.status!=='delivered'||!fulfillment.deliveryReference||!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id))throw fail(409);
+   const consumed={...ledger.consumed},committed={...ledger.committed},seen=new Set();
+   for(const line of old.order.lines){const key=hash(line.sku),used=consumed[key]??0,held=committed[key]??0,total=counts[key];
+    if(seen.has(key)||!Number.isSafeInteger(line.quantity)||line.quantity<1||!Number.isSafeInteger(used)||used<0||!Number.isSafeInteger(held)||held<line.quantity||!Number.isSafeInteger(total)||total<held+used)throw fail(409);
+    seen.add(key);consumed[key]=used+line.quantity;committed[key]=held-line.quantity;if(!committed[key])delete committed[key];
+   }
+   if(!seen.size)throw fail(409);ledger.consumed=consumed;ledger.committed=committed;
+   record={...old,consumption:{version:1,source:'operator-declared-after-delivery',at:now(),actor:uid,fulfillmentId:id,fulfillmentRevision:fulfillment.revision,deliveryReference:fulfillment.deliveryReference,orderDigest:hash(old.order),lines:old.order.lines.map(l=>({sku:l.sku,quantity:l.quantity}))}};
   }else if(action==='revoke'){
    if(!old||old.status!=='authorized'||old.revision!==input.revision||!old.authorization)throw fail(409);
    // Withdraw internal permission, not a supplier order; keep quantities held.
@@ -57,14 +70,15 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
   }else{
    if(!old||old.status!=='reserved'||old.revision!==input.revision)throw fail(409);
    // Release still works after acquisition, catalog archival or context changes.
-   for(const line of old.proposal.lines){const key=hash(line.sku),reserved=counts[key];if(!Number.isSafeInteger(reserved)||reserved-line.quantity<(ledger.committed?.[key]??0))throw fail(409);counts[key]=reserved-line.quantity;if(counts[key]===0)delete counts[key];}
+   for(const line of old.proposal.lines){const key=hash(line.sku),reserved=counts[key];if(!Number.isSafeInteger(reserved)||reserved-line.quantity<((ledger.committed?.[key]??0)+(ledger.consumed?.[key]??0)))throw fail(409);counts[key]=reserved-line.quantity;if(counts[key]===0)delete counts[key];}
    record={...old,status:'released'};
   }
   const revision=(old?.revision??0)+1;record={...record,revision,updatedAt:now(),actor:uid,reason:input.reason.trim()};
-  if(['reserve','release','confirm'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
+  if(['reserve','release','confirm','consume'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
  });}
  return {
  reserveProposal:(header,input)=>write(header,input,'reserve'),
+ consumeAnticipatedOrder:(header,input)=>write(header,input,'consume'),
  confirmAnticipatedOrder:(header,input)=>write(header,input,'confirm'),
  authorizePurchase:(header,input)=>write(header,input,'authorize'),
  revokePurchaseAuthorization:(header,input)=>write(header,input,'revoke'),
@@ -74,8 +88,8 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
   for(const scope of scopes){const records=await tx.get(campaignRef(scope).collection('giftReservations').limit(201));if(records.size>200||rows.length+records.size>200)throw fail(409);
    for(const doc of records.docs){const r=doc.data();const lines=r.proposal.lines.map(l=>{
     const product=catalog?.products.find(p=>(catalog.masterById?.[p.id]?.sku??p.id)===l.sku),stock=product?catalog.masterById?.[product.id]?.stockQuantity:null,reserved=ledger?.counts?.[hash(l.sku)]??0;
-    return {sku:l.sku,name:l.name,quantity:l.quantity,committedQuantity:ledger?.committed?.[hash(l.sku)]??0,declaredStock:Number.isSafeInteger(stock)?stock:null,unreservedQuantity:Number.isSafeInteger(stock)?Math.max(0,stock-reserved):null,shortfall:Number.isSafeInteger(stock)?Math.max(0,reserved-stock):null};
-   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,fulfillmentLink:r.fulfillmentLink??null,lines});
+    return {sku:l.sku,name:l.name,quantity:l.quantity,committedQuantity:ledger?.committed?.[hash(l.sku)]??0,consumedQuantity:ledger?.consumed?.[hash(l.sku)]??0,declaredStock:Number.isSafeInteger(stock)?stock:null,unreservedQuantity:Number.isSafeInteger(stock)?Math.max(0,stock-reserved):null,shortfall:Number.isSafeInteger(stock)?Math.max(0,reserved-stock):null};
+   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,fulfillmentLink:r.fulfillmentLink??null,consumption:r.consumption??null,lines});
    }
   }return {rows,generatedAt:now()};
  });}
