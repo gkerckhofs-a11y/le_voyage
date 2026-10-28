@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('annual calendar draft previews, saves and reloads without altering current journey',async({page},info)=>{
  await page.goto('/connexion.html');await page.getByRole('button',{name:'Administration fictive',exact:true}).click();await page.getByRole('link',{name:'Préparer le calendrier de la prochaine campagne'}).click();await expect(page.locator('#annual-fields')).toHaveJSProperty('disabled',false);
- await page.locator('#organisation-enabled').uncheck();await page.locator('#funding-enabled').uncheck();await page.locator('#questionnaire-enabled').uncheck();
+ await page.locator('#attentions-enabled').uncheck();await page.locator('#organisation-enabled').uncheck();await page.locator('#funding-enabled').uncheck();await page.locator('#questionnaire-enabled').uncheck();
  const before=await(await page.request.get('/api/demo/team')).json();
  for(const [id,value] of Object.entries({start:'2028-02-29',timeZone:'Europe/Brussels',freezeDate:'2028-12-01',receptionDate:'2029-02-01',giftCount:'5',receptionTierCount:'4',closedStarts:''}))await page.locator('#'+id).fill(value);
  await page.locator('#evaluationWeekday').selectOption('7');await page.locator('#partialWeeks').selectOption('exclude');await page.locator('#leapDayAnniversary').selectOption('march-1');

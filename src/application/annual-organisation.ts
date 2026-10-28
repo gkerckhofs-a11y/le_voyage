@@ -1,3 +1,4 @@
+import type {AnnualAttentionsPreview} from './annual-attentions.ts';
 import type {previewAnnualFunding} from './annual-funding.ts';
 
 export type AnnualOrganisation = {
@@ -37,8 +38,10 @@ export function previewAnnualOrganisation(input: AnnualOrganisation | undefined)
 export function previewEnterpriseFunding(
   organisation: ReturnType<typeof previewAnnualOrganisation>,
   funding: ReturnType<typeof previewAnnualFunding>,
+  attentions: AnnualAttentionsPreview = null,
 ) {
   if (!organisation || !funding) return null;
+  if(attentions&&(attentions.basis!==funding.basis||attentions.totalCents===null))throw new Error('Complete matching attention budgets required');
   const giftLines = funding.giftAllocations.map((allocation, index) => {
     const quantity = allocation.unit === 'team' ? organisation.teamCount : organisation.totalHeadcount;
     return {stage:index + 1,...allocation,quantity,totalCents:safe(BigInt(allocation.amountCents) * BigInt(quantity))};
@@ -47,5 +50,6 @@ export function previewEnterpriseFunding(
   return {currency: funding.currency, basis: funding.basis, teamCount: organisation.teamCount,
     giftLines,giftMaximumPerTeamCents: funding.giftMaximumPerTeamCents, giftMaximumCents: safe(gifts),
     receptionMaximumCents: funding.receptionMaximumCents,
-    configuredMaximumCents: safe(gifts + BigInt(funding.receptionMaximumCents))};
+    datedMaximumCents:attentions?.datedMaximumCents??0,surpriseMaximumCents:attentions?.surpriseMaximumCents??0,
+    configuredMaximumCents: safe(gifts + BigInt(funding.receptionMaximumCents) + BigInt(attentions?.totalCents??0))};
 }
