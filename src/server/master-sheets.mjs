@@ -1,0 +1,22 @@
+import {GoogleAuth} from 'google-auth-library';
+import {createHash} from 'node:crypto';
+const fail=(status=422)=>Object.assign(Error('Master Sheets unavailable'),{status});
+export function masterSheetsConfig(env=process.env){
+ const keys=['RC_MASTER_SHEETS_ID','RC_MASTER_SHEETS_TAB','RC_MASTER_SHEETS_LABEL'];if(keys.every(k=>!env[k]))return null;
+ const [spreadsheetId,tab,label]=keys.map(k=>env[k]);if(typeof spreadsheetId!=='string'||!/^[A-Za-z0-9_-]{10,200}$/.test(spreadsheetId)||[tab,label].some(x=>typeof x!=='string'||!x.trim()||x.length>80||/[\u0000-\u001f\u007f]/.test(x)))throw Error('Explicit Master Sheets configuration required');return {spreadsheetId,tab,label};
+}
+export function masterGridToCsv(payload,tab){
+ if(!Array.isArray(payload?.sheets))throw fail();const matches=payload.sheets.filter(s=>s.properties?.title===tab);if(matches.length!==1)throw fail();const sheet=matches[0];if(sheet.properties.hidden||sheet.merges?.length||!Array.isArray(sheet.data)||sheet.data.length!==1)throw fail();const grid=sheet.data[0];if((grid.startRow??0)!==0||(grid.startColumn??0)!==0||(grid.rowMetadata??[]).some(m=>m.hiddenByUser||m.hiddenByFilter)||(grid.columnMetadata??[]).some(m=>m.hiddenByUser||m.hiddenByFilter))throw fail();
+ const rows=grid.rowData??[];if(!Array.isArray(rows)||rows.length<2||rows.length>101)throw fail();const headers=(rows[0].values??[]).map(c=>c.userEnteredValue?.stringValue),width=headers.length;if(width<1||width>19)throw fail();const numeric=new Set(['prix_achat_htva','tva_taux','prix_vente_htva','stock_quantite','delai_approvisionnement_jours','poids']);
+ const values=rows.map((r,i)=>{if(!Array.isArray(r.values??[])||(r.values??[]).length>width)throw fail();return Array.from({length:width},(_,j)=>{const cell=r.values?.[j]??{},v=cell.userEnteredValue;if(!v){if(cell.effectiveValue&&Object.keys(cell.effectiveValue).length)throw fail();return '';}const keys=Object.keys(v);if(keys.length!==1)throw fail();if(keys[0]==='stringValue'&&typeof v.stringValue==='string')return v.stringValue;if(keys[0]==='numberValue'&&i>0&&numeric.has(headers[j])&&Number.isFinite(v.numberValue)&&!['PERCENT','DATE','TIME','DATE_TIME'].includes(cell.effectiveFormat?.numberFormat?.type))return String(v.numberValue);throw fail();});});
+ const csv=values.map(r=>r.map(v=>'"'+v.replaceAll('"','""')+'"').join(';')).join('\n');if(Buffer.byteLength(csv)>120000)throw fail();return csv;
+}
+export function createMasterSheetsSource(config,{getAccessToken,fetchImpl=fetch,now=()=>new Date().toISOString()}={}){
+ if(!config)return null;const checked=masterSheetsConfig({RC_MASTER_SHEETS_ID:config.spreadsheetId,RC_MASTER_SHEETS_TAB:config.tab,RC_MASTER_SHEETS_LABEL:config.label});
+ const auth=getAccessToken?null:new GoogleAuth({scopes:['https://www.googleapis.com/auth/spreadsheets.readonly']}),token=getAccessToken??(()=>auth.getAccessToken());let active=false;
+ return {label:checked.label,tab:checked.tab,async read(){if(active)throw fail(429);active=true;const controller=new AbortController();let timer;try{
+  return await Promise.race([(async()=>{const accessToken=await token();if(typeof accessToken!=='string'||!accessToken)throw fail(503);const url=new URL('https://sheets.googleapis.com/v4/spreadsheets/'+checked.spreadsheetId);url.searchParams.set('ranges',"'"+checked.tab.replaceAll("'","''")+"'");url.searchParams.set('fields','sheets(properties(title,hidden),merges,data(startRow,startColumn,rowData(values(userEnteredValue,effectiveValue,effectiveFormat(numberFormat(type)))),rowMetadata(hiddenByUser,hiddenByFilter),columnMetadata(hiddenByUser,hiddenByFilter)))');
+   const response=await fetchImpl(url,{method:'GET',headers:{Authorization:'Bearer '+accessToken},redirect:'error',signal:controller.signal});if(!response.ok||!response.body)throw fail(503);const chunks=[];let length=0;for await(const chunk of response.body){length+=chunk.length;if(length>1000000){controller.abort();throw fail(422);}chunks.push(chunk);}const raw=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)),csv=masterGridToCsv(JSON.parse(raw),checked.tab),readAt=now();return {csv,source:{provider:'google-sheets',label:checked.label,tab:checked.tab,readAt,referenceDigest:createHash('sha256').update(checked.spreadsheetId+'\n'+checked.tab).digest('hex')}};
+  })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(fail(503));},10000);})]);
+ }catch(e){throw fail([422,429].includes(e.status)?e.status:503);}finally{clearTimeout(timer);controller.abort();active=false;}}};
+}

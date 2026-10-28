@@ -41,18 +41,18 @@ export function parseMasterCsv(csv,delimiter=';'){
  }catch(e){errors.push({line,message:e.message});}});
  return {errors,records};
 }
-export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
+export function createCatalogImport({actor,check,db,ref,now,validateProduct,sheetsSource=null}){
  const api={
  async listImports(header,input){
   if(!input||Object.keys(input).join(',')!=='beforeRevision'||(input.beforeRevision!==null&&(!Number.isSafeInteger(input.beforeRevision)||input.beforeRevision<1||input.beforeRevision>10001)))throw fail(400);
   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);let query=ref.collection('audit').orderBy('revision','desc');if(input.beforeRevision!==null)query=query.where('revision','<',input.beforeRevision);const rows=(await tx.get(query.limit(21))).docs.map(d=>d.data()),page=rows.slice(0,20);
-   return {imports:page.filter(a=>['csv-import','xlsx-import','catalog-restore'].includes(a.kind)).map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length,kind:a.kind})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
+   return {imports:page.filter(a=>['csv-import','xlsx-import','sheets-import','catalog-restore'].includes(a.kind)).map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length,kind:a.kind})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
   });
  },
  async readImport(header,input){
   if(!input||Object.keys(input).join(',')!=='importId'||typeof input.importId!=='string'||!/^[a-f0-9-]{36}$/.test(input.importId))throw fail(400);
   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(ref.collection('imports').doc(input.importId))).data();if(!d||d.status!=='applied')throw fail(404);
-   return {id:input.importId,revision:d.appliedRevision,previousRevision:d.revision,at:d.appliedAt,actor:d.actor,sourceName:d.sourceName,sourceDigest:d.sourceDigest,reason:d.reason,kind:d.kind??'csv-import',restoredFrom:d.restoredFrom??null,changes:d.changes,products:d.products,masterById:d.masterById};
+   return {id:input.importId,revision:d.appliedRevision,previousRevision:d.revision,at:d.appliedAt,actor:d.actor,sourceName:d.sourceName,sourceDigest:d.sourceDigest,source:d.source??null,reason:d.reason,kind:d.kind??'csv-import',restoredFrom:d.restoredFrom??null,changes:d.changes,products:d.products,masterById:d.masterById};
   });
  },
  async previewRestore(header,input){
@@ -70,6 +70,10 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
    const draftId=randomUUID(),at=now(),sourceName=d.sourceName;tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:digest(canonical({restoredFrom,products,masterById})),revision:c.revision,products,masterById,changes,kind:'catalog-restore',restoredFrom,status:'preview',expiresAt:Date.parse(at)+3600000});return {draftId,revision:c.revision,changes,missing,errors:[],sourceName,at,restoredFrom};
   });
  },
+ async previewSheets(header,input){
+  if(!input||Object.keys(input).length)throw fail(400);const uid=await actor(header);await db.runTransaction(async tx=>{await check(tx,uid);});if(!sheetsSource)throw fail(503);
+  const result=await sheetsSource.read();return api.previewImport(header,{csv:result.csv,delimiter:';',sourceName:'Google Sheets · '+sheetsSource.label},{kind:'sheets-import',sourceDigest:digest(result.csv),source:result.source});
+ },
  async previewXlsx(header,input){
   if(!input||Object.keys(input).sort().join(',')!=='base64,sourceName')throw fail(400);const uid=await actor(header),sourceName=inputText(input.sourceName,120);await db.runTransaction(async tx=>{await check(tx,uid);});
   const decoded=await decodeMasterXlsx(input.base64);if(decoded.error)return {errors:[{line:0,message:decoded.error}],changes:[],missing:[],draftId:null};
@@ -85,7 +89,7 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
    }
    if(products.length>100)errors.push({line:0,message:'Le catalogue dépasserait 100 références.'});const seen=new Set(parsed.records.map(r=>r.sku)),missing=[...bySku.keys()].filter(s=>!seen.has(s));
    if(errors.length||!changes.length)return {errors,changes,missing,draftId:null,revision:c.revision};
-   const draftId=randomUUID(),at=now();tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:sourceInfo?.sourceDigest??digest(input.csv),...(sourceInfo?{kind:sourceInfo.kind}:{}),revision:c.revision,products,masterById,changes,status:'preview',expiresAt:Date.parse(at)+3600000});
+   const draftId=randomUUID(),at=now();tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:sourceInfo?.sourceDigest??digest(input.csv),...(sourceInfo?{kind:sourceInfo.kind,...(sourceInfo.source?{source:sourceInfo.source}:{})}:{}),revision:c.revision,products,masterById,changes,status:'preview',expiresAt:Date.parse(at)+3600000});
    return {draftId,revision:c.revision,changes,missing,errors:[],sourceName,at};
   });
  },
@@ -93,8 +97,8 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
   if(!input||Object.keys(input).sort().join(',')!=='draftId,reason'||typeof input.draftId!=='string'||!/^[a-f0-9-]{36}$/.test(input.draftId))throw fail(400);const reason=inputText(input.reason,240);if(reason.length<3)throw fail(400);const uid=await actor(header),draftRef=ref.collection('imports').doc(input.draftId);
   return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(draftRef)).data();if(!d||d.actor!==uid)throw fail(403);if(d.status==='applied'){if(d.reason!==reason)throw fail(409);return {revision:d.appliedRevision,alreadyApplied:true};}
    const c=(await tx.get(ref)).data();if(!c||d.revision!==c.revision||c.revision>=10000||Date.parse(now())>=d.expiresAt)throw fail(409);
-   const revision=c.revision+1,at=now();tx.set(ref,{...c,revision,products:d.products,masterById:d.masterById,lastImport:{id:input.draftId,sourceName:d.sourceName,at,actor:uid,revision,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{})}});
-   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{}),importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:(d.kind==='catalog-restore'?'Restauration catalogue':d.kind==='xlsx-import'?'Import XLSX':'Import CSV')+' · '+d.changes.length+' référence(s)'}});
+   const revision=c.revision+1,at=now();tx.set(ref,{...c,revision,products:d.products,masterById:d.masterById,lastImport:{id:input.draftId,sourceName:d.sourceName,at,actor:uid,revision,kind:d.kind??'csv-import',...(d.source?{source:d.source}:{}),...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{})}});
+   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:d.kind??'csv-import',...(d.source?{source:d.source}:{}),...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{}),importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:(d.kind==='catalog-restore'?'Restauration catalogue':d.kind==='xlsx-import'?'Import XLSX':d.kind==='sheets-import'?'Import Google Sheets':'Import CSV')+' · '+d.changes.length+' référence(s)'}});
    tx.update(draftRef,{status:'applied',reason,appliedRevision:revision,appliedAt:at});return {revision,alreadyApplied:false};
   });
  }
