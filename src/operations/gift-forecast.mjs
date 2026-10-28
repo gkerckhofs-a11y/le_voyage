@@ -13,7 +13,7 @@ export function forecastGift(state,teamId,asOf){
  const index=state.config.giftMilestones.findIndex(m=>!acquired.has(m.id)),milestone=state.config.giftMilestones[index];
  const byWeek=new Map(outcomes.map(o=>[o.weekId,o]));
  const remaining=weeks.filter(w=>!byWeek.has(w.id)).map(w=>({id:w.id,start:w.start,deadline:state.reports[JSON.stringify([teamId,w.id])]??w.endExclusive}));
- const base={teamId,asOf,distanceKm:rounded(distance),milestoneNumber:milestone?index+1:null,thresholdKm:milestone?.km??null,budgetCents:milestone?.budgetCents??null,remainingKm:null,activeWeeksRemaining:remaining.length,sampleSize:0,meanKm:null,estimatedActiveWeeks:null,fastActiveWeeks:null,slowActiveWeeks:null,estimatedDate:null,status:'no-pending-milestone'};
+ const base={teamId,asOf,distanceKm:rounded(distance),milestoneNumber:milestone?index+1:null,thresholdKm:milestone?.km??null,allocatedCents:milestone?.budgetCents??null,remainingKm:null,activeWeeksRemaining:remaining.length,sampleSize:0,meanKm:null,estimatedActiveWeeks:null,fastActiveWeeks:null,slowActiveWeeks:null,estimatedDate:null,status:'no-pending-milestone'};
  if(!milestone)return base;
  const gap=add(exact(String(milestone.km)),multiply(distance,negativeOne));base.remainingKm=compare(gap,zero)>0?ceiling(gap):0;
  // Never turn a projection into an entitlement, including inconsistent historical states.

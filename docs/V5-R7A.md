@@ -39,6 +39,10 @@ Absence d'historique suffisant, historique ancien, progression nulle, données f
 
 Captures inspectées : [desktop](evidence/v5-r7a-forecasts-desktop.png), [mobile](evidence/v5-r7a-forecasts-mobile.png). Navigation haute desktop, fixe en bas mobile, aucun débordement horizontal constaté. Kiosque inchangé : pas de nouvelle capture.
 
+## Correctif de recette intégrée
+
+La CI du premier commit R7A a signalé les trois nouveaux fichiers absents de la liste publique explicite. Ajout de `assets/web/gift-forecast.js`, `previsions.html`, `previsions.css` dans `tests/visual/public-build.test.mjs`. La projection de budget utilise désormais `allocatedCents`, comme le cockpit existant, et le test conserve l'interdiction de diffuser les champs du modèle privé. Les contrôles de contenu privé ne sont pas assouplis. Vérification du correctif : typecheck/build réussis ; `node --test tests/gift-forecast.test.mjs tests/visual/public-build.test.mjs` **7/7**, tests serveur cadeaux **8/8**, parcours prévisions **2/2**. Captures inchangées après cette correction de schéma.
+
 ## Suite et risques ouverts
 
 R7B : propositions anticipées reliées au catalogue et aux préférences autorisées, coûts et délais explicites, puis validation humaine et gestion du risque de stock réservé. Les conditions de réservation/retour et les seuils d'alerte restent à préciser. Pas de probabilité commerciale calculée ni d'achat automatique.
