@@ -26,3 +26,11 @@ test('organisation and budget previews leave campaign dates, thresholds and ques
  const before=previewAnnualPlan(input),after=previewAnnualPlan({...input,organisation});const {organisation:o,enterpriseFunding:f,...rest}=after;
  assert.deepEqual(rest,(({organisation,enterpriseFunding,...rest})=>rest)(before));assert.equal(f,null);assert.equal(o.totalHeadcount,8);
 });
+test('per-person stage uses planned headcounts, independent from reception guests',()=>{
+ const f=previewAnnualFunding({basis:'TTC',giftAllocations:[{unit:'person',amountCents:12550},{unit:'team',amountCents:20000}],receptionTotalsCents:[100000,130000,160000]},2,2);
+ const p=previewEnterpriseFunding(previewAnnualOrganisation(organisation),f);assert.equal(p.giftMaximumCents,140400);assert.equal(p.configuredMaximumCents,300400);assert.equal(p.giftMaximumPerTeamCents,null);
+ assert.deepEqual(p.giftLines,[{stage:1,unit:'person',amountCents:12550,quantity:8,totalCents:100400},{stage:2,unit:'team',amountCents:20000,quantity:2,totalCents:40000}]);
+ assert.deepEqual(previewEnterpriseFunding(previewAnnualOrganisation({...organisation,receptionGuests:999}),f),p);
+ const more=previewEnterpriseFunding(previewAnnualOrganisation({...organisation,teams:[organisation.teams[0],{name:'Pionniers',headcount:4}]}),f);assert.equal(more.configuredMaximumCents,312950);assert.equal(more.giftLines[1].totalCents,40000);
+ const huge=previewAnnualFunding({basis:'HT',giftAllocations:[{unit:'person',amountCents:Number.MAX_SAFE_INTEGER}],receptionTotalsCents:[0]},1,0);assert.throws(()=>previewEnterpriseFunding(previewAnnualOrganisation(organisation),huge));
+});

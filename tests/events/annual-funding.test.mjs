@@ -15,3 +15,10 @@ test('budgeted annual plan preserves calendar thresholds and does not invent an 
  const input={start:'2027-11-15',evaluationWeekday:7,partialWeeks:'exclude',leapDayAnniversary:'february-28',freezeDate:'2028-09-01',receptionDate:'2028-10-20',giftCount:2,receptionTierCount:2};
  const before=previewAnnualPlan(input),after=previewAnnualPlan({...input,funding});assert.deepEqual(after.weeks,before.weeks);assert.deepEqual(after.giftThresholds,before.giftThresholds);assert.deepEqual(after.receptionThresholds,before.receptionThresholds);assert.equal(after.funding.giftMaximumPerTeamCents,32550);assert.ok(!('enterpriseTotalCents' in after.funding));
 });
+test('mixed gift units remain explicit and legacy team drafts retain their meaning',()=>{
+ const modern={basis:'HT',giftAllocations:[{unit:'person',amountCents:12550},{unit:'team',amountCents:20000}],receptionTotalsCents:funding.receptionTotalsCents};
+ const p=previewAnnualFunding(modern,2,2);assert.equal(p.giftMaximumPerTeamCents,null);assert.equal(p.giftPerTeamCents,null);assert.deepEqual(p.giftAllocations,modern.giftAllocations);p.giftAllocations[0].amountCents=0;assert.equal(modern.giftAllocations[0].amountCents,12550);
+ assert.deepEqual(previewAnnualFunding(funding,2,2),previewAnnualFunding({...modern,giftAllocations:funding.giftPerTeamCents.map(amountCents=>({unit:'team',amountCents}))},2,2));
+ assert.equal(previewAnnualFunding({basis:'HT',giftAllocations:[],receptionTotalsCents:[0]},0,0).giftMaximumPerTeamCents,0);
+ for(const input of [{...modern,giftPerTeamCents:[1,2]},{basis:'HT',receptionTotalsCents:funding.receptionTotalsCents},{...modern,giftAllocations:[{unit:'team',amountCents:1}]},...['',null,'all','people'].map(unit=>({...modern,giftAllocations:[{unit,amountCents:1},modern.giftAllocations[1]]})),{...modern,giftAllocations:[{unit:'person',amountCents:1,recipientId:'other'},modern.giftAllocations[1]]},{...modern,giftAllocations:[{unit:'person',amountCents:-1},modern.giftAllocations[1]]}])assert.throws(()=>previewAnnualFunding(input,2,2));
+});

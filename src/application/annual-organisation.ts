@@ -33,15 +33,19 @@ export function previewAnnualOrganisation(input: AnnualOrganisation | undefined)
   if (!Number.isSafeInteger(input.receptionGuests) || input.receptionGuests < 0) throw new Error('Exact reception guest count required');
   return {...structuredClone(input), teamCount: input.teams.length, totalHeadcount: safe(people)};
 }
-/** Sum only the configured team-gift and reception envelopes, never an all-in quote. */
+/** Sum only the configured progression-gift and reception envelopes, never an all-in quote. */
 export function previewEnterpriseFunding(
   organisation: ReturnType<typeof previewAnnualOrganisation>,
   funding: ReturnType<typeof previewAnnualFunding>,
 ) {
   if (!organisation || !funding) return null;
-  const gifts = BigInt(funding.giftMaximumPerTeamCents) * BigInt(organisation.teamCount);
+  const giftLines = funding.giftAllocations.map((allocation, index) => {
+    const quantity = allocation.unit === 'team' ? organisation.teamCount : organisation.totalHeadcount;
+    return {stage:index + 1,...allocation,quantity,totalCents:safe(BigInt(allocation.amountCents) * BigInt(quantity))};
+  });
+  const gifts = giftLines.reduce((total,line) => total + BigInt(line.totalCents),0n);
   return {currency: funding.currency, basis: funding.basis, teamCount: organisation.teamCount,
-    giftMaximumPerTeamCents: funding.giftMaximumPerTeamCents, giftMaximumCents: safe(gifts),
+    giftLines,giftMaximumPerTeamCents: funding.giftMaximumPerTeamCents, giftMaximumCents: safe(gifts),
     receptionMaximumCents: funding.receptionMaximumCents,
     configuredMaximumCents: safe(gifts + BigInt(funding.receptionMaximumCents))};
 }
