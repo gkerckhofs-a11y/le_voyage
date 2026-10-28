@@ -19,6 +19,7 @@ profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@examp
 for(let i=1;i<=3;i++)profiles['team'+i]={uid:'demo-team-'+i,tenantId:'fiction-lex-ekho',email:'team'+i+'@example.test',teamId:'private-collective-team-'+i};
 profiles.operations={uid:'demo-operations-user',tenantId:'fiction-operations-demo',email:'operations@example.test'};
 for(const p of beneficiaryDemo.filter(p=>p.profile))profiles[p.profile]={uid:p.uid,tenantId:'fiction-operations-demo',email:p.uid+'@example.test',teamId:p.teamId};
+profiles.kpi={uid:'demo-kpi-referent',tenantId:'fiction-kpi-demo',email:'referent-kpi@example.test'};
 profiles.tpe={uid:'demo-tpe-user',tenantId:'fiction-tpe-auto',email:'tpe@example.test'};
 profiles.tpeadmin={uid:'demo-tpe-admin',tenantId:'fiction-tpe-auto',email:'tpe-admin@example.test'};
 
@@ -36,7 +37,11 @@ export async function createFirebaseHttp(options){
    const record=profile.tenantId==='fiction-operations-demo'?newOperationsDemo():profile.tenantId==='fiction-tpe-auto'?newAutonomousTpeDemo():newDemo();record.ledger.state.config.tenantId=profile.tenantId;
    profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:profile.teamId??'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(profile.tenantId==='fiction-tpe-auto'?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(['fiction-tpe-auto','fiction-kpi-demo'].includes(profile.tenantId)?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-kpi-referent'?{participationEnabled:false,kpiAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+  }
+  for(const [id,start,endExclusive,state] of [['october-test','2026-10-01','2026-11-01','open'],['september-test','2026-09-01','2026-10-01','frozen']]){
+   const ref=adapter.db.doc(`tenants/${profiles.kpi.scope.tenantId}/campaigns/${profiles.kpi.scope.campaignId}/kpiPeriods/${id}`);
+   await adapter.db.runTransaction(async tx=>{if(!(await tx.get(ref)).exists)tx.set(ref,{teamId:profiles.kpi.scope.teamId,start,endExclusive,state,definitionVersion:'fiction-v1',definitions:[{id:'quantity',label:'Livraisons fictives',unit:'unités'},{id:'delay',label:'Délai moyen fictif',unit:'jours'}]});});
   }
   await seedBeneficiaryDemo(adapter.db,profiles.operations.scope.campaignId);
   const operationsRef=adapter.db.doc('giftOperators/demo-operations-user');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(operationsRef)).exists)tx.set(operationsRef,{uid:'demo-operations-user',active:true,campaigns:['lex','atelier','tpe','operations'].map(id=>({tenantId:profiles[id].scope.tenantId,campaignId:profiles[id].scope.campaignId}))});});
@@ -57,11 +62,12 @@ export async function createFirebaseHttp(options){
    if(scope)await adapter.read(header,scope);
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
    if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,expires:now+3300000});
-   json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
+   json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
   if(path.startsWith('/api/kpi/')&&req.method==='POST'){
    if(!session.scope)throw failure(403);authorized(req,session);
+   if(path==='/api/kpi/list'){await body(req,[]);json(200,await kpiCollection.list(session.header,session.scope));return;}
    if(path==='/api/kpi/read'){const i=await body(req,['periodId']);json(200,await kpiCollection.read(session.header,session.scope,i.periodId));return;}
    if(path==='/api/kpi/submit'){const i=await body(req,['periodId','revision','mutationId','values','source','reason']);json(200,await kpiCollection.submit(session.header,session.scope,i));return;}
    throw failure(404);
