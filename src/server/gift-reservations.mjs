@@ -4,11 +4,12 @@ const fail=status=>Object.assign(Error('Reservation unavailable'),{status});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
- const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:['revision'])];
+ const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:['revision'])];
  if(!input||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw fail(400);
  for(const key of scopeKeys.slice(0,3))if(typeof input[key]!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input[key]))throw fail(400);
  for(const key of ['milestoneNumber',action==='reserve'?'proposalRevision':'revision'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>1000)throw fail(400);
  if(['authorize','confirm'].includes(action)&&((action==='authorize'?input.riskAccepted:input.confirmationAccepted)!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
+ if(action==='request-cancellation'&&(input.requestAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='consume'&&input.consumptionAccepted!==true)throw fail(400);
  if(input.milestoneNumber>100||typeof input.mutationId!=='string'||!/^[a-f0-9-]{36}$/.test(input.mutationId))throw fail(400);
  for(const key of action==='reserve'?['reason','conditions']:['reason'])if(typeof input[key]!=='string'||input[key].trim().length<3||input[key].length>(key==='conditions'?600:240)||/[\u0000-\u001f]/.test(input[key]))throw fail(400);
@@ -21,6 +22,7 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
   const old=(await tx.get(ref)).data(),auditRef=ref.collection('history').doc(input.mutationId),prior=(await tx.get(auditRef)).data(),digest=hash([uid,action,Object.keys(input).sort().map(k=>[k,input[k]])]);
   if(prior){if(prior.digest!==digest)throw fail(409);return {revision:prior.record.revision,alreadyApplied:true};}
   if((old?.revision??0)>=1000||['reserve','authorize','confirm'].includes(action)&&(old?.revision??0)>=998)throw fail(409);
+  if(action==='request-cancellation'&&(old?.revision??0)>=999)throw fail(409);
   if(old&&(old.teamId!==input.teamId||old.milestoneNumber!==input.milestoneNumber))throw fail(409);
   const ledger=(await tx.get(ledgerRef)).data()??{counts:{}};const counts={...ledger.counts};let record;
   if(action==='reserve'){
@@ -51,7 +53,18 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    }else{
    record={...old,status:'authorized',authorization:{reference:input.reference.trim(),at:now(),actor:uid,reservationRevision:old.revision,proposalRevision:old.proposalRevision,amountCents:current.totalCostCents,allocatedCents:current.allocatedCents,riskAccepted:true}};
    }
+  }else if(['request-cancellation','withdraw-cancellation'].includes(action)){
+   if(!old||old.status!=='ordered'||!old.order||old.revision!==input.revision)throw fail(409);
+   if(action==='withdraw-cancellation'){
+    if(old.cancellationRequest?.status!=='pending')throw fail(409);
+    record={...old,cancellationRequest:{...old.cancellationRequest,status:'withdrawn',withdrawnAt:now(),withdrawnBy:uid,withdrawalReason:input.reason.trim()}};
+   }else{
+    if(old.cancellationRequest?.status==='pending'||old.consumption)throw fail(409);
+    if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id)||fulfillment.status==='delivered'||fulfillment.status==='incident'&&fulfillment.resumeStatus==='delivered')throw fail(409);}
+    record={...old,cancellationRequest:{status:'pending',reference:input.reference.trim(),at:now(),actor:uid,reason:input.reason.trim(),orderDigest:hash(old.order)}};
+   }
   }else if(action==='consume'){
+   if(old?.cancellationRequest?.status==='pending')throw fail(409);
    if(!old||old.status!=='ordered'||old.revision!==input.revision||old.consumption||!old.fulfillmentLink||!old.order)throw fail(409);
    const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);
    const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();
@@ -77,6 +90,8 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
   if(['reserve','release','confirm','consume'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
  });}
  return {
+ requestOrderCancellation:(header,input)=>write(header,input,'request-cancellation'),
+ withdrawOrderCancellation:(header,input)=>write(header,input,'withdraw-cancellation'),
  reserveProposal:(header,input)=>write(header,input,'reserve'),
  consumeAnticipatedOrder:(header,input)=>write(header,input,'consume'),
  confirmAnticipatedOrder:(header,input)=>write(header,input,'confirm'),
@@ -89,7 +104,7 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    for(const doc of records.docs){const r=doc.data();const lines=r.proposal.lines.map(l=>{
     const product=catalog?.products.find(p=>(catalog.masterById?.[p.id]?.sku??p.id)===l.sku),stock=product?catalog.masterById?.[product.id]?.stockQuantity:null,reserved=ledger?.counts?.[hash(l.sku)]??0;
     return {sku:l.sku,name:l.name,quantity:l.quantity,committedQuantity:ledger?.committed?.[hash(l.sku)]??0,consumedQuantity:ledger?.consumed?.[hash(l.sku)]??0,declaredStock:Number.isSafeInteger(stock)?stock:null,unreservedQuantity:Number.isSafeInteger(stock)?Math.max(0,stock-reserved):null,shortfall:Number.isSafeInteger(stock)?Math.max(0,reserved-stock):null};
-   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,fulfillmentLink:r.fulfillmentLink??null,consumption:r.consumption??null,lines});
+   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,fulfillmentLink:r.fulfillmentLink??null,consumption:r.consumption??null,cancellationRequest:r.cancellationRequest??null,lines});
    }
   }return {rows,generatedAt:now()};
  });}
@@ -102,7 +117,7 @@ export async function acquiredAnticipatedOrder(tx,campaignRef,entitlement){
  const matches=records.docs.map(d=>({...d.data(),reservationId:d.id})).filter(r=>r.status==='ordered'&&r.proposal?.milestoneId===entitlement.milestoneId);
  if(matches.length>1)throw fail(409);if(!matches.length)return null;
  const record=matches[0];if(!record.order)throw fail(409);
- return {reservationId:record.reservationId,reservationRevision:record.revision,order:record.order,fulfillmentLink:record.fulfillmentLink??null};
+ return {reservationId:record.reservationId,reservationRevision:record.revision,order:record.order,fulfillmentLink:record.fulfillmentLink??null,cancellationRequest:record.cancellationRequest??null};
 }
 
 export const anticipatedOrderDigest=order=>hash(order);
