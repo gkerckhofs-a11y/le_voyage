@@ -14,10 +14,12 @@ import {planRollingYear} from '../domain/rolling-calendar.ts';
 import type {RollingCalendar} from '../domain/rolling-calendar.ts';
 import {activeWeeks,addDays,civilDate} from '../domain/calendar.ts';
 import {thresholds} from '../domain/scoring.ts';
-export type AnnualPlanInput=RollingCalendar & {freezeDate:string;receptionDate:string;giftCount:number;receptionTierCount:number;funding?:AnnualFunding;questionnaire?:AnnualQuestionnaire;organisation?:AnnualOrganisation;attentions?:AnnualAttentions;logistics?:AnnualLogistics;contract?:AnnualContract};
+import {giftScale} from '../domain/gift-scale.ts';
+import type {GiftScaleVersion} from '../domain/gift-scale.ts';
+export type AnnualPlanInput=RollingCalendar & {freezeDate:string;receptionDate:string;giftCount:number;giftScaleVersion?:GiftScaleVersion;receptionTierCount:number;funding?:AnnualFunding;questionnaire?:AnnualQuestionnaire;organisation?:AnnualOrganisation;attentions?:AnnualAttentions;logistics?:AnnualLogistics;contract?:AnnualContract};
 /** Calendar draft only: never changes a running campaign or awards a gift. */
 export function previewAnnualPlan(input:AnnualPlanInput){
- const keys=['start','evaluationWeekday','partialWeeks','leapDayAnniversary','timeZone','closedStarts','freezeDate','receptionDate','giftCount','receptionTierCount','funding','questionnaire','organisation','attentions','logistics','contract'];
+ const keys=['start','evaluationWeekday','partialWeeks','leapDayAnniversary','timeZone','closedStarts','freezeDate','receptionDate','giftCount','giftScaleVersion','receptionTierCount','funding','questionnaire','organisation','attentions','logistics','contract'];
  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))throw new Error('Invalid annual plan');
  if(input.closedStarts!==undefined&&(!Array.isArray(input.closedStarts)||input.closedStarts.length>60||input.closedStarts.some(s=>typeof s!=='string')))throw new Error('Invalid closures');
  const calendar=planRollingYear(input),freezeDate=civilDate(input.freezeDate),receptionDate=civilDate(input.receptionDate);
@@ -27,7 +29,8 @@ export function previewAnnualPlan(input:AnnualPlanInput){
  const organisation=previewAnnualOrganisation(input.organisation),funding=previewAnnualFunding(input.funding,input.giftCount,input.receptionTierCount);
  const attentions=previewAnnualAttentions(input.attentions,calendar.start,calendar.endExclusive,organisation);
  if(funding&&attentions&&funding.basis!==attentions.basis)throw new Error('All annual envelopes require the same HT/TTC basis');
- return {contract:previewAnnualContract(input.contract),logistics:previewAnnualLogistics(input.logistics,input.receptionTierCount),attentions,organisation,enterpriseFunding:previewEnterpriseFunding(organisation,funding,attentions),questionnaire:previewAnnualQuestionnaire(input.questionnaire),funding,schemaVersion:1 as const,...calendar,activeWeeks:active,maximumKm:active*100,weeksBeforeFreeze:beforeFreeze,receptionMaximumKm:beforeFreeze*100,
-  giftThresholds:thresholds(active,input.giftCount,'gift'),receptionThresholds:thresholds(beforeFreeze,input.receptionTierCount,'reception'),freezeDate,receptionDate};
+ const scale=giftScale(active,input.giftCount,input.giftScaleVersion);
+ return {giftScale:scale,contract:previewAnnualContract(input.contract),logistics:previewAnnualLogistics(input.logistics,input.receptionTierCount),attentions,organisation,enterpriseFunding:previewEnterpriseFunding(organisation,funding,attentions),questionnaire:previewAnnualQuestionnaire(input.questionnaire),funding,schemaVersion:1 as const,...calendar,activeWeeks:active,maximumKm:active*100,weeksBeforeFreeze:beforeFreeze,receptionMaximumKm:beforeFreeze*100,
+  giftThresholds:scale.thresholds,receptionThresholds:thresholds(beforeFreeze,input.receptionTierCount,'reception'),freezeDate,receptionDate};
 }
 export type AnnualPlanPreview=ReturnType<typeof previewAnnualPlan>;
