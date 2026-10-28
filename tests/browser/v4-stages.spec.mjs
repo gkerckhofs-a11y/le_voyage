@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('V4 milestones, full-route view and return to the same car',async({page},info)=>{
  await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
- const car=page.getByTestId('team-car');await expect(car).toHaveCount(1);await expect(page.locator('.road-marker')).toHaveCount(58);await expect(page.locator('.gift-route-marker')).toHaveCount(5);
+ const car=page.getByTestId('team-car');await expect(car).toHaveCount(1);await expect(page.locator('.road-marker')).toHaveCount(47);await expect(page.locator('.gift-route-marker')).toHaveCount(5);
  const before=await car.getAttribute('transform');await expect(page.locator('#stage-list')).toContainText('encore 710 km');
  await page.getByRole('button',{name:'Voir tout le parcours',exact:true}).click();
  const bounds=await page.evaluate(()=>{const r=document.getElementById('road').getBoundingClientRect(),m=document.getElementById('map').getBoundingClientRect();return {inside:r.left>=m.left&&r.right<=m.right&&r.top>=m.top&&r.bottom<=m.bottom,zoom:Number(document.getElementById('map').dataset.zoom)};});expect(bounds.inside).toBe(true);expect(bounds.zoom).toBeLessThan(.45);await expect(car).toHaveAttribute('transform',before);

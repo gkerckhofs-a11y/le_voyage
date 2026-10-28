@@ -1,5 +1,5 @@
 import { parkingPose, parkingMarkup } from './parking.ts';
-import { distanceRatio, positionAt, roadsideMarkers } from '../map/geometry.ts';
+import { distanceRatio, positionAt, roadsideMarkers, markerInterval } from '../map/geometry.ts';
 import { journeyRoute as route, landscapeZones } from '../map/route.ts';
 import { applySeason, seasonAt, seasonThemes } from './seasons.ts';
 import { MapCamera } from './camera.ts';
@@ -23,9 +23,9 @@ export function mountJourneyMap(data:MapData,options:Options){
     <path d="${route.path}" fill="none" stroke="#f3e6c5" stroke-width="61" stroke-linecap="round"/>
     <path id="road" d="${route.path}" fill="none" stroke="#c6b28e" stroke-width="45" stroke-linecap="round"/>
     <path d="${route.path}" fill="none" stroke="#f6ebce" stroke-width="2.5" stroke-dasharray="16 17" opacity=".9"/>
-    ${roadsideMarkers(route).map(m=>`<g class="road-marker" data-marker="${m.number}" transform="translate(${m.x} ${m.y})"><ellipse cx="3" cy="12" rx="14" ry="5" fill="#405936" opacity=".18"/><path d="M-12 10V-11Q-12-24 0-24Q12-24 12-11V10Z" fill="#f8f2d8" stroke="#818d70" stroke-width="1.3"/><path d="M-11-9H11" stroke="#a94433" stroke-width="6"/><text y="6">${m.number}</text></g>`).join('')}
     <g transform="translate(240 2180) rotate(-8)"><path d="M-45 24V58M45 24V58" stroke="#76684c" stroke-width="7"/><rect x="-68" y="-10" width="136" height="42" rx="4" fill="#ecddac" stroke="#887b55" stroke-width="3"/><text text-anchor="middle" y="17" fill="#5d6548" font-family="Georgia" font-size="20">Le départ</text></g>
     <g transform="translate(${positionAt(route,1).x} ${positionAt(route,1).y})"><circle r="34" fill="#355e49"/><text y="6" text-anchor="middle" font-size="18" fill="white">FIN</text></g>
+    ${roadsideMarkers(route,data.maximumKm).map(m=>`<g class="road-marker" data-marker="${m.km}" data-major="${m.major}" data-terminal="${m.terminal}" transform="translate(${m.x} ${m.y})"><g class="marker-sign"><rect x="-27" y="-24" width="54" height="34" rx="8" fill="#f8f2d8" stroke="#818d70" stroke-width="1.3"/><path d="M-22-15H22" stroke="${m.major?'#a94433':'#718260'}" stroke-width="${m.major?5:2}"/><text y="3" text-anchor="middle" fill="#243b32" font-size="11">${m.km} km</text></g></g>`).join('')}
     </g>
     <g id="${options.kind}-car" data-testid="${options.kind}-car" role="img" aria-label="${vehicleName}"><circle class="car-shadow-ring" r="67"/><g id="car-heading">${options.kind==='collective'?minibusMarkup(options.color):carMarkup(options.color)}</g><g transform="translate(0 90)"><rect x="-48" y="-17" width="96" height="25" rx="12" fill="#fffbee" stroke="#d0d9b6"/><text class="car-location-label" y="0">Nous sommes ici</text></g></g>`;
   function refreshSeason(){
@@ -61,6 +61,19 @@ export function mountJourneyMap(data:MapData,options:Options){
   const initial=position(ratio);
   const camera=new MapCamera($('map'),world,route.width,route.height,{x:initial.x,y:initial.y,zoom:innerWidth<=700?.85:.78},manual);
   camera.center(initial);
+  const markers=[...world.querySelectorAll<SVGGElement>('.road-marker')];
+  function updateMarkers(){
+    const interval=markerInterval(data.maximumKm,camera.state.zoom);$('map').dataset.markerInterval=String(interval);
+    for(const marker of markers){const km=Number(marker.dataset.marker);marker.toggleAttribute('hidden',km%interval!==0&&marker.dataset.terminal!=='true');marker.querySelector('.marker-sign')!.setAttribute('transform',`scale(${1/camera.state.zoom})`);}
+    // Read after other camera listeners resize gift symbols. Never move a business threshold.
+    queueMicrotask(()=>{
+      const obstacles=[car,...world.querySelectorAll<SVGElement>('.gift-route-marker,.festive-stop')].map(el=>el.getBoundingClientRect());
+      for(const marker of markers){if(marker.hasAttribute('hidden')||marker.dataset.terminal==='true')continue;const box=marker.getBoundingClientRect();
+        if(obstacles.some(o=>box.left<o.right+3&&box.right>o.left-3&&box.top<o.bottom+3&&box.bottom>o.top-3))marker.setAttribute('hidden','');
+      }
+    });
+  }
+  $('map').addEventListener('camera-change',updateMarkers);updateMarkers();
   function leaveOverview(){const was=$('map').parentElement!.classList.contains('overview');$('map').parentElement!.classList.remove('overview');return was;}
   function recenter(){clearTimeout(idleTimer);follow=true;const p=viewPoint(visualRatio);if(leaveOverview())camera.follow(p);else camera.center(p);announce(options.kind==='collective'?'Vous avez retrouvé le minibus collectif.':'Vous avez retrouvé votre voiture.');}
   $('fit-route').addEventListener('click',()=>{manual();$('map').parentElement!.classList.add('overview');camera.fit();announce('Tout le parcours, du départ au terminus.');});

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 const open=async(page,query='')=>{await page.goto('/collectif.html'+query);await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');};
 test('collective route has one retro minibus, four festive stops and no individual data',async({page},info)=>{
   await open(page);await expect(page.getByTestId('collective-car')).toHaveCount(1);await expect(page.getByTestId('team-car')).toHaveCount(0);await expect(page.locator('[data-vehicle="minibus"]')).toHaveCount(1);await expect(page.locator('.car-art')).toHaveCount(0);await expect(page.getByTestId('collective-car')).toHaveAttribute('aria-label',/^Minibus collectif/);
-  await expect(page.locator('.festive-stop')).toHaveCount(4);await expect(page.locator('.tier-card')).toHaveCount(4);await expect(page.locator('[data-marker]')).toHaveCount(58);
+  await expect(page.locator('.festive-stop')).toHaveCount(4);await expect(page.locator('.tier-card')).toHaveCount(4);await expect(page.locator('[data-marker]')).toHaveCount(47);
   await expect(page.getByRole('heading',{name:'La fête est garantie.'})).toBeVisible();await expect(page.locator('#distance')).toHaveText('1 680');
   for(const name of ['journey','before-freeze','frozen','tpe']){
     const dto=await(await page.request.get(`/data/collective-${name}.json`)).json();

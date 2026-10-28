@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { journeyRoute as route, landscapeZones } from '../../src/map/route.ts';
-import { positionAt, cubicPoint, roadsideMarkers, distanceRatio, distanceFromRoute } from '../../src/map/geometry.ts';
+import { positionAt, cubicPoint, roadsideMarkers, markerInterval, markerStep, distanceRatio, distanceFromRoute } from '../../src/map/geometry.ts';
 import { zoomAt } from '../../src/web/camera.ts';
 test('0%, 50%, 100% remain on the continuous road; endpoints and finite tangents',()=>{
   assert.deepEqual({...positionAt(route,0),angle:0,segment:0,t:0},{...route.curves[0][0],angle:0,segment:0,t:0});
@@ -24,9 +24,22 @@ test('arc-length mapping has nearly equal steps, including hairpins',()=>{
     const cross=(a[3].x-a[2].x)*(b[1].y-b[0].y)-(a[3].y-a[2].y)*(b[1].x-b[0].x);assert.ok(Math.abs(cross)<1e-6);
   }
 });
-test('58 neutral unique markers, independent of campaign calendar',()=>{
-  const markers=roadsideMarkers(route);assert.equal(markers.length,58);assert.equal(new Set(markers.map(m=>m.number)).size,58);
-  markers.forEach(m=>{assert.deepEqual(Object.keys(m),['number','ratio','x','y']);assert.ok(distanceFromRoute(route,m)>45);});
+test('kilometre markers follow Dmax, not a fixed count or calendar',()=>{
+  for(const maximum of [1,50,100,450,4600,4650,5200,100000,Number.MAX_SAFE_INTEGER]){
+    const markers=roadsideMarkers(route,maximum),step=markerStep(maximum);
+    assert.ok(markers.length<=1002);assert.equal(markers[0].km,0);assert.equal(markers.at(-1).km,maximum);
+    assert.equal(new Set(markers.map(m=>m.km)).size,markers.length);
+    markers.forEach(m=>{assert.equal(m.ratio,m.km/maximum);assert.ok(Number.isFinite(m.x+m.y));assert.equal(m.major,m.km%(step*5)===0);if(!m.terminal)assert.equal(m.km%step,0);});
+  }
+  const markers=roadsideMarkers(route,4600);assert.equal(markers.length,47);assert.equal(markers.filter(m=>m.major).length,10);
+  assert.equal(markers.find(m=>m.km===2300).ratio,.5);assert.equal(roadsideMarkers(route,5200).length,53);
+  for(const bad of [0,-100,1.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1])assert.throws(()=>roadsideMarkers(route,bad));
+});
+test('zoom selects 100, 500 or 1000 km density without moving any marker',()=>{
+  assert.equal(markerInterval(4600,.85),100);assert.equal(markerInterval(4600,.4),500);assert.equal(markerInterval(4600,.07),1000);
+  assert.equal(markerInterval(4600,.65),100);assert.equal(markerInterval(4600,.25),500);
+  for(const z of [0,-1,NaN,Infinity])assert.throws(()=>markerInterval(4600,z));
+  const all=roadsideMarkers(route,4650);for(const z of [.85,.4,.07]){const visible=all.filter(m=>m.km%markerInterval(4650,z)===0||m.terminal);assert.equal(visible.at(-1).km,4650);assert.equal(visible[0].km,0);}
 });
 test('exact distance ratio clamps overflow without rounding kilometres',()=>{
   assert.equal(distanceRatio({numerator:'0',denominator:'1'},4600),0);

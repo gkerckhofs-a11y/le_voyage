@@ -56,10 +56,21 @@ export function distanceRatio(km: { numerator: string; denominator: string }, ma
   const n = BigInt(km.numerator), d = BigInt(km.denominator) * BigInt(maximumKm);
   return n >= d ? 1 : Number(n * 1_000_000_000n / d) / 1_000_000_000;
 }
-export function roadsideMarkers(route: Route) {
-  return Array.from({ length: 58 }, (_, i) => {
-    const ratio = .012 + i / 57 * .976, p = positionAt(route, ratio), a = p.angle * Math.PI / 180, side = i % 2 ? 1 : -1;
-    return { number: i + 1, ratio, x: p.x - Math.sin(a) * 58 * side, y: p.y + Math.cos(a) * 58 * side };
+/** Visual spacing only. Annual journeys use 100/500 km; extreme inputs stay bounded. */
+export function markerStep(maximumKm:number){
+  if(!Number.isSafeInteger(maximumKm)||maximumKm<1)throw new Error('Invalid maximum distance');
+  return 100*10**Math.max(0,Math.ceil(Math.log10(maximumKm/100000)));
+}
+export function markerInterval(maximumKm:number,zoom:number){
+  if(!Number.isFinite(zoom)||zoom<=0)throw new Error('Invalid marker zoom');
+  return markerStep(maximumKm)*(zoom>=.65?1:zoom>=.25?5:10);
+}
+export function roadsideMarkers(route: Route,maximumKm:number) {
+  const step=markerStep(maximumKm),distances=Array.from({length:Math.floor(maximumKm/step)+1},(_,i)=>i*step);
+  if(distances.at(-1)!==maximumKm)distances.push(maximumKm);
+  return distances.map((km,i)=>{
+    const ratio=km/maximumKm,p=positionAt(route,ratio),a=p.angle*Math.PI/180,side=i%2?1:-1;
+    return {km,ratio,major:km%(step*5)===0,terminal:km===maximumKm,x:p.x-Math.sin(a)*58*side,y:p.y+Math.cos(a)*58*side};
   });
 }
 export function distanceFromRoute(route: Route, p: Point): number {

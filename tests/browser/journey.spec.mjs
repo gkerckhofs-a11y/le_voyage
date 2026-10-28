@@ -3,7 +3,7 @@ import { journeyRoute } from '../../src/map/route.ts';
 import { positionAt } from '../../src/map/geometry.ts';
 test.beforeEach(async({page})=>{await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');});
 test('one car, neutral markers, no private resources; responsive capture',async({page},info)=>{
-  await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('.minibus-art')).toHaveCount(0);await expect(page.locator('.car-art')).toHaveCount(1);await expect(page.locator('[data-marker]')).toHaveCount(58);
+  await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('.minibus-art')).toHaveCount(0);await expect(page.locator('.car-art')).toHaveCount(1);await expect(page.locator('[data-marker]')).toHaveCount(47);
   const dto=(await (await page.request.get('/api/demo/team')).json()).journey;
   expect(JSON.stringify(dto)).not.toMatch(/budget|autre-equipe|responses|preferences|reception|private-/i);
   await expect(page.locator('#stage-list')).toContainText('Cadeau mystère');await expect(page.locator('body')).not.toContainText(/classement/i);
