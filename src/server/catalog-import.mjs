@@ -45,13 +45,28 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
  async listImports(header,input){
   if(!input||Object.keys(input).join(',')!=='beforeRevision'||(input.beforeRevision!==null&&(!Number.isSafeInteger(input.beforeRevision)||input.beforeRevision<1||input.beforeRevision>10001)))throw fail(400);
   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);let query=ref.collection('audit').orderBy('revision','desc');if(input.beforeRevision!==null)query=query.where('revision','<',input.beforeRevision);const rows=(await tx.get(query.limit(21))).docs.map(d=>d.data()),page=rows.slice(0,20);
-   return {imports:page.filter(a=>a.kind==='csv-import').map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
+   return {imports:page.filter(a=>['csv-import','catalog-restore'].includes(a.kind)).map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length,kind:a.kind})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
   });
  },
  async readImport(header,input){
   if(!input||Object.keys(input).join(',')!=='importId'||typeof input.importId!=='string'||!/^[a-f0-9-]{36}$/.test(input.importId))throw fail(400);
   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(ref.collection('imports').doc(input.importId))).data();if(!d||d.status!=='applied')throw fail(404);
-   return {id:input.importId,revision:d.appliedRevision,previousRevision:d.revision,at:d.appliedAt,actor:d.actor,sourceName:d.sourceName,sourceDigest:d.sourceDigest,reason:d.reason,changes:d.changes,products:d.products,masterById:d.masterById};
+   return {id:input.importId,revision:d.appliedRevision,previousRevision:d.revision,at:d.appliedAt,actor:d.actor,sourceName:d.sourceName,sourceDigest:d.sourceDigest,reason:d.reason,kind:d.kind??'csv-import',restoredFrom:d.restoredFrom??null,changes:d.changes,products:d.products,masterById:d.masterById};
+  });
+ },
+ async previewRestore(header,input){
+  if(!input||Object.keys(input).join(',')!=='importId'||typeof input.importId!=='string'||!/^[a-f0-9-]{36}$/.test(input.importId))throw fail(400);
+  const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(ref.collection('imports').doc(input.importId))).data(),c=(await tx.get(ref)).data();if(!d||d.status!=='applied')throw fail(404);if(!c)throw fail(503);
+   const products=[...c.products],masterById={...(c.masterById??{})},changes=[];
+   for(const archived of d.products){const index=products.findIndex(p=>p.id===archived.id),old=products[index],beforeMaster=masterById[archived.id]??null,archivedMaster=d.masterById?.[archived.id]??null;
+    if(!old||(beforeMaster?.sku??old.id)!==(archivedMaster?.sku??archived.id))throw fail(409);
+    // Availability and stock are current operational declarations, never historical quantities to reinstate.
+    const product=validateProduct({...archived,availability:old.availability}),afterMaster=archivedMaster?{...archivedMaster,stockQuantity:beforeMaster?.stockQuantity??null}:beforeMaster?{...beforeMaster}:null;
+    if(canonical(old)!==canonical(product)||canonical(beforeMaster)!==canonical(afterMaster)){changes.push({sku:beforeMaster?.sku??old.id,action:'restauration',before:old,after:product,beforeMaster,afterMaster});products[index]=product;if(afterMaster)masterById[old.id]=afterMaster;}
+   }
+   const restoredFrom={id:input.importId,revision:d.appliedRevision},missing=products.filter(p=>!d.products.some(a=>a.id===p.id)).map(p=>masterById[p.id]?.sku??p.id);
+   if(!changes.length)return {draftId:null,revision:c.revision,changes,missing,errors:[],restoredFrom};
+   const draftId=randomUUID(),at=now(),sourceName=d.sourceName;tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:digest(canonical({restoredFrom,products,masterById})),revision:c.revision,products,masterById,changes,kind:'catalog-restore',restoredFrom,status:'preview',expiresAt:Date.parse(at)+3600000});return {draftId,revision:c.revision,changes,missing,errors:[],sourceName,at,restoredFrom};
   });
  },
  async previewImport(header,input){
@@ -72,8 +87,8 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
   if(!input||Object.keys(input).sort().join(',')!=='draftId,reason'||typeof input.draftId!=='string'||!/^[a-f0-9-]{36}$/.test(input.draftId))throw fail(400);const reason=inputText(input.reason,240);if(reason.length<3)throw fail(400);const uid=await actor(header),draftRef=ref.collection('imports').doc(input.draftId);
   return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(draftRef)).data();if(!d||d.actor!==uid)throw fail(403);if(d.status==='applied'){if(d.reason!==reason)throw fail(409);return {revision:d.appliedRevision,alreadyApplied:true};}
    const c=(await tx.get(ref)).data();if(!c||d.revision!==c.revision||c.revision>=10000||Date.parse(now())>=d.expiresAt)throw fail(409);
-   const revision=c.revision+1,at=now();tx.set(ref,{...c,revision,products:d.products,masterById:d.masterById,lastImport:{id:input.draftId,sourceName:d.sourceName,at,actor:uid,revision}});
-   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:'csv-import',importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:'Import CSV · '+d.changes.length+' référence(s)'}});
+   const revision=c.revision+1,at=now();tx.set(ref,{...c,revision,products:d.products,masterById:d.masterById,lastImport:{id:input.draftId,sourceName:d.sourceName,at,actor:uid,revision,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{})}});
+   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{}),importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:(d.kind==='catalog-restore'?'Restauration catalogue':'Import CSV')+' · '+d.changes.length+' référence(s)'}});
    tx.update(draftRef,{status:'applied',reason,appliedRevision:revision,appliedAt:at});return {revision,alreadyApplied:false};
   });
  }
