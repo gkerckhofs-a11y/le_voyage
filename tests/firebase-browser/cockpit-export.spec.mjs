@@ -4,7 +4,9 @@ import {agendaCsv} from '../../src/web/cockpit-export.ts';
 test('Clem exports only the freshly authorized filtered agenda and cannot export on read failure',async({page},info)=>{
  await page.goto('/connexion.html');await page.getByRole('button',{name:'Cockpit Clem · démo',exact:true}).click();
  await expect(page.locator('.gift-row')).toHaveCount(4);
- const initial=await(await page.request.get('/api/gifts/ops')).json(),row=initial.rows[0];
+ const initial=await(await page.request.get('/api/gifts/ops')).json(),row=initial.rows.find(r=>!r.dueDate);
+ // Other cockpit scenarios may schedule the first row outside the seven-day window.
+ expect(row,'fixture with an unplanned acquired gift').toBeTruthy();
  await page.locator('#client-filter').selectOption(row.tenantId);
  await page.locator('#team-filter').fill(row.team);
  await page.locator('#status-filter').selectOption(row.status);
