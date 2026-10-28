@@ -75,7 +75,7 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    for(const doc of records.docs){const r=doc.data();const lines=r.proposal.lines.map(l=>{
     const product=catalog?.products.find(p=>(catalog.masterById?.[p.id]?.sku??p.id)===l.sku),stock=product?catalog.masterById?.[product.id]?.stockQuantity:null,reserved=ledger?.counts?.[hash(l.sku)]??0;
     return {sku:l.sku,name:l.name,quantity:l.quantity,committedQuantity:ledger?.committed?.[hash(l.sku)]??0,declaredStock:Number.isSafeInteger(stock)?stock:null,unreservedQuantity:Number.isSafeInteger(stock)?Math.max(0,stock-reserved):null,shortfall:Number.isSafeInteger(stock)?Math.max(0,reserved-stock):null};
-   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,lines});
+   });rows.push({...scope,teamId:r.teamId,milestoneNumber:r.milestoneNumber,status:r.status,revision:r.revision,proposalRevision:r.proposalRevision,conditions:r.conditions,reservedAt:r.reservedAt,reservedBy:r.reservedBy,updatedAt:r.updatedAt,actor:r.actor,reason:r.reason,potentialExposureCents:r.proposal.totalCostCents,authorization:r.authorization??null,order:r.order??null,fulfillmentLink:r.fulfillmentLink??null,lines});
    }
   }return {rows,generatedAt:now()};
  });}
@@ -85,8 +85,13 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
 // Match stable team + milestone identity, independent of later milestone reordering.
 export async function acquiredAnticipatedOrder(tx,campaignRef,entitlement){
  const records=await tx.get(campaignRef.collection('giftReservations').where('teamId','==',entitlement.teamId).limit(101));if(records.size>100)throw fail(409);
- const matches=records.docs.map(d=>d.data()).filter(r=>r.status==='ordered'&&r.proposal?.milestoneId===entitlement.milestoneId);
+ const matches=records.docs.map(d=>({...d.data(),reservationId:d.id})).filter(r=>r.status==='ordered'&&r.proposal?.milestoneId===entitlement.milestoneId);
  if(matches.length>1)throw fail(409);if(!matches.length)return null;
  const record=matches[0];if(!record.order)throw fail(409);
- return {reservationRevision:record.revision,order:record.order};
+ return {reservationId:record.reservationId,reservationRevision:record.revision,order:record.order,fulfillmentLink:record.fulfillmentLink??null};
+}
+
+export const anticipatedOrderDigest=order=>hash(order);
+export function attachedAnticipatedOrder(value,stored,id){
+ return !!value&&value.fulfillmentLink?.id===id&&stored?.confirmation?.source==='anticipated-order'&&stored.anticipatedOrderLink?.reservationId===value.reservationId&&stored.anticipatedOrderLink?.orderDigest===hash(value.order);
 }

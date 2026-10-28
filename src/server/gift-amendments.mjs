@@ -11,7 +11,7 @@ export function normalizeAmendment(input){
  const reference=input.reference.trim(),reason=input.reason.trim(),digest=createHash('sha256').update(JSON.stringify([input.revision,reference,reason,delta])).digest('hex');return {delta,reference,reason,digest};
 }
 export function planAmendment(old,delta){
- if(![1,2].includes(old?.confirmation?.version)||(old.financialAdjustment?.count??0)>=20)throw fail(409);
+ if(!([1,2].includes(old?.confirmation?.version)||old?.confirmation?.version===3&&old.confirmation.source==='anticipated-order')||(old.financialAdjustment?.count??0)>=20)throw fail(409);
  const before=effectiveGiftCosts(old),adjustment={...Object.fromEntries(costKeys.map(k=>[k,(old.financialAdjustment?.[k]??0)+delta[k]])),count:(old.financialAdjustment?.count??0)+1},after=effectiveGiftCosts({...old,financialAdjustment:adjustment});
  if(costKeys.some(k=>after[k]<0||after[k]>100000000)||after.totalCostCents>old.confirmation.allocatedCents)throw fail(422);return {before,after,adjustment};
 }
