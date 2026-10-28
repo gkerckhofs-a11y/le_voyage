@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 const fail=status=>Object.assign(Error('Proposal unavailable'),{status});
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+export const proposalDocumentId=(teamId,milestoneNumber)=>hash([teamId,milestoneNumber]);
 const baseKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
  const keys=[...baseKeys,...(action==='read'?[]:['revision','mutationId','reason',...(action==='save'?['fingerprint','packagingCents','transportCents']:[])])];
@@ -12,7 +13,7 @@ function validate(input,action){
  if(action==='save'&&(typeof input.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(input.fingerprint)||['packagingCents','transportCents'].some(k=>!Number.isSafeInteger(input[k])||input[k]<0||input[k]>100000000)))throw fail(400);
 }
 export function createGiftProposals({db,actor,check,campaignRef,build,now}){
- const refFor=i=>campaignRef(i).collection('giftProposals').doc(hash([i.teamId,i.milestoneNumber]));
+ const refFor=i=>campaignRef(i).collection('giftProposals').doc(proposalDocumentId(i.teamId,i.milestoneNumber));
  const publicRecord=r=>{if(!r)return null;const {fingerprint,...proposal}=r.proposal;return {...r,proposal};};
  async function write(header,input,action){validate(input,action);const uid=await actor(header);return db.runTransaction(async tx=>{
   await check(tx,uid,input);const ref=refFor(input),old=(await tx.get(ref)).data(),auditRef=ref.collection('history').doc(input.mutationId),prior=(await tx.get(auditRef)).data(),digest=hash([action,Object.keys(input).sort().map(k=>[k,input[k]])]);
@@ -30,4 +31,16 @@ export function createGiftProposals({db,actor,check,campaignRef,build,now}){
  async readProposal(header,input){validate(input,'read');const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,input);const ref=refFor(input),record=(await tx.get(ref)).data();if(!record)return {record:null,history:[],current:false};let current=false;try{current=(await build(tx,{...input,packagingCents:record.proposal.packagingCents,transportCents:record.proposal.transportCents})).fingerprint===record.proposal.fingerprint;}catch(e){if(![404,409,422].includes(e.status))throw e;}
  const history=(await tx.get(ref.collection('history').orderBy('record.revision','desc').limit(20))).docs.map(d=>{const h=d.data();return {action:h.action,...publicRecord(h.record)};});return {record:publicRecord(record),history,current};});}
  };
+}
+
+
+export async function acquiredProposal(tx,campaignRef,state,entitlement){
+ const index=state.config.giftMilestones.findIndex(m=>m.id===entitlement.milestoneId);
+ if(index<0)return {status:'unavailable'};
+ const record=(await tx.get(campaignRef.collection('giftProposals').doc(proposalDocumentId(entitlement.teamId,index+1)))).data();
+ if(!record)return {status:'none'};
+ if(record.teamId!==entitlement.teamId||record.milestoneNumber!==index+1||record.proposal?.milestoneId!==entitlement.milestoneId)return {status:'identity-unverified'};
+ const p=record.proposal;
+ // Historical reference only. Never import it into a fulfillment or expose fingerprints.
+ return {status:'linked',revision:record.revision,updatedAt:record.updatedAt,actor:record.actor,reason:record.reason,review:record.review?{actor:record.review.actor,at:record.review.at}:null,proposal:{asOf:p.asOf,dueDate:p.dueDate,catalogRevision:p.catalogRevision,allocatedCents:p.allocatedCents,purchaseCents:p.purchaseCents,packagingCents:p.packagingCents,transportCents:p.transportCents,totalCostCents:p.totalCostCents,complete:p.complete,lines:p.lines.map(l=>Object.fromEntries(['quantity','name','sku','supplier','unitPurchaseCents','priceBasis','vatBasisPoints','restrictions'].map(k=>[k,l[k]])))}};
 }
