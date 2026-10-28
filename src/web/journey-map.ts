@@ -67,7 +67,7 @@ export function mountJourneyMap(data:MapData,options:Options){
     for(const marker of markers){const km=Number(marker.dataset.marker);marker.toggleAttribute('hidden',km%interval!==0&&marker.dataset.terminal!=='true');marker.querySelector('.marker-sign')!.setAttribute('transform',`scale(${1/camera.state.zoom})`);}
     // Read after other camera listeners resize gift symbols. Never move a business threshold.
     queueMicrotask(()=>{
-      const obstacles=[car,...world.querySelectorAll<SVGElement>('.gift-route-marker,.festive-stop')].map(el=>el.getBoundingClientRect());
+      const obstacles=[car,...world.querySelectorAll<SVGElement>('.gift-route-marker,.gift-cluster,.festive-stop')].map(el=>el.getBoundingClientRect());
       for(const marker of markers){if(marker.hasAttribute('hidden')||marker.dataset.terminal==='true')continue;const box=marker.getBoundingClientRect();
         if(obstacles.some(o=>box.left<o.right+3&&box.right>o.left-3&&box.top<o.bottom+3&&box.bottom>o.top-3))marker.setAttribute('hidden','');
       }

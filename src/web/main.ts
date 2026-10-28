@@ -1,4 +1,4 @@
-import { distanceRatio, positionAt } from '../map/geometry.ts';
+import { distanceRatio, positionAt, groupNearbyPoints } from '../map/geometry.ts';
 import { journeyRoute as route } from '../map/route.ts';
 import { mountJourneyMap } from './journey-map.ts';
 import { startDemo, readDemo, sendDemo } from './demo-client.ts';
@@ -37,11 +37,29 @@ function renderStages(){
   for(const [i,stage] of stageData.stages.entries()){
     const state=stage.status==='unlocked'?'Débloqué':feed.closure?'Non atteint':stage.status==='next'?'Prochain':'À venir';
     const copy=`${i+1}. ${stage.label} · ${format(stage.thresholdKm)} km · ${state}${stage.status==='unlocked'?'':` · ${feed.closure?'il manquait':'encore'} ${format(stage.remainingKm)} km`}`;
-    const li=document.createElement('li'),button=document.createElement('button');button.textContent=copy;button.addEventListener('click',()=>map.focusRatio(stage.thresholdKm/stageData.maximumKm));li.append(button);list.append(li);
+    const li=document.createElement('li'),button=document.createElement('button');button.textContent=copy;button.addEventListener('click',()=>map.focusRatio(stage.thresholdKm/stageData.maximumKm));button.id=`gift-stage-${i+1}`;li.append(button);list.append(li);
     const p=positionAt(route,stage.thresholdKm/stageData.maximumKm),marker=document.createElementNS(ns,'g');marker.classList.add('gift-route-marker');marker.dataset.status=stage.status;marker.setAttribute('transform',`translate(${p.x} ${p.y})`);marker.setAttribute('role','img');marker.setAttribute('aria-label',copy);
     marker.innerHTML=`<circle r="28" fill="${stage.status==='unlocked'?'#355e49':'#a94433'}" stroke="#fff8e9" stroke-width="4"/><path d="M-13-5H13V14H-13Z M-16-11H16V-4H-16Z M0-11V14 M0-11C-22-26-18 0 0-11C22-26 18 0 0-11" fill="none" stroke="#fff8e9" stroke-width="2"/><text y="49" text-anchor="middle" fill="#213f30" stroke="#fff8e9" stroke-width="4" paint-order="stroke" font-size="18">${i+1} · ${format(stage.thresholdKm)} km</text>`;group.append(marker);
   }
-  world?.append(group);
+  world?.append(group);updateGiftLayout();
+}
+function updateGiftLayout(){
+ const zoom=Number($('map').dataset.zoom);if(!Number.isFinite(zoom)||zoom<=0||!stageData)return;
+ const markers=[...document.querySelectorAll<SVGGElement>('.gift-route-marker')];
+ const points=stageData.stages.map(s=>positionAt(route,s.thresholdKm/stageData.maximumKm));
+ const compact=zoom<.5,groups=compact?groupNearbyPoints(points.map(p=>({x:p.x*zoom,y:p.y*zoom})),58):points.map((_,i)=>[i]);
+ document.getElementById('gift-clusters')?.remove();const ns='http://www.w3.org/2000/svg',layer=document.createElementNS(ns,'g');layer.id='gift-clusters';
+ markers.forEach((marker,i)=>{marker.removeAttribute('hidden');marker.removeAttribute('aria-hidden');marker.setAttribute('transform',`translate(${points[i].x} ${points[i].y}) scale(${compact?.55/zoom:Math.min(2.5,Math.max(.6,.7/zoom))})`);const label=marker.querySelector('text')!;label.textContent=compact?String(i+1):`${i+1} · ${format(stageData.stages[i].thresholdKm)} km`;});
+ for(const members of groups){
+  if(members.length<2)continue;
+  members.forEach(i=>{markers[i].setAttribute('hidden','');markers[i].setAttribute('aria-hidden','true');});
+  const x=members.reduce((v,i)=>v+points[i].x,0)/members.length,y=members.reduce((v,i)=>v+points[i].y,0)/members.length;
+  const badge=document.createElementNS(ns,'g');badge.classList.add('gift-cluster');badge.dataset.members=members.map(i=>i+1).join(',');badge.setAttribute('transform',`translate(${x} ${y}) scale(${1/zoom})`);badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label',`${members.length} paliers regroupés : ${members.map(i=>i+1).join(', ')}. Consulter leurs kilomètres dans la liste.`);
+  badge.innerHTML=`<circle r="22" fill="#a94433" stroke="#fff8e9" stroke-width="3"/><text y="5" text-anchor="middle" fill="#fff8e9" font-size="15" font-weight="700">${members.length}</text>`;
+  const open=()=>{const first=$(`gift-stage-${members[0]+1}`);first.scrollIntoView({block:'center'});first.focus({preventScroll:true});};badge.addEventListener('pointerdown',e=>e.stopPropagation());badge.addEventListener('click',open);badge.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});layer.append(badge);
+ }
+ document.getElementById('world')?.append(layer);
+ $('gift-map-legend').hidden=!compact;
 }
 function renderJourney(data:TeamJourneyView){
   stageData=data;renderStages();
@@ -113,7 +131,7 @@ async function start(){
   await startDemo();feed=await readDemo<TeamFeed>('team');const data=feed.journey;
   if(data.schemaVersion!==1||data.routeId!==route.id||!/^#[a-fA-F0-9]{6}$/.test(data.team.color))throw new Error('Unsupported journey');
   renderFeed();map=mountJourneyMap(data,{kind:'team',color:data.team.color,label:data.team.name});renderStages();if(feed.closure)await map.park(false);
-  $('map').addEventListener('camera-change',()=>{const zoom=Number($('map').dataset.zoom);document.querySelectorAll<SVGGElement>('.gift-route-marker').forEach(el=>{const base=el.getAttribute('transform')!.split(' scale')[0];el.setAttribute('transform',base+` scale(${Math.min(2.5,Math.max(.6,.7/zoom))})`);});});
+  $('map').addEventListener('camera-change',updateGiftLayout);updateGiftLayout();
   // Initial reads never replay motion or open a reveal. Unread attentions remain available on demand.
 }
 start().catch(()=>{

@@ -82,3 +82,11 @@ export function distanceFromRoute(route: Route, p: Point): number {
   }
   return best;
 }
+
+/** Connected groups in screen pixels; only presentation, never changes source positions. */
+export function groupNearbyPoints(points:readonly Point[],radius:number):number[][]{
+ if(!Number.isFinite(radius)||radius<=0||points.length>100||points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))throw new Error('Invalid grouping geometry');
+ const parent=points.map((_,i)=>i),root=(i:number):number=>parent[i]===i?i:(parent[i]=root(parent[i]));
+ for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++)if(Math.hypot(points[i].x-points[j].x,points[i].y-points[j].y)<radius)parent[root(j)]=root(i);
+ const groups=new Map<number,number[]>();points.forEach((_,i)=>{const key=root(i);groups.set(key,[...(groups.get(key)??[]),i]);});return [...groups.values()];
+}
