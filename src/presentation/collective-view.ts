@@ -1,3 +1,4 @@
+import { completedCollectiveJourney } from '../application/closure.ts';
 import { convoyDistance, receptionLevel } from '../domain/engine.ts';
 import type { Scope, State } from '../domain/engine.ts';
 import { add, exact, displayKm } from '../domain/exact.ts';
@@ -42,6 +43,7 @@ export function collectiveJourneyView(state: State, access: Scope, identity: Rec
     schemaVersion: 1 as const, routeId: 'wallonie-imaginaire-v1', organizationName: identity.organizationName,
     distance: { ...distance }, displayKm: displayKm(distance), maximumKm: weeks.length * 100,
     activeWeeks: weeks.length, completedWeeks: history.length, history,
+    closure: completedCollectiveJourney(state,access),
     reception: {
       date: identity.receptionDate, baseTitle: identity.baseTitle,
       freezeDate, frozen, frozenOn: state.freeze?.frozenOn ?? null,

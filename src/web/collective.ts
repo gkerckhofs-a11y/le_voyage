@@ -39,6 +39,16 @@ async function start(){
   $('future-note').textContent=reception.frozen?'Les escales non atteintes au gel ne sont pas incluses.':'Les escales enrichissent une seule réception annuelle.';
   document.body.classList.toggle('reception-frozen',reception.frozen);
   const map=mountJourneyMap(data,{kind:'collective',color:'#427d86',label:'notre collectif',decorate:world=>festiveStops(world,data),autoRecenter:()=>kiosk});
+  if(data.closure){
+    document.body.classList.add('collective-complete');
+    $('collective-ending').hidden=false;
+    $('collective-ending-summary').textContent=`${format(data.displayKm)} km parcourus ensemble. Réception annuelle garantie : ${reception.formulaTitle}, niveau ${data.closure.frozenLevel} / ${reception.tiers.length}, figé le ${date(data.closure.frozenOn)}. Les escales non retenues ne sont pas ajoutées au bilan.`;
+    await map.park(false);
+    $('collective-arrival-replay').addEventListener('click',async()=>{
+      const button=$('collective-arrival-replay') as HTMLButtonElement;button.disabled=true;
+      try{await map.park(true);}finally{button.disabled=false;}
+    });
+  }
   $('kiosk-toggle').addEventListener('click',()=>{kiosk=!kiosk;kioskStyle();const url=new URL(location.href);if(kiosk)url.searchParams.set('kiosk','1');else url.searchParams.delete('kiosk');history.replaceState(null,'',url);map.recenter();});
   for(const tier of reception.tiers){
     const li=document.createElement('li'),button=document.createElement('button'),number=document.createElement('span'),copy=document.createElement('span'),title=document.createElement('strong'),state=document.createElement('span'),detail=document.createElement('span');

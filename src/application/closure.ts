@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { teamDistance } from '../domain/engine.ts';
+import { teamDistance, convoyDistance } from '../domain/engine.ts';
 import type { State, Scope } from '../domain/engine.ts';
 
 /** Server-only final snapshot. Completion requires every eligible active week to be settled.
@@ -22,3 +22,17 @@ export function completedTeamJourney(state:State,scope:Scope,teamId:string){
   };
 }
 export type Closure = NonNullable<ReturnType<typeof completedTeamJourney>>;
+
+/** Stable projection of immutable final outcomes and the persisted reception freeze.
+ * No claim/write on a kiosk read, and no automatic replay on refresh. */
+export function completedCollectiveJourney(state:State,scope:Scope){
+  if(scope.tenantId!==state.config.tenantId||scope.campaignId!==state.config.campaignId)throw new Error('Scope denied');
+  const weeks=state.config.weeks.filter(w=>w.active);
+  if(!state.freeze||!weeks.length||weeks.some(w=>!state.convoys[w.id]))return null;
+  return {
+    id:createHash('sha256').update(JSON.stringify([scope.tenantId,scope.campaignId,'collective-closure'])).digest('hex'),
+    date:[state.freeze.frozenOn,...weeks.map(w=>state.convoys[w.id].closedOn)].sort().at(-1)!,
+    distance:{...convoyDistance(state)},maximumKm:weeks.length*100,
+    frozenLevel:state.freeze.level,frozenOn:state.freeze.frozenOn,
+  };
+}

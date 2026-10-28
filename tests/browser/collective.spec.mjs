@@ -51,3 +51,17 @@ test('team/collective navigation, mobile journal, TPE and network fallback',asyn
   await page.locator('#scenario').selectOption('tpe');await expect(page.locator('#company')).toHaveText('Atelier fictif');await expect(page.getByTestId('collective-car')).toHaveCount(1);
   await page.route('**/data/collective-tpe.json',r=>r.abort());await page.reload();await expect(page.locator('#fallback')).toBeVisible();await expect(page.locator('#collective-content')).toBeHidden();
 });
+
+test('completed collective parks once, retains frozen level and offers manual reduced-motion replay',async({page},info)=>{
+ await open(page,'?scenario=frozen');
+ const car=page.getByTestId('collective-car');await expect(car).toHaveAttribute('data-parked','true');await expect(car).toHaveCount(1);
+ await expect(page.locator('#collective-ending-summary')).toContainText('3 880 km');await expect(page.locator('#collective-ending-summary')).toContainText('niveau 3 / 4');
+ const pose=await car.getAttribute('transform');await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);
+ await page.locator('#collective-arrival-replay').click();await expect(page.locator('#map')).toHaveClass(/is-replaying/);await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);await expect(car).toHaveAttribute('transform',pose);
+ await page.emulateMedia({reducedMotion:'reduce'});await page.locator('#collective-arrival-replay').focus();await page.keyboard.press('Enter');await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);
+ await page.reload();await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');await expect(car).toHaveAttribute('transform',pose);await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);await expect(page.locator('.tier-card[data-level="4"]')).toHaveAttribute('data-status','unreached');
+ if(info.project.name==='desktop-1920'){await page.locator('#kiosk-toggle').click();expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBe(true);}
+ await page.locator('#collective-ending-summary').click();
+ await page.screenshot({path:info.outputPath(`collective-ending-${info.project.name}.png`),fullPage:true});
+ await open(page,'?scenario=before-freeze');await expect(page.locator('#collective-ending')).toBeHidden();await expect(page.locator('#arrival-parking')).toHaveCount(0);
+});

@@ -13,7 +13,7 @@ test('collective projects the weekly mean, never the sum or membership',()=>{
   assert.deepEqual(dto.reception.tiers.map(t=>t.status),['next','unreached','unreached','unreached']);
   assert.equal(dto.reception.formulaTitle,'Réception conviviale');
   assert.doesNotMatch(JSON.stringify(dto),/private-|budget|tenantId|teams|roster|participant|answers|scores|weights|gift|entitlement|preferences/i);
-  assert.deepEqual(Object.keys(dto),['timeZone','schemaVersion','routeId','organizationName','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','reception']);
+  assert.deepEqual(Object.keys(dto),['timeZone','schemaVersion','routeId','organizationName','distance','displayKm','maximumKm','activeWeeks','completedWeeks','history','closure','reception']);
   dto.history[0].distance.numerator='9999';dto.reception.distance.numerator='9999';assert.equal(JSON.stringify(s),before);
 });
 test('scope and public reception metadata are checked without copying extra fields',()=>{
@@ -54,4 +54,19 @@ test('repeated weekly close never advances the collective again',()=>{
   const s=collectiveState(),team=s.config.teams[0],week=s.config.weeks[23];
   const next=closeWeek(s,{...s.config,teamId:team.id,weekId:week.id,today:week.endExclusive},{kind:'joker'});
   assert.strictEqual(next,s);assert.deepEqual(collectiveJourneyView(next,next.config,collectiveIdentity(next)),demoCollective());
+});
+
+test('collective closure requires all weekly means and frozen reception; stays stable and private',()=>{
+  const state=collectiveState('frozen'),identity=collectiveIdentity(state),before=JSON.stringify(state);
+  const result=collectiveJourneyView(state,state.config,identity);
+  assert.equal(result.closure.distance.numerator,'3880');assert.equal(result.closure.frozenLevel,3);
+  assert.equal(result.closure.maximumKm,4600);
+  assert.deepEqual(collectiveJourneyView(JSON.parse(before),state.config,identity).closure,result.closure);
+  const missing={...state,convoys:{...state.convoys}};delete missing.convoys[state.config.weeks.at(-1).id];
+  assert.equal(collectiveJourneyView(missing,state.config,identity).closure,null);
+  assert.equal(collectiveJourneyView({...state,freeze:null},state.config,identity).closure,null);
+  assert.equal(demoCollective('before-freeze').closure,null);
+  assert.equal(demoCollective('tpe').closure,null);
+  result.closure.distance.numerator='9999';assert.equal(JSON.stringify(state),before);
+  assert.doesNotMatch(JSON.stringify(result.closure),/budget|gift|teamId|tenant|participant|private-/i);
 });
