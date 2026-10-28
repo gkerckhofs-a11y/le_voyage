@@ -1,3 +1,4 @@
+import {decodeMasterXlsx} from './catalog-xlsx.mjs';
 import {createHash,randomUUID} from 'node:crypto';
 const fail=status=>Object.assign(new Error('Catalog import unavailable'),{status});
 export const masterRequired=['sku','nom','fournisseur','categorie','description','prix_achat_htva','tva_taux','statut','delai_approvisionnement_jours','saisonnalite','sans_alcool'];
@@ -41,11 +42,11 @@ export function parseMasterCsv(csv,delimiter=';'){
  return {errors,records};
 }
 export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
- return {
+ const api={
  async listImports(header,input){
   if(!input||Object.keys(input).join(',')!=='beforeRevision'||(input.beforeRevision!==null&&(!Number.isSafeInteger(input.beforeRevision)||input.beforeRevision<1||input.beforeRevision>10001)))throw fail(400);
   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid);let query=ref.collection('audit').orderBy('revision','desc');if(input.beforeRevision!==null)query=query.where('revision','<',input.beforeRevision);const rows=(await tx.get(query.limit(21))).docs.map(d=>d.data()),page=rows.slice(0,20);
-   return {imports:page.filter(a=>['csv-import','catalog-restore'].includes(a.kind)).map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length,kind:a.kind})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
+   return {imports:page.filter(a=>['csv-import','xlsx-import','catalog-restore'].includes(a.kind)).map(a=>({id:a.importId,revision:a.revision,at:a.at,actor:a.actor,sourceName:a.sourceName,reason:a.reason,changeCount:a.changes.length,kind:a.kind})),nextBeforeRevision:rows.length>20?page.at(-1).revision:null};
   });
  },
  async readImport(header,input){
@@ -69,7 +70,12 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
    const draftId=randomUUID(),at=now(),sourceName=d.sourceName;tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:digest(canonical({restoredFrom,products,masterById})),revision:c.revision,products,masterById,changes,kind:'catalog-restore',restoredFrom,status:'preview',expiresAt:Date.parse(at)+3600000});return {draftId,revision:c.revision,changes,missing,errors:[],sourceName,at,restoredFrom};
   });
  },
- async previewImport(header,input){
+ async previewXlsx(header,input){
+  if(!input||Object.keys(input).sort().join(',')!=='base64,sourceName')throw fail(400);const uid=await actor(header),sourceName=inputText(input.sourceName,120);await db.runTransaction(async tx=>{await check(tx,uid);});
+  const decoded=await decodeMasterXlsx(input.base64);if(decoded.error)return {errors:[{line:0,message:decoded.error}],changes:[],missing:[],draftId:null};
+  return api.previewImport(header,{csv:decoded.csv,delimiter:';',sourceName},{kind:'xlsx-import',sourceDigest:digest(Buffer.from(input.base64,'base64'))});
+ },
+ async previewImport(header,input,sourceInfo=null){
   if(!input||Object.keys(input).sort().join(',')!=='csv,delimiter,sourceName')throw fail(400);const uid=await actor(header),sourceName=inputText(input.sourceName,120),parsed=parseMasterCsv(input.csv,input.delimiter);
   return db.runTransaction(async tx=>{await check(tx,uid);const c=(await tx.get(ref)).data();if(!c)throw fail(503);if(parsed.errors.length)return {errors:parsed.errors,changes:[],missing:[],draftId:null,revision:c.revision};
    const bySku=new Map(c.products.map(p=>[c.masterById?.[p.id]?.sku??p.id,p])),masterById={...(c.masterById??{})},products=[...c.products],changes=[],errors=[];
@@ -79,7 +85,7 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
    }
    if(products.length>100)errors.push({line:0,message:'Le catalogue dépasserait 100 références.'});const seen=new Set(parsed.records.map(r=>r.sku)),missing=[...bySku.keys()].filter(s=>!seen.has(s));
    if(errors.length||!changes.length)return {errors,changes,missing,draftId:null,revision:c.revision};
-   const draftId=randomUUID(),at=now();tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:digest(input.csv),revision:c.revision,products,masterById,changes,status:'preview',expiresAt:Date.parse(at)+3600000});
+   const draftId=randomUUID(),at=now();tx.create(ref.collection('imports').doc(draftId),{actor:uid,at,sourceName,sourceDigest:sourceInfo?.sourceDigest??digest(input.csv),...(sourceInfo?{kind:sourceInfo.kind}:{}),revision:c.revision,products,masterById,changes,status:'preview',expiresAt:Date.parse(at)+3600000});
    return {draftId,revision:c.revision,changes,missing,errors:[],sourceName,at};
   });
  },
@@ -88,9 +94,10 @@ export function createCatalogImport({actor,check,db,ref,now,validateProduct}){
   return db.runTransaction(async tx=>{await check(tx,uid);const d=(await tx.get(draftRef)).data();if(!d||d.actor!==uid)throw fail(403);if(d.status==='applied'){if(d.reason!==reason)throw fail(409);return {revision:d.appliedRevision,alreadyApplied:true};}
    const c=(await tx.get(ref)).data();if(!c||d.revision!==c.revision||c.revision>=10000||Date.parse(now())>=d.expiresAt)throw fail(409);
    const revision=c.revision+1,at=now();tx.set(ref,{...c,revision,products:d.products,masterById:d.masterById,lastImport:{id:input.draftId,sourceName:d.sourceName,at,actor:uid,revision,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{})}});
-   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{}),importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:(d.kind==='catalog-restore'?'Restauration catalogue':'Import CSV')+' · '+d.changes.length+' référence(s)'}});
+   tx.create(ref.collection('audit').doc(String(revision).padStart(6,'0')),{revision,actor:uid,at,reason,kind:d.kind??'csv-import',...(d.restoredFrom?{restoredFrom:d.restoredFrom}:{}),importId:input.draftId,sourceName:d.sourceName,sourceDigest:d.sourceDigest,changes:d.changes,before:null,after:{name:(d.kind==='catalog-restore'?'Restauration catalogue':d.kind==='xlsx-import'?'Import XLSX':'Import CSV')+' · '+d.changes.length+' référence(s)'}});
    tx.update(draftRef,{status:'applied',reason,appliedRevision:revision,appliedAt:at});return {revision,alreadyApplied:false};
   });
  }
  };
+ return api;
 }
