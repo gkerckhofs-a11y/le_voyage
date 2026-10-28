@@ -21,3 +21,12 @@
 .season-label{display:inline-block;margin-left:.65rem;font-size:.8rem;font-weight:600;color:#355e49}
 
 .journey-closure{margin:2rem 1rem;padding:clamp(1.2rem,3vw,2.4rem);border:1px solid #bdc8b3;border-radius:20px;background:#edf0e5;color:#244438;max-width:960px}.journey-closure[hidden]{display:none}.journey-closure h2{font:clamp(1.7rem,3vw,2.6rem) Georgia,serif;margin:.5rem 0 1rem}.journey-closure p{line-height:1.6}.closure-signature{font-style:italic}.journey-closure .replay{max-width:280px}
+/* Scoped to the explicitly selected workspaces; legacy demos retain their navigation. */
+.workspace-session .header nav{flex-wrap:wrap;gap:16px}
+@media(max-width:700px){
+ .workspace-session{padding-bottom:125px}
+ .workspace-session .header{height:77px}
+ .workspace-session .header nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--paper);border-top:1px solid var(--line);margin:0;padding:10px 16px max(10px,env(safe-area-inset-bottom));gap:4px 20px;justify-content:center}
+ .workspace-session .header nav a,.workspace-session .header nav button{padding:8px 0}
+ .workspace-session .page-bottom{height:auto;min-height:60px;flex-wrap:wrap;gap:12px}
+}
