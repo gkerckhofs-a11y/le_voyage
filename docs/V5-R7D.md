@@ -29,6 +29,12 @@ La projection du rapprochement contient seulement les champs nécessaires ; pas 
 
 Captures inspectées : [desktop](evidence/v5-r7d-acquired-desktop.png), [mobile](evidence/v5-r7d-acquired-mobile.png), [mobile — montants et précautions après défilement](evidence/v5-r7d-acquired-mobile-review.png). La barre fixe reste présente ; le complément montre les informations qu'elle masquait dans la capture du panneau long. Kiosque inchangé, sans nouvelle capture.
 
+## Correctif de recette intégrée
+
+La CI initiale a révélé une hypothèse incorrecte du test mobile : le catalogue partagé avait été modifié par un scénario précédent (infusion à 13 €), et la proposition conservée totalisait donc 52,50 € au lieu des 51,50 € du catalogue initial. L'application affichait correctement cet instantané. Le test compare désormais le total historique affiché au montant de la proposition réellement enregistrée, sans supposer un prix initial constant.
+
+Rejeu ciblé avec `gift-forecast.spec.mjs supplier-catalog.spec.mjs` dans les émulateurs : **4/4**, avec modification du catalogue entre les passages desktop et mobile. Aucun code applicatif changé par ce correctif. Captures du premier passage isolé conservées ; elles représentent son catalogue initial.
+
 ## Limites et suite
 
 Lecture du dernier état conservé pour ce palier, sans transfert automatique de composition ni validation de commande. Une modification de l'ordre ou la suppression des paliers peut empêcher le rapprochement ; le système ne tente pas de deviner une correspondance. Les anciennes versions restent dans l'historique R7C, pas dans un nouvel écran transversal.
