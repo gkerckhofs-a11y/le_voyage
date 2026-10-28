@@ -34,3 +34,11 @@ Captures inspectées : [forêt desktop](evidence/v5-r4b-forest-desktop-1440.png)
 Illustration fictive inspirée d'un paysage rural, sans coordonnées ni noms de lieux réels. Les animaux restent décoratifs. Les captures vérifient des positions représentatives, pas chaque cadrage possible. La lisibilité et le regroupement des cadeaux au dézoom restent à traiter dans R4C ; la présente tranche ne déclare pas toute la carte V5 terminée.
 
 Aucun déploiement, aucune URL de test nouvelle, aucune modification de production. Le staging antérieur n'est pas revalidé. Ce n'est pas la dernière tranche du projet.
+
+## Isolation du test cockpit après CI
+
+La première CI `6615644` réussit moteur, accès et carte ; Firebase échoue uniquement sur le comptage d'historique du cockpit mobile. L'artefact du run [40691463672](https://github.com/gkerckhofs-a11y/le_voyage/actions/runs/40691463672) montre un suivi « Composition partagée adaptée aux goûts confirmés » antérieur aux actions du scénario, sur « Les Chemins verts ». Ce suivi est créé par `beneficiaries.spec.mjs` : le test d'opérations mobile sélectionnait simplement la première ligne triée, déjà utilisée par ce scénario. Il ne s'agit pas d'une preuve de double écriture par le cockpit.
+
+`tests/firebase-browser/gift-operations.spec.mjs` sélectionne désormais explicitement « Les Champs dorés » sur mobile (et conserve « Les Explorateurs » sur desktop), puis exige une révision initiale nulle. Les comptes exacts d'historique, la perte de réponse, la récupération et la livraison confirmée restent testés sans relâchement. Aucun code métier du cockpit n'est changé.
+
+Recette ciblée sur les émulateurs : `npx playwright test --config playwright.local-check.config.mjs beneficiaries.spec.mjs gift-operations.spec.mjs supplier-catalog.spec.mjs` → **6/6 réussis**, dans l'ordre desktop puis mobile avec les données partagées. Total de la tranche : **18 scénarios navigateur ciblés distincts réussis**. La CI du commit correctif est suivie dans la PR. Ce diagnostic précise aussi la cause de l'écart non reproduit signalé dans R4A.
