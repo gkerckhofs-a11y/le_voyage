@@ -16,5 +16,18 @@ test('annual calendar draft previews, saves and reloads without altering current
  await page.locator('#annual-funding-preview').screenshot({path:info.outputPath(`annual-funding-preview-${info.project.name}.png`)});
  await page.locator('#giftCount').fill('6');await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#gift-funding-5')).toBeFocused();const stored=await(await page.request.get('/api/annual-plan')).json();expect(stored.input.giftCount).toBe(5);
 
+ await page.getByRole('button',{name:'Recharger le brouillon enregistré'}).click();await expect(page.locator('#giftCount')).toHaveValue('5');
+ await page.locator('#questionnaire-enabled').check();await page.locator('#questionnaire-mode').selectOption('autonomous');
+ for(let i=0;i<3;i++){await page.locator('#value-'+i).fill(['Entraide','Qualité','Initiative'][i]);await page.locator('#question-'+i).fill('Cette semaine, ai-je contribué à notre valeur '+(i+1)+' ?');}
+ for(let i=0;i<5;i++)await page.locator('#weight-'+i).fill('20');await page.locator('#minimumRespondents').fill('5');
+ await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('Brouillon enregistré');await page.reload();await expect(page.locator('#annual-fields')).toBeEnabled();await expect(page.locator('#value-0')).toHaveValue('Entraide');await expect(page.locator('#annual-questionnaire-preview')).toContainText('total 100 %');
+ await page.locator('#weight-0').fill('19');await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('refusé');expect((await(await page.request.get('/api/annual-plan')).json()).input.questionnaire.weights[0]).toBe('20');
+ await page.locator('#weight-0').fill('20');await page.locator('#questionnaire-mode').selectOption('kpi');
+ for(let i=0;i<2;i++){for(const [key,value] of Object.entries({definition:'Délai '+i,source:'Rapport mensuel',target:'2,5',unit:'jours'}))await page.locator('#kpi-'+i+'-'+key).fill(value);await page.locator('#kpi-'+i+'-direction').selectOption('lower');}
+ await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('Brouillon enregistré');await page.reload();await expect(page.locator('#kpi-0-target')).toHaveValue('2.5');await expect(page.locator('#annual-questionnaire-preview')).toContainText('moins est mieux');expect(await(await page.request.get('/api/demo/team')).json()).toEqual(before);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.locator('.annual-questionnaire-form').screenshot({path:info.outputPath(`annual-questionnaire-${info.project.name}.png`)});
+ await page.locator('#annual-questionnaire-preview').screenshot({path:info.outputPath(`annual-questionnaire-preview-${info.project.name}.png`)});
+ await page.locator('#questionnaire-mode').selectOption('autonomous');await page.getByRole('button',{name:'Enregistrer le brouillon',exact:true}).click();await expect(page.locator('#annual-status')).toContainText('Brouillon enregistré');expect((await(await page.request.get('/api/annual-plan')).json()).input.questionnaire.kpis).toBeUndefined();
  const rejected=await page.request.post('/api/annual-plan/save',{headers:{Origin:new URL(page.url()).origin},data:{input:{},revision:0,mutationId:'forbidden'}});expect(rejected.status()).toBe(403);
 });
