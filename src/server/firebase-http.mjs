@@ -1,3 +1,4 @@
+import {createOrganizerDashboard} from './organizer-dashboard.mjs';
 import {createDirectorProgress} from './director-progress.mjs';
 import {createKpiPeriods} from './kpi-periods.mjs';
 import {createKpiAccess} from './kpi-access.mjs';
@@ -18,6 +19,7 @@ import {newDemo,newAutonomousTpeDemo,newOperationsDemo} from './demo-service.mjs
 import {body,authorized} from './http.mjs';
 const profiles={lex:{uid:'demo-lex-user',tenantId:'fiction-lex-ekho',email:'lex@example.test'},atelier:{uid:'demo-atelier-user',tenantId:'fiction-atelier',email:'atelier@example.test'}};
 const invitedProfile={uid:'demo-invited-user',email:'camille@example.test'};
+profiles.organizer={uid:'demo-organizer-user',tenantId:'fiction-lex-ekho',email:'organizer@example.test'};
 profiles.director={uid:'demo-director-user',tenantId:'fiction-lex-ekho',email:'director@example.test'};
 profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@example.test'};
 for(let i=1;i<=3;i++)profiles['team'+i]={uid:'demo-team-'+i,tenantId:'fiction-lex-ekho',email:'team'+i+'@example.test',teamId:'private-collective-team-'+i};
@@ -35,14 +37,14 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
    const record=profile.tenantId==='fiction-operations-demo'?newOperationsDemo():profile.tenantId==='fiction-tpe-auto'?newAutonomousTpeDemo():newDemo();record.ledger.state.config.tenantId=profile.tenantId;
    profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:profile.teamId??'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(['fiction-tpe-auto','fiction-kpi-demo'].includes(profile.tenantId)?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-kpi-admin'?{participationEnabled:false,kpiPeriodManagementAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}],kpiManagementAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-kpi-referent'?{participationEnabled:false,kpiAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-director-user'?{participationEnabled:false,directorCampaigns:[profile.scope.campaignId],assignments:[]}:{assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]})});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(['fiction-tpe-auto','fiction-kpi-demo'].includes(profile.tenantId)?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-kpi-admin'?{participationEnabled:false,kpiPeriodManagementAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}],kpiManagementAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-kpi-referent'?{participationEnabled:false,kpiAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-organizer-user'?{participationEnabled:false,organizerCampaigns:[profile.scope.campaignId],canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-director-user'?{participationEnabled:false,directorCampaigns:[profile.scope.campaignId],assignments:[]}:{assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]})});});
   }
   for(const [id,start,endExclusive,state] of [['october-test','2026-10-01','2026-11-01','open'],['september-test','2026-09-01','2026-10-01','frozen']]){
    const ref=adapter.db.doc(`tenants/${profiles.kpi.scope.tenantId}/campaigns/${profiles.kpi.scope.campaignId}/kpiPeriods/${id}`);
@@ -64,12 +66,18 @@ export async function createFirebaseHttp(options){
    if(!response.ok)throw failure(401);const result=await response.json(),header='Bearer '+result.idToken;
    let scope=profile.scope??null;
    if(id==='camille'){const m=(await adapter.db.doc(`tenants/fiction-lex-ekho/members/${profile.uid}`).get()).data();if(m?.active&&m.assignments?.length)scope={tenantId:'fiction-lex-ekho',...m.assignments[0]};}
-   if(scope){if(id==='director')await directorProgress.read(header,scope);else await adapter.read(header,scope);}
+   if(scope){if(id==='director')await directorProgress.read(header,scope);else if(id==='organizer')await organizerDashboard.read(header,scope);else await adapter.read(header,scope);}
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
-   if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,directorOnly:id==='director',expires:now+3300000});
-   json(200,{connected:true,...(id==='director'?{destination:'/entreprise.html'}:['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
+   if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
+   json(200,{connected:true,...(id==='organizer'?{destination:'/organisateur.html'}:id==='director'?{destination:'/entreprise.html'}:['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(session.organizerOnly&&path!=='/api/auth/logout'){
+   const routes={GET:['/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
+   if(!routes[req.method]?.includes(path))throw failure(403);
+   await organizerDashboard.read(session.header,session.scope);
+  }
+  if(path==='/api/organizer/overview'&&req.method==='GET'){json(200,await organizerDashboard.read(session.header,session.scope));return;}
   if(path==='/api/director/progress'&&req.method==='GET'){json(200,await directorProgress.read(session.header,session.scope));return;}
   if(session.directorOnly&&!['/api/demo/session','/api/auth/logout'].includes(path))throw failure(403);
   if(path.startsWith('/api/kpi-periods/')&&req.method==='POST'){
@@ -153,7 +161,7 @@ export async function createFirebaseHttp(options){
     throw failure(404);
    }
    if(!session.scope&&path!=='/api/auth/logout')throw failure(403);
-   if(path==='/api/demo/session'){await body(req,[]);if(session.directorOnly){await directorProgress.read(session.header,session.scope);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false});return;}await adapter.read(session.header,session.scope);const campaign=await adapter.db.doc(`tenants/${session.scope.tenantId}/campaigns/${session.scope.campaignId}`).get();json(200,{csrf:session.csrf,authenticated:true,canSimulate:campaign.data()?.collectionMode!=='weekly-questionnaire'});return;}
+   if(path==='/api/demo/session'){await body(req,[]);if(session.organizerOnly){json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:'organizer'});return;}if(session.directorOnly){await directorProgress.read(session.header,session.scope);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false});return;}await adapter.read(session.header,session.scope);const campaign=await adapter.db.doc(`tenants/${session.scope.tenantId}/campaigns/${session.scope.campaignId}`).get();json(200,{csrf:session.csrf,authenticated:true,canSimulate:campaign.data()?.collectionMode!=='weekly-questionnaire'});return;}
    authorized(req,session);
    if(path==='/api/auth/logout'){await body(req,[]);sessions.delete(token);json(200,{disconnected:true},{'Set-Cookie':cookie('',req,0)});return;}
    if(path==='/api/demo/advance'){
