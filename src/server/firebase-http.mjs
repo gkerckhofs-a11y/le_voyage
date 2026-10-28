@@ -1,3 +1,4 @@
+import {createKpiAccess} from './kpi-access.mjs';
 import {createKpiCollection} from './kpi-collection.mjs';
 import {createAnnualPlanning} from './annual-planning.mjs';
 import {beneficiaryDemo,seedBeneficiaryDemo} from './beneficiary-demo.mjs';
@@ -19,6 +20,7 @@ profiles.clem={uid:'demo-rc-admin',tenantId:'fiction-lex-ekho',email:'clem@examp
 for(let i=1;i<=3;i++)profiles['team'+i]={uid:'demo-team-'+i,tenantId:'fiction-lex-ekho',email:'team'+i+'@example.test',teamId:'private-collective-team-'+i};
 profiles.operations={uid:'demo-operations-user',tenantId:'fiction-operations-demo',email:'operations@example.test'};
 for(const p of beneficiaryDemo.filter(p=>p.profile))profiles[p.profile]={uid:p.uid,tenantId:'fiction-operations-demo',email:p.uid+'@example.test',teamId:p.teamId};
+profiles.kpiadmin={uid:'demo-kpi-admin',tenantId:'fiction-kpi-demo',email:'admin-kpi@example.test'};
 profiles.kpi={uid:'demo-kpi-referent',tenantId:'fiction-kpi-demo',email:'referent-kpi@example.test'};
 profiles.tpe={uid:'demo-tpe-user',tenantId:'fiction-tpe-auto',email:'tpe@example.test'};
 profiles.tpeadmin={uid:'demo-tpe-admin',tenantId:'fiction-tpe-auto',email:'tpe-admin@example.test'};
@@ -30,14 +32,14 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
    const record=profile.tenantId==='fiction-operations-demo'?newOperationsDemo():profile.tenantId==='fiction-tpe-auto'?newAutonomousTpeDemo():newDemo();record.ledger.state.config.tenantId=profile.tenantId;
    profile.scope={tenantId:profile.tenantId,campaignId:record.ledger.state.config.campaignId,teamId:profile.teamId??'explorateurs'};
    const campaign=adapter.db.doc(`tenants/${profile.tenantId}/campaigns/${profile.scope.campaignId}`),member=adapter.db.doc(`tenants/${profile.tenantId}/members/${profile.uid}`);
-   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(['fiction-tpe-auto','fiction-kpi-demo'].includes(profile.tenantId)?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-kpi-referent'?{participationEnabled:false,kpiAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
+   await adapter.db.runTransaction(async tx=>{const c=await tx.get(campaign),m=await tx.get(member);if(!c.exists)tx.set(campaign,{payload:JSON.stringify(record),...(['fiction-tpe-auto','fiction-kpi-demo'].includes(profile.tenantId)?{collectionMode:'weekly-questionnaire'}:{})});if(m.exists&&profile.uid==='demo-rc-admin'&&m.data().canPlanCampaign===undefined)tx.update(member,{canPlanCampaign:true});if(!m.exists)tx.set(member,{uid:profile.uid,tenantId:profile.tenantId,active:true,...(profile.uid==='demo-kpi-admin'?{participationEnabled:false,kpiManagementAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-kpi-referent'?{participationEnabled:false,kpiAssignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]}:{}),...(profile.uid==='demo-operations-user'?{participationEnabled:false}:{}),...(profile.uid==='demo-tpe-admin'?{participationEnabled:false,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),...(profile.uid==='demo-rc-admin'?{canPlanCampaign:true,canInvite:true,canManageTeam:true,canCloseWeeks:true,canCoordinateWeeks:true,coordinatedAssignments:record.ledger.state.config.teams.map(t=>({campaignId:profile.scope.campaignId,teamId:t.id}))}:{}),assignments:[{campaignId:profile.scope.campaignId,teamId:profile.scope.teamId}]});});
   }
   for(const [id,start,endExclusive,state] of [['october-test','2026-10-01','2026-11-01','open'],['september-test','2026-09-01','2026-10-01','frozen']]){
    const ref=adapter.db.doc(`tenants/${profiles.kpi.scope.tenantId}/campaigns/${profiles.kpi.scope.campaignId}/kpiPeriods/${id}`);
@@ -62,9 +64,15 @@ export async function createFirebaseHttp(options){
    if(scope)await adapter.read(header,scope);
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
    if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,expires:now+3300000});
-   json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
+   json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/kpi-access/')&&req.method==='POST'){
+   if(!session.scope)throw failure(403);authorized(req,session);
+   if(path==='/api/kpi-access/read'){await body(req,[]);json(200,await kpiAccess.read(session.header,session.scope));return;}
+   if(path==='/api/kpi-access/save'){const i=await body(req,['uid','enabled','revision','mutationId','reason']);json(200,await kpiAccess.save(session.header,session.scope,i));return;}
+   throw failure(404);
+  }
   if(path.startsWith('/api/kpi/')&&req.method==='POST'){
    if(!session.scope)throw failure(403);authorized(req,session);
    if(path==='/api/kpi/list'){await body(req,[]);json(200,await kpiCollection.list(session.header,session.scope));return;}
