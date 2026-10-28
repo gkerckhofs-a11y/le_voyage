@@ -1,3 +1,4 @@
+import {createKpiCollection} from './kpi-collection.mjs';
 import {createAnnualPlanning} from './annual-planning.mjs';
 import {beneficiaryDemo,seedBeneficiaryDemo} from './beneficiary-demo.mjs';
 import {createGiftBeneficiaries} from './gift-beneficiaries.mjs';
@@ -28,7 +29,7 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter),giftBeneficiaries=createGiftBeneficiaries(adapter);
  try{
   for(const profile of Object.values(profiles)){
    try{await adapter.auth.getUser(profile.uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:profile.uid,email:profile.email,password});}
@@ -59,6 +60,12 @@ export async function createFirebaseHttp(options){
    json(200,{connected:true,...(['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
   const session=sessions.get(token);if(!session)throw failure(401);
+  if(path.startsWith('/api/kpi/')&&req.method==='POST'){
+   if(!session.scope)throw failure(403);authorized(req,session);
+   if(path==='/api/kpi/read'){const i=await body(req,['periodId']);json(200,await kpiCollection.read(session.header,session.scope,i.periodId));return;}
+   if(path==='/api/kpi/submit'){const i=await body(req,['periodId','revision','mutationId','values','source','reason']);json(200,await kpiCollection.submit(session.header,session.scope,i));return;}
+   throw failure(404);
+  }
   if(path==='/api/annual-plan'&&req.method==='GET'){json(200,await annualPlanning.read(session.header,session.scope));return;}
   if(path.startsWith('/api/annual-plan/')&&req.method==='POST'){
    authorized(req,session);
