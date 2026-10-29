@@ -50,6 +50,8 @@ test('organizer explicitly sends one addressed invitation through HTTP and an is
  assert.equal(directory.entries.length,1);
  assert.equal(directory.entries[0].space,'organizer');
  assert.equal((await post('/api/workspaces/select',{id:directory.entries[0].id})).status,200);
+ const selected=await get('/api/workspaces');assert.equal(selected.status,200);
+ csrf=(await selected.json()).csrf;
  const mutationId='mutation-'+randomUUID();
  const dispatched=await post('/api/invitation/send',{recipientUid:recipient,mutationId});
  assert.equal(dispatched.status,200);
