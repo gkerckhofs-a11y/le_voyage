@@ -333,6 +333,12 @@ export async function createFirebaseHttp(options){
    const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken,now:clock()}),token=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
    await sessions.issue(null,token,{...identity,csrf,authenticationMode});return {token,expires:identity.expires};
   },
+  async identityInvitationLogin(idToken,invitationToken){
+   if(authenticationMode!=='provisioned')throw failure(403);
+   const identity=await provisionedInvitationLogin({auth:adapter.auth,invitations,idToken,invitationToken,now:clock()});
+   const token=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+   await sessions.issue(null,token,{...identity,csrf,authenticationMode});return {token,expires:identity.expires};
+  },
   async identityLogout(token){if(authenticationMode!=='provisioned')throw failure(403);const session=await sessions.get(token);if(session?.authenticationMode==='provisioned')await sessions.revoke(token,session._version);}
  };
 
