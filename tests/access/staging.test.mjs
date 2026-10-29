@@ -32,3 +32,15 @@ test('provisioned access is explicit and Google still requires a tester allowlis
  assert.equal(stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:'a@example.test',RC_TEST_AUTH_PASSWORD:undefined,RC_TEST_ACCESS_PASSWORD:undefined}).googleAccess,true);
  assert.throws(()=>stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:''}));
 });
+
+test('email-link pilot is opt-in, isolated from Google gate, and disabled by default',()=>{
+ const stage={...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'basic'};
+ assert.equal(stagingConfig(stage).emailLinkEnabled,false);
+ assert.equal(stagingConfig({...stage,RC_TEST_EMAIL_LINK_MODE:'enabled'}).emailLinkEnabled,true);
+ for(const patch of [
+  {RC_AUTHENTICATION_MODE:'demo'},
+  {RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:'x@example.test'},
+  {RC_TEST_ACCESS_MODE:undefined},
+  {RC_TEST_EMAIL_LINK_MODE:'invalid'}
+ ])assert.throws(()=>stagingConfig({...stage,RC_TEST_EMAIL_LINK_MODE:'enabled',...patch}));
+});
