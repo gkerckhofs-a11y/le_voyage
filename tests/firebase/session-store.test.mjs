@@ -29,3 +29,9 @@ test('HTTP sessions survive process replacement and rotate and logout consistent
  assert.equal((await post(replacement,'/api/auth/logout',{},cookie,oldCsrf)).status,403);assert.equal((await post(replacement,'/api/auth/logout',{})).status,200);assert.equal((await get(second,'/api/workspaces')).status,401);
  const relogin=await post(second,'/api/auth/login',{profile:'multispace'});cookie=relogin.headers.get('set-cookie').split(';')[0];now+=3300000;assert.equal((await get(replacement,'/api/workspaces')).status,401);
 });
+
+test('session scope updates persist across stores without reviving rotated sessions',async t=>{
+ const a=createFirebaseEmulatorAdapter();t.after(()=>a.close());const first=createSessionStore(a,{key}),second=createSessionStore(a,{key}),id=token(),next=token();await first.issue(null,id,{header:'Bearer test',csrf:'test',expires:Date.now()+3000000});const before=await first.get(id);
+ await second.update(id,{...before,scope:{tenantId:'invited',campaignId:'current'}});const updated=await first.get(id);assert.equal(updated.scope.tenantId,'invited');assert.equal(updated.expires,before.expires);assert.equal(updated.csrf,before.csrf);
+ await assert.rejects(first.update(id,{...before,scope:{tenantId:'stale'}}),{status:409});await second.rotate(id,next,updated);await assert.rejects(first.update(id,updated),{status:409});assert.equal(await second.get(id),null);assert.equal((await first.get(next)).scope.tenantId,'invited');
+});
