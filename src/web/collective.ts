@@ -1,3 +1,4 @@
+import {setNavigationCompany,installTeamNavigation} from './team-navigation.js';
 import { distanceRatio } from '../map/geometry.ts';
 import { journeyRoute } from '../map/route.ts';
 import { mountJourneyMap } from './journey-map.ts';
@@ -30,10 +31,10 @@ async function start(){
       const response=await fetch('/api/kiosk/progress',{cache:'no-store'});if(!response.ok)throw Error('Kiosk unavailable');data=await response.json();
     }else data=await readDemo<CollectiveJourneyView>('collective');
   }
-  else{const response=await fetch(`data/collective-${scenario}.json`);if(!response.ok)throw new Error('Journey unavailable');data=await response.json();}
+  else{installTeamNavigation();const response=await fetch(`data/collective-${scenario}.json`);if(!response.ok)throw new Error('Journey unavailable');data=await response.json();}
   if(data.schemaVersion!==1||data.routeId!==journeyRoute.id)throw new Error('Unsupported journey');
   const reception=data.reception,last=data.history.at(-1),ratio=distanceRatio(data.distance,data.maximumKm);
-  $('company').textContent=data.organizationName;$('demo-company').textContent=data.organizationName;
+  $('company').textContent=data.organizationName;setNavigationCompany(data.organizationName);$('demo-company').textContent=data.organizationName;
   $('distance').textContent=format(data.displayKm);$('maximum').textContent=`${format(data.maximumKm)} km`;
   $('distance-meter').setAttribute('aria-valuemax',String(data.maximumKm));$('distance-meter').setAttribute('aria-valuenow',data.displayKm);
   $('distance-meter').setAttribute('aria-valuetext',`${format(data.displayKm)} kilomètres collectifs sur ${format(data.maximumKm)}`);$('progress-fill').style.width=`${ratio*100}%`;

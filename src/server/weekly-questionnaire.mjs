@@ -8,7 +8,7 @@ import {catalog} from './demo-service.mjs';
 import {assertTestAdapter} from './test-environment.mjs';
 const fail=status=>Object.assign(new Error('Questionnaire unavailable'),{status});
 const questions=['Cette semaine, j’ai contribué à l’entraide dans mon équipe.','Cette semaine, j’ai contribué à la qualité de notre service.','Cette semaine, j’ai pris des initiatives utiles.'];
-export function createWeeklyQuestionnaire(adapter){
+export function createWeeklyQuestionnaire(adapter,{now=Date.now}={}){
  assertTestAdapter(adapter);const {auth,db}=adapter;
  async function operate(header,scope,action,input={},coordination=false){
   const project=m=>coordination?coordinatedMembership(m,scope):m;
@@ -22,7 +22,7 @@ export function createWeeklyQuestionnaire(adapter){
    const week=management?state.config.weeks.find(w=>w.id===input.weekId&&w.active&&team.eligibleWeekIds.includes(w.id)):state.config.weeks.find(w=>w.active&&team.eligibleWeekIds.includes(w.id)&&!state.outcomes[JSON.stringify([team.id,w.id])]);
    const canClose=member.canCloseWeeks===true;
    const canOpen=member.canManageTeam===true;
-   if(!week){if(management)throw fail(409);return {status:'finished',canOpen:false,canClose:false};}
+   if(!week){if(action==='prompt')return {show:false};if(management)throw fail(409);return {status:'finished',canOpen:false,canClose:false};}
    const ref=campaignRef.collection('questionnaires').doc(scope.teamId+'_'+week.id),snapshot=await tx.get(ref);let survey=snapshot.data();
    if(coordination&&action==='open'&&input.weekId!==week.id)throw fail(409);
    if(action==='open'){
@@ -35,6 +35,7 @@ export function createWeeklyQuestionnaire(adapter){
      tx.set(ref,survey);tx.update(campaignRef,{collectionMode:'weekly-questionnaire'});
     }
    }
+   if(action==='prompt'&&!survey)return {show:false};
    if(!survey&&action!=='read')throw fail(409);
    if(!survey)return {status:'not-open',canOpen,week:{id:week.id,start:week.start,endExclusive:week.endExclusive}};
    const outcomeKey=JSON.stringify([scope.teamId,week.id]);
@@ -83,9 +84,17 @@ export function createWeeklyQuestionnaire(adapter){
      survey.absent=survey.absent.filter(uid=>uid!==viewer.viewerId);if(input.absent)survey.absent.push(viewer.viewerId);tx.set(ref,survey);
     }
    }
+   if(action==='prompt'){
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now()));
+    if(survey.status!=='open'||!eligible||response||survey.absent.includes(viewer.viewerId)||today<week.start||today>=deadline())return {show:false};
+    const seen=ref.collection('prompts').doc(viewer.viewerId),previous=await tx.get(seen);
+    if(previous.exists)return {show:false};
+    tx.create(seen,{shownAt:now()});
+    return {show:true,week:{id:week.id,start:week.start,endExclusive:week.endExclusive},questions:survey.questions};
+   }
    // Only the caller's response. No roster, counts, scores or answers of colleagues.
    return {status:survey.status,canOpen,canClose,deadline:deadline(),scoringLabel:scoringDescription(survey.scoring),eligible,week:{id:week.id,start:week.start,endExclusive:week.endExclusive},questions:survey.questions,myAnswers:survey.answers[viewer.viewerId]??null,absent:survey.absent.includes(viewer.viewerId)};
   });
  }
- return {coordinate:(h,s,a,i)=>operate(h,s,a,i,true),read:(h,s)=>operate(h,s,'read'),open:(h,s)=>operate(h,s,'open'),answer:(h,s,i)=>operate(h,s,'answer',i),absence:(h,s,i)=>operate(h,s,'absence',i),close:(h,s,i)=>operate(h,s,'close',i),postpone:(h,s,i)=>operate(h,s,'postpone',i)};
+ return {prompt:(h,s)=>operate(h,s,'prompt'),coordinate:(h,s,a,i)=>operate(h,s,a,i,true),read:(h,s)=>operate(h,s,'read'),open:(h,s)=>operate(h,s,'open'),answer:(h,s,i)=>operate(h,s,'answer',i),absence:(h,s,i)=>operate(h,s,'absence',i),close:(h,s,i)=>operate(h,s,'close',i),postpone:(h,s,i)=>operate(h,s,'postpone',i)};
 }

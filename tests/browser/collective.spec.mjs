@@ -47,7 +47,7 @@ test('escale navigation, keyboard, kiosk idle recenter and reduced motion',async
 test('team/collective navigation, mobile journal, TPE and network fallback',async({page})=>{
   await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
   await page.getByRole('button',{name:'Carnet de bord'}).click();await expect(page.locator('#journal')).toBeVisible();await page.keyboard.press('Escape');
-  await page.getByRole('link',{name:'Le collectif',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
+  await page.getByRole('link',{name:'Le Voyage Lex EKHO',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
   await page.locator('#scenario').selectOption('tpe');await expect(page.locator('#company')).toHaveText('Atelier fictif');await expect(page.getByTestId('collective-car')).toHaveCount(1);
   await page.route('**/data/collective-tpe.json',r=>r.abort());await page.reload();await expect(page.locator('#fallback')).toBeVisible();await expect(page.locator('#collective-content')).toBeHidden();
 });

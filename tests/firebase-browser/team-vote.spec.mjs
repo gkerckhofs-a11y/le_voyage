@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 test('private team ballot, refresh and one car after vote',async({page},info)=>{
- await page.goto('/connexion.html');await page.getByRole('button',{name:'Explorer Lex EKHO'}).click();await expect(page.getByTestId('team-car')).toHaveCount(1);await page.getByRole('link',{name:'Choix de l’équipe'}).click();
+ await page.goto('/connexion.html');await page.getByRole('button',{name:'Explorer Lex EKHO'}).click();await expect(page.getByTestId('team-car')).toHaveCount(1);await page.getByRole('link',{name:'Nos choix',exact:true}).click();await page.getByRole('link',{name:/^03 Choix d’équipe/}).click();
  // The same fixture account is reused on mobile; its committed ballot must survive.
  const status=page.locator('#vote-status');await expect(status).toContainText(/Votre voix|Votre vote/);
  if(await page.locator('#vote-form').isVisible()){

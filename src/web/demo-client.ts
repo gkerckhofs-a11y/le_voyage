@@ -1,3 +1,5 @@
+import {installTeamNavigation,setNavigationCompany} from './team-navigation.js';
+import {openWeeklyPopup} from './weekly-popup.js';
 let csrf='';
 function primaryNavigation(){let nav=document.querySelector('.header nav');if(!nav){nav=document.createElement('nav');nav.setAttribute('aria-label','Navigation principale');document.querySelector('.header')?.append(nav);}return nav;}
 function check(response:Response){if(response.status===401||response.status===403)location.replace('/connexion.html');if(!response.ok)throw new Error('Demo unavailable');}
@@ -15,7 +17,16 @@ export async function startDemo(){
       const link=document.createElement('a');link.id='organizer-home';link.href='/organisateur.html';link.textContent='Espace organisateur';primaryNavigation().append(link);
     }
   }
-  if(result.canSimulate===false){const simulate=document.getElementById('advance');if(simulate)simulate.hidden=true;}if(result.authenticated){if(!result.workspace||result.workspace==='team'){if(!document.getElementById('my-week-link')){const link=document.createElement('a');link.id='my-week-link';link.href='/semaine.html';link.textContent='Ma semaine';primaryNavigation().append(link);}if(!document.getElementById('team-vote-link')){const link=document.createElement('a');link.id='team-vote-link';link.href='/equipe.html';link.textContent='Choix de l’équipe';primaryNavigation().append(link);}if(!document.getElementById('gift-preferences-link')){const link=document.createElement('a');link.id='gift-preferences-link';link.href='/preferences.html';link.textContent='Mes goûts';primaryNavigation().append(link);}}const nav=document.querySelector('.demo-label');if(nav&&!document.getElementById('logout')){const button=document.createElement('button');button.id='logout';button.textContent='Se déconnecter';button.addEventListener('click',async()=>{try{const r=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:'{}'});if(r.ok||r.status===401)location.replace('/connexion.html');else button.textContent='Réessayer la déconnexion';}catch{button.textContent='Réessayer la déconnexion';}});const badge=document.createElement('span');badge.hidden=true;while(nav.firstChild)badge.append(nav.firstChild);nav.append(badge,button);}}
+  if(result.canSimulate===false){const simulate=document.getElementById('advance');if(simulate)simulate.hidden=true;}if(result.authenticated){const nav=document.querySelector('.demo-label');if(nav&&!document.getElementById('logout')){const button=document.createElement('button');button.id='logout';button.textContent='Se déconnecter';button.addEventListener('click',async()=>{try{const r=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:'{}'});if(r.ok||r.status===401)location.replace('/connexion.html');else button.textContent='Réessayer la déconnexion';}catch{button.textContent='Réessayer la déconnexion';}});const badge=document.createElement('span');badge.hidden=true;while(nav.firstChild)badge.append(nav.firstChild);nav.append(badge,button);}}
+  const teamSurface=!result.workspace||result.workspace==='team';
+  const teamPage=['/','/index.html','/collectif.html','/choix.html','/preferences.html','/equipe.html','/semaine.html'].includes(location.pathname);
+  if(teamSurface&&teamPage){
+   installTeamNavigation();
+   if(result.authenticated){
+    void fetch('/api/demo/team').then(r=>r.ok?r.json():null).then(feed=>{if(feed?.journey?.organizationName)setNavigationCompany(feed.journey.organizationName);}).catch(()=>{});
+    if(!new URLSearchParams(location.search).has('attentions'))void openWeeklyPopup(csrf).catch(()=>{});
+   }
+  }
   return result;
 }
 export async function readDemo<T>(surface:'team'|'collective'):Promise<T>{

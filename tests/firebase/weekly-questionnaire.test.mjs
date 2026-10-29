@@ -21,3 +21,19 @@ test('report adds one window only; non-response floor and all-absent joker never
  w=await service.open(admin.header,scope);await assert.rejects(service.close(admin.header,scope,{weekId:w.week.id,decision:'joker'}),{status:409});assert.equal((await a.read(one.header,scope)).journey.displayKm,'1860');});
 test('nine private closures cross one gift threshold and emit one entitlement on retries',async t=>{const {a,scope,users:[admin,one],service}=await setup(t);for(let i=0;i<9;i++){const w=await service.open(admin.header,scope);await service.answer(one.header,scope,{weekId:w.week.id,answers:[i%2?1:5,3,4]});await service.close(admin.header,scope,{weekId:w.week.id,decision:'evaluate'});await service.close(admin.header,scope,{weekId:w.week.id,decision:'evaluate'});}const record=JSON.parse((await a.db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`).get()).data().payload);assert.equal((await a.read(one.header,scope)).journey.displayKm,'2445');assert.equal(Object.keys(record.ledger.state.entitlements).length,1);assert.equal(Object.keys(record.ledger.state.tasks).length,1);assert.equal(record.ledger.events.filter(e=>e.kind==='attention').length,1);assert.equal(record.ledger.events.filter(e=>e.kind==='progress').length,9);});
 test('single-team convoy is updated and reception frozen before a post-cutoff closure',async t=>{const {a,scope,users:[admin,one],service}=await setup(t),ref=a.db.doc(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}`);let record=JSON.parse((await ref.get()).data().payload);record.ledger.state.config.teams=record.ledger.state.config.teams.filter(t=>t.id===scope.teamId);const next=record.ledger.state.config.weeks[24];record.ledger.state.config.reception.cutoffDate=next.start;await ref.update({payload:JSON.stringify(record)});const w=await service.open(admin.header,scope);await service.answer(one.header,scope,{weekId:w.week.id,answers:[5,5,5]});await service.close(admin.header,scope,{weekId:w.week.id,decision:'evaluate'});record=JSON.parse((await ref.get()).data().payload);assert.ok(record.ledger.state.convoys[w.week.id]);const frozen=record.ledger.state.freeze;assert.ok(frozen);const later=await service.open(admin.header,scope);await service.close(admin.header,scope,{weekId:later.week.id,decision:'joker'});assert.deepEqual(JSON.parse((await ref.get()).data().payload).ledger.state.freeze,frozen);});
+
+test('weekly popup is claimed once across instances, starts on the local campaign week and respects response and membership',async t=>{
+ const {a,scope,users:[admin,one],service}=await setup(t);
+ const opened=await service.open(admin.header,scope);
+ let clock=Date.parse(opened.week.start+'T00:00:00Z')-10800000;
+ const first=createWeeklyQuestionnaire(a,{now:()=>clock}),second=createWeeklyQuestionnaire(a,{now:()=>clock});
+ assert.deepEqual(await first.prompt(one.header,scope),{show:false});
+ clock=Date.parse(opened.week.start+'T08:00:00Z');
+ const results=await Promise.all([first.prompt(one.header,scope),second.prompt(one.header,scope),first.prompt(one.header,scope)]);
+ assert.equal(results.filter(r=>r.show===true).length,1);
+ assert.equal(results.find(r=>r.show).questions.length,3);
+ assert.deepEqual(await createWeeklyQuestionnaire(a,{now:()=>clock}).prompt(one.header,scope),{show:false});
+ await service.answer(admin.header,scope,{weekId:opened.week.id,answers:[3,4,5]});
+ assert.deepEqual(await first.prompt(admin.header,scope),{show:false});
+ await one.member.update({active:false});await assert.rejects(second.prompt(one.header,scope),{status:403});
+});

@@ -1,15 +1,15 @@
 import {test,expect} from '@playwright/test';
 async function check(page,info){
  await expect(page.locator('.brand-logo')).toHaveJSProperty('naturalWidth',300);const nav=page.locator('.header nav');await expect(nav).toHaveCount(1);await expect(nav).toBeVisible();
- const mobile=info.project.name==='mobile';expect(await nav.evaluate(el=>getComputedStyle(el).position)).toBe(mobile?'fixed':'static');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- if(mobile){const box=await nav.boundingBox();expect(box.height).toBeLessThanOrEqual(150);expect(Math.abs(box.y+box.height-page.viewportSize().height)).toBeLessThan(2);}
+ const mobile=info.project.name==='mobile',team=await page.locator('body').evaluate(el=>el.classList.contains('team-navigation'));expect(await nav.evaluate(el=>getComputedStyle(el).position)).toBe(team||mobile?'fixed':'static');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ if(mobile){const box=await nav.boundingBox();expect(box.height).toBeLessThanOrEqual(150);expect(team?Math.abs(box.y):Math.abs(box.y+box.height-page.viewportSize().height)).toBeLessThan(2);}
 }
 test('four spaces retain one usable branded navigation',async({page},info)=>{
  await page.goto('/connexion.html');await page.getByRole('button',{name:'Les quatre espaces · compte fictif'}).click();await expect(page.locator('#workspace-list section')).toHaveCount(4);
  for(const role of ['Mon équipe','Cockpit cadeaux','Vue entreprise','Organisation des campagnes']){
   await page.locator('#workspace-list section').filter({has:page.getByRole('heading',{name:role,exact:true})}).getByRole('button').click();await expect(page.locator('#workspace-switch')).toBeVisible();await check(page,info);
   if(role==='Mon équipe'){
-   for(const name of ['Ma semaine','Mes goûts','Choix de l’équipe']){const link=page.getByRole('link',{name,exact:true});await expect(link).toHaveCount(1);await expect(page.locator('.header nav').getByRole('link',{name,exact:true})).toBeVisible();}
+   await expect(page.locator('.header nav').locator('a,button')).toHaveCount(4);for(const name of ['Le voyage d’équipe','Nos choix'])await expect(page.locator('.header nav').getByRole('link',{name,exact:true})).toBeVisible();await expect(page.locator('.header nav').getByRole('link',{name:'Ma semaine',exact:true})).toHaveCount(0);
    await page.screenshot({path:info.outputPath('team-session.png')});
   }
   await page.getByRole('link',{name:'Changer d’espace',exact:true}).click();await expect(page.locator('#workspace-list section')).toHaveCount(4);

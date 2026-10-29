@@ -1,3 +1,4 @@
+import {setNavigationCompany} from './team-navigation.js';
 import { distanceRatio, positionAt, groupNearbyPoints } from '../map/geometry.ts';
 import { journeyRoute as route } from '../map/route.ts';
 import { mountJourneyMap } from './journey-map.ts';
@@ -64,7 +65,7 @@ function updateGiftLayout(){
 function renderJourney(data:TeamJourneyView){
   stageData=data;renderStages();
   const ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
-  $('team-name').textContent=data.team.name;$('company').textContent=data.organizationName;
+  $('team-name').textContent=data.team.name;$('company').textContent=data.organizationName;setNavigationCompany(data.organizationName);
   $('distance').textContent=format(data.displayKm);$('maximum').textContent=`${format(data.maximumKm)} km`;
   $('distance-meter').setAttribute('aria-valuemax',String(data.maximumKm));$('distance-meter').setAttribute('aria-valuenow',data.displayKm);
   $('distance-meter').setAttribute('aria-valuetext',`${format(data.displayKm)} kilomètres parcourus sur ${format(data.maximumKm)}`);
@@ -132,6 +133,7 @@ async function start(){
   if(data.schemaVersion!==1||data.routeId!==route.id||!/^#[a-fA-F0-9]{6}$/.test(data.team.color))throw new Error('Unsupported journey');
   renderFeed();map=mountJourneyMap(data,{kind:'team',color:data.team.color,label:data.team.name});renderStages();if(feed.closure)await map.park(false);
   $('map').addEventListener('camera-change',updateGiftLayout);updateGiftLayout();
+  if(new URLSearchParams(location.search).get('attentions')==='1')show('attentions');
   // Initial reads never replay motion or open a reveal. Unread attentions remain available on demand.
 }
 start().catch(()=>{

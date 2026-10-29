@@ -18,7 +18,7 @@ test('real crossing reveals once, keeps history and updates the collective',asyn
   await expect(page.getByTestId('team-car')).toHaveCount(1);await page.screenshot({path:info.outputPath(`reveal-${info.project.name}.png`),fullPage:true});
   await page.keyboard.press('Escape');await page.getByRole('button',{name:'Mes attentions',exact:true}).click();await expect(page.locator('.attention-card')).toHaveCount(1);await expect(page.locator('.attention-card')).toContainText('À composer');await page.keyboard.press('Escape');
   await page.reload();await expect(page.locator('#map')).toHaveAttribute('data-ready','true');await expect(page.locator('#reveal')).not.toBeVisible();await expect(page.locator('#map')).not.toHaveClass(/is-replaying/);await expect(page.locator('#distance')).toHaveText('2 480');
-  await page.getByRole('link',{name:'Le collectif',exact:true}).click();await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');await expect(page.locator('#distance')).toHaveText('2 480');await expect(page.getByTestId('collective-car')).toHaveCount(1);
+  await page.getByRole('link',{name:'Le Voyage Lex EKHO',exact:true}).click();await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');await expect(page.locator('#distance')).toHaveText('2 480');await expect(page.getByTestId('collective-car')).toHaveCount(1);
 });
 test('lost response preserves acquired attention and refresh never autoplays it',async({page})=>{
   await open(page);await prepareCrossing(page);
