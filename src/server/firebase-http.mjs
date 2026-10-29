@@ -56,6 +56,8 @@ export async function createFirebaseHttp(options){
  if(!['demo','provisioned'].includes(authenticationMode))throw new Error('Unknown authentication mode');
  const clock=options?.now??Date.now;
  const cookieName=options?.cookieName??'rc_auth';
+ const emailLink=options?.emailLink??null;
+ if(emailLink&&(authenticationMode!=='provisioned'||typeof emailLink.projectId!=='string'||!/^[a-z][a-z0-9-]{5,60}$/.test(emailLink.projectId)||typeof emailLink.apiKey!=='string'||!/^[A-Za-z0-9_-]{20,100}$/.test(emailLink.apiKey)||emailLink.canonical!==`https://${emailLink.projectId}.web.app`))throw Error('Explicit isolated e-mail link configuration required');
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
@@ -107,7 +109,11 @@ export async function createFirebaseHttp(options){
  async function handler(req,json,path){
   const now=clock();
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
-  if(path==='/api/auth/config'&&req.method==='GET'){json(200,{mode:authenticationMode});return;}
+  if(path==='/api/auth/config'&&req.method==='GET'){json(200,{mode:authenticationMode,...(emailLink?{emailLinkEnabled:true}:{})});return;}
+  if(path==='/api/auth/email-link/config'&&req.method==='GET'){
+   if(!emailLink)throw failure(404);
+   json(200,{projectId:emailLink.projectId,apiKey:emailLink.apiKey,authDomain:emailLink.projectId+'.firebaseapp.com',canonical:emailLink.canonical});return;
+  }
   if(path==='/api/auth/password'&&req.method==='POST'){
    if(authenticationMode!=='provisioned')throw failure(404);
    const {email,password:credential,invitationToken}=await body(req,['email','password'],4096,['invitationToken']);
