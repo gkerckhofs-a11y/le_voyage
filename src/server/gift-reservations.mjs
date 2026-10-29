@@ -4,10 +4,13 @@ const fail=status=>Object.assign(Error('Reservation unavailable'),{status});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
- const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:action==='resolve-cancellation'?['revision','reference','outcome','responseAcknowledged']:['revision'])];
+ const keys=action==='preview-cancellation-stock'?[...scopeKeys,'revision']:[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:action==='regularize-cancellation-stock'?['revision','inventoryReference','inventoryConfirmed','fingerprint']:action==='resolve-cancellation'?['revision','reference','outcome','responseAcknowledged']:['revision'])];
  if(!input||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw fail(400);
  for(const key of scopeKeys.slice(0,3))if(typeof input[key]!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input[key]))throw fail(400);
  for(const key of ['milestoneNumber',action==='reserve'?'proposalRevision':'revision'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>1000)throw fail(400);
+ if(input.milestoneNumber>100)throw fail(400);
+ if(action==='preview-cancellation-stock')return;
+ if(action==='regularize-cancellation-stock'&&(input.inventoryConfirmed!==true||typeof input.inventoryReference!=='string'||input.inventoryReference.trim().length<3||input.inventoryReference.length>120||/[\u0000-\u001f]/.test(input.inventoryReference)||typeof input.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(input.fingerprint)))throw fail(400);
  if(['authorize','confirm'].includes(action)&&((action==='authorize'?input.riskAccepted:input.confirmationAccepted)!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='request-cancellation'&&(input.requestAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='resolve-cancellation'&&(!['accepted','refused'].includes(input.outcome)||input.responseAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
@@ -18,6 +21,22 @@ function validate(input,action){
 // counts includes held and declared consumed units pending reconciliation; Master is never decremented here.
 export function createGiftReservations({db,actor,check,campaignRef,build,now,catalogDocument}){
  const ledgerRef=db.doc(catalogDocument).collection('reservationLedger').doc('main');
+ async function cancellationStockPreview(tx,uid,input,old,ledger,reservationId){
+  const c=old?.cancellationRequest;
+  if(!old||old.status!=='ordered'||old.teamId!==input.teamId||old.milestoneNumber!==input.milestoneNumber||old.revision!==input.revision||old.revision>=1000||!old.order||old.consumption||c?.status!=='accepted'||c.stockRegularization||c.orderDigest!==hash(old.order)||c.response?.outcome!=='accepted'||c.response.orderDigest!==hash(old.order))throw fail(409);
+  if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const f=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId},f,id)||f.status==='delivered'||f.status==='incident'&&f.resumeStatus==='delivered')throw fail(409);}
+  const catalog=(await tx.get(db.doc(catalogDocument))).data();
+  if(!catalog||!Number.isSafeInteger(catalog.revision)||!Array.isArray(catalog.products)||!Array.isArray(old.order.lines)||!old.order.lines.length)throw fail(409);
+  const seen=new Set(),lines=old.order.lines.map(line=>{
+   const key=hash(line.sku),count=ledger.counts?.[key]??0,committed=ledger.committed?.[key]??0,consumed=ledger.consumed?.[key]??0;
+   if(seen.has(key)||!Number.isSafeInteger(line.quantity)||line.quantity<1||!Number.isSafeInteger(count)||!Number.isSafeInteger(committed)||committed<line.quantity||!Number.isSafeInteger(consumed)||consumed<0||count<committed+consumed)throw fail(409);seen.add(key);
+   const matches=catalog.products.filter(p=>(catalog.masterById?.[p.id]?.sku??p.id)===line.sku),stock=matches.length===1?catalog.masterById?.[matches[0].id]?.stockQuantity:null;
+   if(!Number.isSafeInteger(stock)||stock<0)throw fail(422);
+   return {sku:line.sku,name:line.name,quantity:line.quantity,declaredStock:stock,countBefore:count,countAfter:count-line.quantity,committedBefore:committed,committedAfter:committed-line.quantity,consumed,availableBefore:Math.max(0,stock-count),availableAfter:Math.max(0,stock-count+line.quantity),shortfallAfter:Math.max(0,count-line.quantity-stock)};
+  });
+  const snapshot={version:1,catalogRevision:catalog.revision,orderDigest:hash(old.order),lines};
+  return {...snapshot,fingerprint:hash([uid,scopeKeys.map(k=>input[k]),old.revision,c,snapshot])};
+ }
  async function write(header,input,action){validate(input,action);const uid=await actor(header);return db.runTransaction(async tx=>{
   await check(tx,uid,input);const ref=campaignRef(input).collection('giftReservations').doc(proposalDocumentId(input.teamId,input.milestoneNumber));
   const old=(await tx.get(ref)).data(),auditRef=ref.collection('history').doc(input.mutationId),prior=(await tx.get(auditRef)).data(),digest=hash([uid,action,Object.keys(input).sort().map(k=>[k,input[k]])]);
@@ -68,6 +87,10 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    if(!old||old.status!=='ordered'||!old.order||old.revision!==input.revision||old.consumption||old.cancellationRequest?.status!=='pending'||old.cancellationRequest.orderDigest!==hash(old.order))throw fail(409);
    if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id)||fulfillment.status==='delivered')throw fail(409);}
    record={...old,cancellationRequest:{...old.cancellationRequest,status:input.outcome,response:{source:'operator-declared-supplier-response',outcome:input.outcome,reference:input.reference.trim(),at:now(),actor:uid,reason:input.reason.trim(),scope:'whole-order',orderDigest:hash(old.order)}}};
+  }else if(action==='regularize-cancellation-stock'){
+   const preview=await cancellationStockPreview(tx,uid,input,old,ledger,ref.id);if(preview.fingerprint!==input.fingerprint)throw fail(409);
+   const committed={...ledger.committed};for(const line of preview.lines){const key=hash(line.sku);counts[key]=line.countAfter;committed[key]=line.committedAfter;if(!counts[key])delete counts[key];if(!committed[key])delete committed[key];}ledger.committed=committed;
+   record={...old,cancellationRequest:{...old.cancellationRequest,stockRegularization:{...preview,source:'operator-confirmed-inventory-after-cancellation',at:now(),actor:uid,reason:input.reason.trim(),inventoryReference:input.inventoryReference.trim(),inventoryConfirmed:true}}};
   }else if(action==='consume'){
    if(['pending','accepted'].includes(old?.cancellationRequest?.status))throw fail(409);
    if(!old||old.status!=='ordered'||old.revision!==input.revision||old.consumption||!old.fulfillmentLink||!old.order)throw fail(409);
@@ -92,9 +115,11 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    record={...old,status:'released'};
   }
   const revision=(old?.revision??0)+1;record={...record,revision,updatedAt:now(),actor:uid,reason:input.reason.trim()};
-  if(['reserve','release','confirm','consume'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
+  if(['reserve','release','confirm','consume','regularize-cancellation-stock'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
  });}
  return {
+ async previewCancellationStock(header,input){validate(input,'preview-cancellation-stock');const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,input);const ref=campaignRef(input).collection('giftReservations').doc(proposalDocumentId(input.teamId,input.milestoneNumber)),old=(await tx.get(ref)).data(),ledger=(await tx.get(ledgerRef)).data()??{};return cancellationStockPreview(tx,uid,input,old,ledger,ref.id);});},
+ regularizeCancellationStock:(header,input)=>write(header,input,'regularize-cancellation-stock'),
  resolveOrderCancellation:(header,input)=>write(header,input,'resolve-cancellation'),
  requestOrderCancellation:(header,input)=>write(header,input,'request-cancellation'),
  withdrawOrderCancellation:(header,input)=>write(header,input,'withdraw-cancellation'),
