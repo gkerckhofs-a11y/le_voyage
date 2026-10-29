@@ -10,7 +10,7 @@ import {createDemoServer} from '../src/server/http.mjs';
 const config=stagingConfig();
 const adapter=createFirestoreAdapter(initializeApp({projectId:config.projectId,credential:applicationDefault()}));
 const integration=await createFirebaseHttp({adapter,authenticationMode:config.authenticationMode,sheetsSource:createMasterSheetsSource(masterSheetsConfig()),cookieName:'__session',password:config.authPassword,loginEndpoint:'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+config.apiKey});
-const googleGate=config.googleAccess?await createGoogleTestGate({auth:adapter.auth,config,...(config.authenticationMode==='provisioned'?{identityLogin:integration.identityLogin,identityLogout:integration.identityLogout,sessionStore:createSessionStore(adapter)}:{})}):null;
+const googleGate=config.googleAccess?await createGoogleTestGate({auth:adapter.auth,config,...(config.authenticationMode==='provisioned'?{identityLogin:integration.identityLogin,identityInvitationLogin:integration.identityInvitationLogin,identityLogout:integration.identityLogout,sessionStore:createSessionStore(adapter)}:{})}):null;
 const server=createDemoServer({root:resolve('dist-web'),directory:'/tmp/rc-unused-local-store',apiHandler:googleGate?googleGate.apiHandler(integration.handler):integration.handler,remoteOrigins:config.origins});
 const handler=server.listeners('request')[0],gate=googleGate?.gate??testGate(config.accessPassword);server.removeAllListeners('request');
 server.on('request',async(req,res)=>{if(await gate(req,res))handler(req,res);});

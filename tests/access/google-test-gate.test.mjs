@@ -9,7 +9,7 @@ function fakeStore(now){const records=new Map();let version=0;return {
  };}
 async function setup(t,{provisioned=false,denied=false}={}){let clock=1800000000000,revoked=false;const checks=[],claims={uid:'allowed',email:'tester@example.test',email_verified:true,auth_time:clock/1000,firebase:{sign_in_provider:'google.com'}};
  const auth={async verifyIdToken(token,check){checks.push(['id',check]);if(token==='bad')throw Error('Invalid');return {...claims,...(token==='other'?{email:'other@example.test'}:{}),...(token==='unverified'?{email_verified:false}:{}),...(token==='password'?{firebase:{sign_in_provider:'password'}}:{}),...(token==='old'?{auth_time:clock/1000-400}:{} )};},async createSessionCookie(token,options){assert.equal(options.expiresIn,provisioned?3300000:28800000);return 'credential';},async verifySessionCookie(value,check){checks.push(['cookie',check]);assert.equal(value,'credential');if(revoked)throw Error('Revoked');return claims;}};
- const gate=await createGoogleTestGate({auth,config:{projectId:stagingProjectId,origins:[origin,'https://voyage-test-proxy.a.run.app'],testerEmails:['tester@example.test'],apiKey:'public-test-key',authenticationMode:provisioned?'provisioned':'demo'},now:()=>clock,...(provisioned?{identityLogin:async token=>{checks.push(['bridge',token]);if(denied)throw Object.assign(Error('No workspace'),{status:403});return {token:'e'.repeat(64),expires:clock+3300000};},identityLogout:async token=>{checks.push(['logout',token]);},sessionStore:fakeStore(()=>clock)}:{})});
+ const gate=await createGoogleTestGate({auth,config:{projectId:stagingProjectId,origins:[origin,'https://voyage-test-proxy.a.run.app'],testerEmails:['tester@example.test'],apiKey:'public-test-key',authenticationMode:provisioned?'provisioned':'demo'},now:()=>clock,...(provisioned?{identityLogin:async token=>{checks.push(['bridge',token]);if(denied)throw Object.assign(Error('No workspace'),{status:403});return {token:'e'.repeat(64),expires:clock+3300000};},identityInvitationLogin:async(token,invite)=>{checks.push(['invited',token,invite]);if(denied||invite!=='a'.repeat(64))throw Object.assign(Error('Not recipient'),{status:403});return {token:'f'.repeat(64),expires:clock+3300000};},identityLogout:async token=>{checks.push(['logout',token]);},sessionStore:fakeStore(()=>clock)}:{})});
  const api=gate.apiHandler(async(req,json,path)=>{if(path==='/api/auth/login')json(200,{connected:true},{'Set-Cookie':'__session='+'d'.repeat(64)+'; Path=/; Secure; HttpOnly'});else if(path==='/api/auth/logout')json(200,{disconnected:true},{'Set-Cookie':'__session=; Path=/; Max-Age=0'});else json(200,{profileCookie:req.headers.cookie});});
  const server=createServer(async(req,res)=>{if(await gate.gate(req,res)){if(req.url.startsWith('/api/')){try{await api(req,(s,v,h={})=>{res.writeHead(s,{'Content-Type':'application/json',...h});res.end(JSON.stringify(v));},req.url);}catch(error){res.writeHead(error.status??500);res.end('{}');}}else res.end('PRIVATE');}});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});
  let session='';const request=async(path,options={})=>{const r=await new Promise((resolve,reject)=>{const q=httpRequest({hostname:'127.0.0.1',port:server.address().port,path,method:options.method??'GET',headers:{Host:host,...(session?{Cookie:session}:{}),...options.headers}},response=>{let text='';response.setEncoding('utf8');response.on('data',x=>text+=x);response.on('end',()=>resolve({status:response.statusCode,headers:{get:name=>{const v=response.headers[name.toLowerCase()];return Array.isArray(v)?v[0]:v??null;}},text:async()=>text,json:async()=>JSON.parse(text)}));});q.on('error',reject);q.end(options.body);});const c=r.headers.get('set-cookie');if(c)session=c.split(';')[0];return r;};
@@ -38,4 +38,20 @@ test('provisioned Google gate opens only the verified account bridge and prevent
 });
 test('provisioned Google gate requires explicit session integration',async()=>{
  await assert.rejects(createGoogleTestGate({auth:{},config:{authenticationMode:'provisioned'}}));
+});
+
+test('Google invited account without a workspace opens only the addressed invitation and keeps the existing gate session',async t=>{
+ const h=await setup(t,{provisioned:true});
+ const csrf=await h.pre(),token='a'.repeat(64);
+ const response=await h.request('/test-access/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Test-CSRF':csrf},body:JSON.stringify({idToken:'good',invitationToken:token})});
+ assert.equal(response.status,200);assert.equal((await response.json()).destination,'/invitation.html#'+token);
+ assert.equal((await h.request('/invitation.html')).status,200);
+ assert.equal((await h.request('/api/auth/identity',{method:'POST',headers:{Origin:origin}})).status,403);
+ assert.ok(h.checks.some(c=>c[0]==='invited'&&c[1]==='good'&&c[2]===token));
+ const refused=await setup(t,{provisioned:true,denied:true}),csrfDenied=await refused.pre();
+ assert.equal((await refused.request('/test-access/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Test-CSRF':csrfDenied},body:JSON.stringify({idToken:'good',invitationToken:token})})).status,403);
+ const invalid=await setup(t,{provisioned:true}),csrfInvalid=await invalid.pre();
+ assert.equal((await invalid.request('/test-access/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Test-CSRF':csrfInvalid},body:JSON.stringify({idToken:'good',invitationToken:'../bad'})})).status,403);
+ const demo=await setup(t),csrfDemo=await demo.pre();
+ assert.equal((await demo.request('/test-access/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Test-CSRF':csrfDemo},body:JSON.stringify({idToken:'good',invitationToken:token})})).status,403);
 });
