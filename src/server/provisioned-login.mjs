@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 const fail=status=>Object.assign(new Error('Authentication refused'),{status});
 /** Exchanges an already authenticated identity; never provisions users or grants. */
 export async function verifyProvisionedIdentity({auth,idToken,now=Date.now()}){
@@ -16,4 +17,22 @@ export async function provisionedLogin({auth,workspaces,idToken,now=Date.now()})
  if(!entries.length)throw fail(403);
  return {header,scope:null,workspaceEnabled:true,directorOnly:false,organizerOnly:false,
   expires:Math.min(now+3300000,claims.exp*1000)};
+}
+
+/**
+ * Exchanges a recently verified Firebase identity for access to ONE addressed
+ * invitation. An email address alone never grants membership or a workspace.
+ * Works with existing password and Google Firebase identities and can also
+ * accept an email-link Firebase ID token when that provider is configured.
+ */
+export async function provisionedInvitationLogin({auth,invitations,idToken,invitationToken,now=Date.now()}){
+ if(typeof invitationToken!=='string'||!/^[a-f0-9]{64}$/.test(invitationToken))throw fail(400);
+ const claims=await verifyProvisionedIdentity({auth,idToken,now});
+ const header='Bearer '+idToken;
+ await invitations.preview(header,invitationToken);
+ return {
+  header,
+  expires:Math.min(now+3300000,claims.exp*1000),
+  invitationId:createHash('sha256').update(invitationToken).digest('hex')
+ };
 }

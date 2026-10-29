@@ -1,0 +1,56 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {once} from 'node:events';
+import {resolve} from 'node:path';
+import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';
+import {createFirebaseHttp} from '../../src/server/firebase-http.mjs';
+import {createDemoServer} from '../../src/server/http.mjs';
+import {createInvitations} from '../../src/server/invitations.mjs';
+import {newDemo} from '../../src/server/demo-service.mjs';
+
+test('a verified employee can accept an addressed invitation using Firebase identity without gaining other spaces',async t=>{
+ const a=createFirebaseEmulatorAdapter(),suffix=randomUUID(),tenantId='invite-id-'+suffix,issuerUid='issuer-'+suffix,recipientUid='recipient-'+suffix,otherUid='other-'+suffix;
+ const password='Fictitious-Invited-Identity-42!';
+ let app,server;
+ t.after(async()=>{if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}if(app)await app.close();else await a.close();});
+ for(const uid of [issuerUid,recipientUid,otherUid])await a.auth.createUser({uid,email:uid+'@example.test',password,emailVerified:true});
+ const tokenFor=async uid=>{
+  const r=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:uid+'@example.test',password,returnSecureToken:true})});
+  assert.equal(r.status,200);return (await r.json()).idToken;
+ };
+ const issuerToken=await tokenFor(issuerUid),recipientToken=await tokenFor(recipientUid),otherToken=await tokenFor(otherUid);
+ const record=newDemo();record.ledger.state.config.tenantId=tenantId;
+ const campaignId=record.ledger.state.config.campaignId,teamId=record.ledger.state.config.teams[0].id,scope={tenantId,campaignId,teamId};
+ await a.db.doc('tenants/'+tenantId+'/campaigns/'+campaignId).set({payload:JSON.stringify(record)});
+ await a.db.doc('tenants/'+tenantId+'/members/'+issuerUid).set({uid:issuerUid,tenantId,active:true,canInvite:true,assignments:[{campaignId,teamId}]});
+ const invitation=await createInvitations(a,{provisionWorkspaces:true}).issue('Bearer '+issuerToken,scope,recipientUid);
+ app=await createFirebaseHttp({adapter:a,authenticationMode:'provisioned'});
+ server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});
+ server.listen(0,'127.0.0.1');await once(server,'listening');
+ const origin='http://127.0.0.1:'+server.address().port;let cookie='',csrf='';
+ const post=async(path,value)=>{
+  const r=await fetch(origin+path,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie,'X-Demo-CSRF':csrf},body:JSON.stringify(value)});
+  const set=r.headers.get('set-cookie');if(set)cookie=set.split(';')[0];return r;
+ };
+ const get=path=>fetch(origin+path,{headers:{Cookie:cookie}});
+ assert.equal((await post('/api/auth/identity',{idToken:otherToken,invitationToken:invitation.token})).status,403);
+ assert.equal((await post('/api/auth/identity',{idToken:recipientToken,invitationToken:'x'})).status,400);
+ assert.equal((await post('/api/auth/identity',{idToken:recipientToken})).status,403);
+ const login=await post('/api/auth/identity',{idToken:recipientToken,invitationToken:invitation.token});
+ assert.equal(login.status,200);assert.deepEqual(await login.json(),{connected:true,destination:'/invitation.html'});
+ assert.match(cookie,/^rc_auth=[a-f0-9]{64}$/);
+ for(const endpoint of ['/api/workspaces','/api/demo/team','/api/director/progress','/api/gifts/ops'])assert.equal((await get(endpoint)).status,403);
+ const session=await post('/api/invitation/session',{});assert.equal(session.status,200);csrf=(await session.json()).csrf;
+ assert.equal((await post('/api/invitation/preview',{token:'b'.repeat(64)})).status,403);
+ const preview=await post('/api/invitation/preview',{token:invitation.token});assert.equal(preview.status,200);
+ const accepted=await post('/api/invitation/accept',{token:invitation.token,displayName:'Compte e-mail vérifié'});
+ assert.equal(accepted.status,200);assert.equal((await accepted.json()).destination,'/connexion.html');
+ assert.equal((await get('/api/workspaces')).status,403);
+ const joined=(await a.db.doc('tenants/'+tenantId+'/members/'+recipientUid).get()).data();
+ assert.deepEqual(joined.assignments,[{campaignId,teamId}]);
+ const second=await post('/api/auth/identity',{idToken:recipientToken});assert.equal(second.status,200);assert.equal((await second.json()).destination,'/espaces.html');
+ const spaces=await get('/api/workspaces');assert.equal(spaces.status,200);
+ assert.deepEqual((await spaces.json()).entries.map(x=>x.space),['team']);
+ assert.equal((await post('/api/auth/identity',{idToken:otherToken,invitationToken:invitation.token})).status,403);
+});

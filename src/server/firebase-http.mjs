@@ -1,5 +1,5 @@
 import {createWorkspaceAccess} from './workspace-access.mjs';
-import {provisionedLogin,verifyProvisionedIdentity} from './provisioned-login.mjs';
+import {provisionedLogin,provisionedInvitationLogin} from './provisioned-login.mjs';
 import {createSessionStore} from './session-store.mjs';
 import {createKioskProgress} from './kiosk-progress.mjs';
 import {createWorkspaces} from './workspaces.mjs';
@@ -116,12 +116,10 @@ export async function createFirebaseHttp(options){
    if(!response.ok)throw failure(response.status===429?429:401);
    const result=await response.json();
    if(invitationToken!==undefined){
-    if(typeof invitationToken!=='string'||!/^[a-f0-9]{64}$/.test(invitationToken))throw failure(400);
-    const claims=await verifyProvisionedIdentity({auth:adapter.auth,idToken:result.idToken,now}),header='Bearer '+result.idToken;
-    await invitations.preview(header,invitationToken);
-    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex'),expires=Math.min(now+3300000,claims.exp*1000);
-    await sessions.issue(token,next,{header,csrf,expires,authenticationMode,invitationId:createHash('sha256').update(invitationToken).digest('hex')});
-    json(200,{connected:true,destination:'/invitation.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((expires-clock())/1000)))});return;
+    const identity=await provisionedInvitationLogin({auth:adapter.auth,invitations,idToken:result.idToken,invitationToken,now});
+    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+    await sessions.issue(token,next,{...identity,csrf,authenticationMode});
+    json(200,{connected:true,destination:'/invitation.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((identity.expires-clock())/1000)))});return;
    }
    const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken:result.idToken,now});
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
@@ -130,11 +128,14 @@ export async function createFirebaseHttp(options){
   }
   if(path==='/api/auth/identity'&&req.method==='POST'){
    if(authenticationMode!=='provisioned')throw failure(404);
-   const {idToken}=await body(req,['idToken'],12288);
-   const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken,now});
+   const {idToken,invitationToken}=await body(req,['idToken'],12288,['invitationToken']);
+   const invited=invitationToken!==undefined;
+   const identity=invited
+    ?await provisionedInvitationLogin({auth:adapter.auth,invitations,idToken,invitationToken,now})
+    :await provisionedLogin({auth:adapter.auth,workspaces,idToken,now});
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
    await sessions.issue(token,next,{...identity,csrf,authenticationMode});
-   json(200,{connected:true,destination:'/espaces.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((identity.expires-clock())/1000)))});return;
+   json(200,{connected:true,destination:invited?'/invitation.html':'/espaces.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((identity.expires-clock())/1000)))});return;
   }
   if(path==='/api/auth/login'&&req.method==='POST'){
    if(authenticationMode!=='demo')throw failure(404);
