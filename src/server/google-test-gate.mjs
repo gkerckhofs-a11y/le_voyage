@@ -69,7 +69,7 @@ export async function createGoogleTestGate({auth,config,now=Date.now,identityLog
    if(sessionStore)await sessionStore.update(entry.token,{...entry.s,demoToken:next[1]??null});else entry.s.demoToken=next[1]??null;
    delete outgoing['Set-Cookie'];
   }
-  json(status,value,outgoing);
+  json(status,provisioned&&path==='/api/auth/config'&&status===200?{...value,googleTestGate:true}:value,outgoing);
  };}
  };
 }
