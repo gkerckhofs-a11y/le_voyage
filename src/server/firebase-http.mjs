@@ -164,9 +164,15 @@ export async function createFirebaseHttp(options){
    // Directory edits must not retarget an already open session.
    if(JSON.stringify(current.scope)!==JSON.stringify(session.scope)||current.space!==session.workspaceSpace)throw failure(403);
   }
+  if(path==='/api/access/read'&&req.method==='POST'){
+   if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);
+   const {uid}=await body(req,['uid']);json(200,await workspaceAccess.read(session.header,session.scope,uid));return;
+  }
   if(path==='/api/access/save'&&req.method==='POST'){
    if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);
-   json(200,await workspaceAccess.save(session.header,await body(req,['uid','tenantId','campaignId','space','enabled','revision','mutationId','reason'])));return;
+   const input=await body(req,['uid','tenantId','campaignId','space','enabled','revision','mutationId','reason']);
+   if(input.tenantId!==session.scope?.tenantId||input.campaignId!==session.scope?.campaignId)throw failure(403);
+   json(200,await workspaceAccess.save(session.header,input));return;
   }
   if(['team','gifts'].includes(session.workspaceSpace)&&path!=='/api/auth/logout'){
    const routes=session.workspaceSpace==='team'?{

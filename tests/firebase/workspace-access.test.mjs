@@ -1,3 +1,4 @@
+import {once} from 'node:events';import {resolve} from 'node:path';import {createFirebaseHttp} from '../../src/server/firebase-http.mjs';import {createDemoServer} from '../../src/server/http.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';import {createWorkspaceAccess} from '../../src/server/workspace-access.mjs';import {newDemo} from '../../src/server/demo-service.mjs';
 test('explicit tenant administrator grants and revokes read-only spaces atomically with durable replay',async t=>{
@@ -10,10 +11,28 @@ test('explicit tenant administrator grants and revokes read-only spaces atomical
  await assert.rejects(service.save(header,input),{status:403});await grant.set({uid:admin,active:true,tenants:['foreign']});await assert.rejects(service.save(header,input),{status:403});await grant.update({tenants:[tenantId]});
  assert.deepEqual(await service.save(header,input),{applied:true,revision:1});assert.deepEqual(await service.save(header,input),{applied:false,revision:1});
  assert.deepEqual((await member.get()).data().directorCampaigns,[campaignId]);assert.equal((await member.get()).data().participationEnabled,false);assert.equal((await directory.get()).data().entries.length,1);
+ assert.equal((await service.read(header,{tenantId,campaignId},uid)).director,true);
+ await assert.rejects(service.read(header,{tenantId:'foreign',campaignId},uid),{status:403});
  await assert.rejects(service.save(header,{...input,space:'organizer'}),{status:400});await assert.rejects(service.save(header,{...input,reason:'different'}),{status:409});
  const results=await Promise.allSettled([service.save(header,{...input,space:'kiosk',revision:1,mutationId:'tv'}),service.save(header,{...input,enabled:false,revision:1,mutationId:'revoke'})]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.status,409);
  const current=(await directory.get()).data();assert.equal(current.revision,2);
  await service.save(header,{...input,enabled:false,revision:2,mutationId:'final-revoke'});assert.deepEqual((await member.get()).data().directorCampaigns,[]);assert.ok(!(await directory.get()).data().entries.some(x=>x.space==='director'));
  await grant.update({active:false});await assert.rejects(service.save(header,input),{status:403});
+ await assert.rejects(service.read(header,{tenantId,campaignId},uid),{status:403});
  await grant.update({active:true});await a.auth.updateUser(uid,{disabled:true});await assert.rejects(service.save(header,{...input,revision:3,mutationId:'disabled'}),{status:403});
+
+ await a.db.doc(`tenants/${tenantId}/members/${admin}`).set({uid:admin,tenantId,active:true,participationEnabled:false,assignments:[{campaignId,teamId:record.ledger.state.config.teams[0].id}],organizerCampaigns:[campaignId]});
+ await a.db.doc('workspaceDirectories/'+admin).set({uid:admin,active:true,entries:[{id:'organizer',space:'organizer',tenantId,campaignId,teamId:record.ledger.state.config.teams[0].id,label:'Organisation'}]});
+ const app=await createFirebaseHttp({adapter:a,authenticationMode:'provisioned'}),server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});server.listen(0,'127.0.0.1');await once(server,'listening');
+ t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
+ const origin='http://127.0.0.1:'+server.address().port;let cookie='',csrf='';
+ const post=(path,data)=>fetch(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(data)});
+ const login=await post('/api/auth/password',{email:admin+'@example.test',password:'Fictitious-Password-42!'});assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];
+ csrf=(await(await fetch(origin+'/api/workspaces',{headers:{Cookie:cookie}})).json()).csrf;
+ const selected=await post('/api/workspaces/select',{id:'organizer'});assert.equal(selected.status,200);cookie=selected.headers.get('set-cookie').split(';')[0];csrf=(await(await fetch(origin+'/api/workspaces',{headers:{Cookie:cookie}})).json()).csrf;
+ assert.equal((await post('/api/access/read',{uid})).status,200);
+ assert.equal((await post('/api/access/save',{...input,space:'kiosk',enabled:false,revision:3,mutationId:'http-revoke'})).status,200);
+ assert.equal((await post('/api/access/save',{...input,tenantId:'foreign'})).status,403);
+ const original=csrf;csrf='0'.repeat(64);assert.equal((await post('/api/access/read',{uid})).status,403);csrf=original;
+ await grant.update({active:false});assert.equal((await post('/api/access/read',{uid})).status,403);
 });

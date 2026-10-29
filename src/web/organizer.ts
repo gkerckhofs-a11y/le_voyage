@@ -1,3 +1,4 @@
+import {initAccessAdmin} from './workspace-access.js';
 import {startDemo} from './demo-client.js';
 type Overview={organizationName:string;campaignId:string;teamId:string;calendar:{start:string|null;endExclusive:string|null;activeWeeks:number;timeZone:string};teams:{id:string;name:string}[];giftMilestoneCount:number;receptionTierCount:number;annualDraft:{saved:boolean;revision:number};capabilities:{plan:boolean;invite:boolean;coordinate:boolean}};
 const el=(id:string)=>document.getElementById(id)!,button=el('refresh-organizer') as HTMLButtonElement;let busy=false;
@@ -16,4 +17,4 @@ async function refresh(){
  }catch(e){el('organizer-status').textContent=e instanceof TypeError?'Lecture indisponible. Réessayez.':(e as Error).message;}
  finally{busy=false;button.disabled=false;}
 }
-button.addEventListener('click',()=>void refresh());void(async()=>{try{await startDemo();await refresh();}catch{el('organizer-status').textContent='Connexion requise.';}})();
+button.addEventListener('click',()=>void refresh());void(async()=>{try{const session=await startDemo();await refresh();await initAccessAdmin(session.csrf);}catch{el('organizer-status').textContent='Connexion requise.';}})();

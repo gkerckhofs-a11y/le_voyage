@@ -4,7 +4,19 @@ const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
 /** Separate tenant-scoped grant. Only read-only director and display roles in this increment. */
 export function createWorkspaceAccess(adapter){
  assertTestAdapter(adapter);const {auth,db}=adapter;
- return {async save(header,input){
+ return {async read(header,scope,uid){
+  if(!scope||![scope.tenantId,scope.campaignId,uid].every(id))throw fail(400);
+  if(typeof header!=='string'||!/^Bearer \S{1,8192}$/.test(header))throw fail(401);
+  let actor;try{actor=await auth.verifyIdToken(header.slice(7),true);}catch{throw fail(401);}if(!id(actor.uid))throw fail(403);
+  const grant=db.doc('accessAdministrators/'+actor.uid);
+  return db.runTransaction(async tx=>{
+   const [g,d,m]=await Promise.all([tx.get(grant),tx.get(db.doc('workspaceDirectories/'+uid)),tx.get(db.doc(`tenants/${scope.tenantId}/members/${uid}`))]);
+   const access=g.data();if(access?.uid!==actor.uid||access.active!==true||!Array.isArray(access.tenants)||!access.tenants.includes(scope.tenantId))throw fail(403);
+   const directory=d.data(),membership=m.data();
+   if((directory&&(directory.uid!==uid||directory.active!==true))||(membership&&(membership.uid!==uid||membership.tenantId!==scope.tenantId||membership.active!==true)))throw fail(403);
+   return {uid,tenantId:scope.tenantId,campaignId:scope.campaignId,revision:directory?.revision??0,director:membership?.directorCampaigns?.includes(scope.campaignId)===true,kiosk:membership?.kioskCampaigns?.includes(scope.campaignId)===true};
+  });
+ },async save(header,input){
   if(!input||Object.keys(input).sort().join(',')!=='campaignId,enabled,mutationId,reason,revision,space,tenantId,uid'||![input.uid,input.tenantId,input.campaignId,input.mutationId].every(id)||!['director','kiosk'].includes(input.space)||typeof input.enabled!=='boolean'||!Number.isSafeInteger(input.revision)||input.revision<0||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>1000)throw fail(400);
   if(typeof header!=='string'||!/^Bearer \S{1,8192}$/.test(header))throw fail(401);
   let actor;try{actor=await auth.verifyIdToken(header.slice(7),true);}catch{throw fail(401);}if(!id(actor.uid))throw fail(403);
