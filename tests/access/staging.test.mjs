@@ -26,8 +26,9 @@ test('services reject a production adapter even with a valid staging environment
  assert.throws(()=>assertTestAdapter(adapter('le-voyage-f0ae3'),valid));
  assert.throws(()=>assertTestAdapter({...adapter(stagingProjectId),db:{projectId:'le-voyage-f0ae3'}},valid));
 });
-test('provisioned access is explicit and cannot inherit the demo Google gate',()=>{
+test('provisioned access is explicit and Google still requires a tester allowlist',()=>{
  assert.equal(stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned'}).authenticationMode,'provisioned');
  assert.throws(()=>stagingConfig({...valid,RC_AUTHENTICATION_MODE:'unknown'}));
- assert.throws(()=>stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:'a@example.test'}));
+ assert.equal(stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:'a@example.test',RC_TEST_AUTH_PASSWORD:undefined,RC_TEST_ACCESS_PASSWORD:undefined}).googleAccess,true);
+ assert.throws(()=>stagingConfig({...valid,RC_AUTHENTICATION_MODE:'provisioned',RC_TEST_ACCESS_MODE:'google',RC_TESTER_EMAILS:''}));
 });

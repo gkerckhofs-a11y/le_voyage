@@ -326,5 +326,13 @@ export async function createFirebaseHttp(options){
   if(req.method==='GET'&&path==='/api/demo/collective'){json(200,await adapter.collective(session.header,session.scope));return;}
   throw failure(404);
  }
- return {handler,close:()=>adapter.close()};
+ return {handler,close:()=>adapter.close(),
+  async identityLogin(idToken){
+   if(authenticationMode!=='provisioned')throw failure(403);
+   const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken,now:clock()}),token=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+   await sessions.issue(null,token,{...identity,csrf,authenticationMode});return {token,expires:identity.expires};
+  },
+  async identityLogout(token){if(authenticationMode!=='provisioned')throw failure(403);const session=await sessions.get(token);if(session?.authenticationMode==='provisioned')await sessions.revoke(token,session._version);}
+ };
+
 }
