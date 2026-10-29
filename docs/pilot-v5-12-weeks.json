@@ -1,0 +1,1087 @@
+{
+  "schemaVersion": 1,
+  "scenario": "v5-pilot-12-weeks-1",
+  "start": "2027-03-01",
+  "giftScaleVersion": "v5-early-simulation-1",
+  "scope": "Simulation du moteur uniquement ; parcours Auth/Firestore et interfaces vérifiés séparément. Aucune activation contractuelle, donnée réelle ou commande.",
+  "disclaimer": "Simulation déterministe fictive; aucun KPI réel, commande, déploiement ni efficacité RH mesurée.",
+  "hypotheses": {
+    "calendar": "12 semaines dont une fermeture; seuils recalculés pour ce pilote court, pas des seuils annuels validés",
+    "regularity": "moyenne des taux de participation des 4 dernières semaines actives, semaine courante incluse",
+    "privacy": "seuil 5, valeur neutre 3; validation vie privée encore requise",
+    "receptionCutoff": "jour inclus, gel le lendemain; rapports clôturés après ce jour exclus de la réception",
+    "giftBudgetCentsPerTeamMilestone": 10000
+  },
+  "clients": [
+    {
+      "client": "TPE fictive",
+      "mode": "autonomous",
+      "fictional": true,
+      "teamSizes": [
+        2
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        110,
+        470,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "3455",
+            "denominator": "4"
+          },
+          "displayed": "864"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "3455",
+        "denominator": "4"
+      },
+      "convoyKmDisplayed": "864",
+      "milestonesEarned": 2,
+      "milestonesAvailable": 3,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 2,
+      "giftBudgetAcquiredCents": 20000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "2465",
+          "denominator": "4"
+        },
+        "frozenOn": "2027-05-04"
+      },
+      "maximumBudgetCents": 200000,
+      "budgetDueCents": 150000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 1
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 1
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 1
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 1
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 1
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 2
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 2
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 2
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 2
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "325",
+            "denominator": "4"
+          },
+          "convoyKmDisplayed": "81",
+          "giftTasks": 2
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 2
+        }
+      ]
+    },
+    {
+      "client": "PME fictive",
+      "mode": "autonomous",
+      "fictional": true,
+      "teamSizes": [
+        4,
+        10,
+        7,
+        6
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        110,
+        470,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "3455",
+            "denominator": "4"
+          },
+          "displayed": "864"
+        },
+        {
+          "teamId": "team-2",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        },
+        {
+          "teamId": "team-3",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        },
+        {
+          "teamId": "team-4",
+          "exact": {
+            "numerator": "3665",
+            "denominator": "4"
+          },
+          "displayed": "916"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "7225",
+        "denominator": "8"
+      },
+      "convoyKmDisplayed": "903",
+      "milestonesEarned": 8,
+      "milestonesAvailable": 12,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 8,
+      "giftBudgetAcquiredCents": 80000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "2555",
+          "denominator": "4"
+        },
+        "frozenOn": "2027-05-04"
+      },
+      "maximumBudgetCents": 290000,
+      "budgetDueCents": 210000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "725",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "91",
+          "giftTasks": 4
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "635",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "79",
+          "giftTasks": 4
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 4
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "185",
+            "denominator": "2"
+          },
+          "convoyKmDisplayed": "93",
+          "giftTasks": 4
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "725",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "91",
+          "giftTasks": 4
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 8
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 8
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "605",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "76",
+          "giftTasks": 8
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "185",
+            "denominator": "2"
+          },
+          "convoyKmDisplayed": "93",
+          "giftTasks": 8
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "695",
+            "denominator": "8"
+          },
+          "convoyKmDisplayed": "87",
+          "giftTasks": 8
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 8
+        }
+      ]
+    },
+    {
+      "client": "Lex EKHO — démonstration fictive",
+      "mode": "kpi",
+      "fictional": true,
+      "teamSizes": [
+        6,
+        8,
+        5
+      ],
+      "activeWeeks": 11,
+      "giftThresholds": [
+        110,
+        470,
+        970
+      ],
+      "receptionThresholds": [
+        460,
+        740
+      ],
+      "individualAbsences": 2,
+      "jokers": 1,
+      "teamKm": [
+        {
+          "teamId": "team-1",
+          "exact": {
+            "numerator": "785",
+            "denominator": "1"
+          },
+          "displayed": "785"
+        },
+        {
+          "teamId": "team-2",
+          "exact": {
+            "numerator": "815",
+            "denominator": "1"
+          },
+          "displayed": "815"
+        },
+        {
+          "teamId": "team-3",
+          "exact": {
+            "numerator": "815",
+            "denominator": "1"
+          },
+          "displayed": "815"
+        }
+      ],
+      "convoyKm": {
+        "numerator": "805",
+        "denominator": "1"
+      },
+      "convoyKmDisplayed": "805",
+      "milestonesEarned": 6,
+      "milestonesAvailable": 9,
+      "weeksUnder50Km": 1,
+      "giftTasksCreated": 6,
+      "giftBudgetAcquiredCents": 60000,
+      "reception": {
+        "level": 1,
+        "budgetCents": 130000,
+        "km": {
+          "numerator": "550",
+          "denominator": "1"
+        },
+        "frozenOn": "2027-05-04"
+      },
+      "maximumBudgetCents": 260000,
+      "budgetDueCents": 190000,
+      "rows": [
+        {
+          "week": 1,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 0
+        },
+        {
+          "week": 2,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 3
+        },
+        {
+          "week": 3,
+          "active": true,
+          "convoyKm": {
+            "numerator": "55",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "55",
+          "giftTasks": 3
+        },
+        {
+          "week": 4,
+          "active": false,
+          "convoyKm": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "0",
+          "giftTasks": 3
+        },
+        {
+          "week": 5,
+          "active": true,
+          "convoyKm": {
+            "numerator": "90",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "90",
+          "giftTasks": 3
+        },
+        {
+          "week": 6,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 3
+        },
+        {
+          "week": 7,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 3
+        },
+        {
+          "week": 8,
+          "active": true,
+          "convoyKm": {
+            "numerator": "40",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "40",
+          "giftTasks": 6
+        },
+        {
+          "week": 9,
+          "active": true,
+          "convoyKm": {
+            "numerator": "55",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "55",
+          "giftTasks": 6
+        },
+        {
+          "week": 10,
+          "active": true,
+          "convoyKm": {
+            "numerator": "100",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "100",
+          "giftTasks": 6
+        },
+        {
+          "week": 11,
+          "active": true,
+          "convoyKm": {
+            "numerator": "85",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "85",
+          "giftTasks": 6
+        },
+        {
+          "week": 12,
+          "active": true,
+          "convoyKm": {
+            "numerator": "70",
+            "denominator": "1"
+          },
+          "convoyKmDisplayed": "70",
+          "giftTasks": 6
+        }
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "clientId": "demo-tpe",
+      "week": 1,
+      "start": "2027-03-01",
+      "endExclusive": "2027-03-08",
+      "reports": 0,
+      "outcomes": 1,
+      "convoys": 1,
+      "gifts": 0,
+      "tasks": 0,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 2,
+      "start": "2027-03-08",
+      "endExclusive": "2027-03-15",
+      "reports": 0,
+      "outcomes": 2,
+      "convoys": 2,
+      "gifts": 1,
+      "tasks": 1,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 3,
+      "start": "2027-03-15",
+      "endExclusive": "2027-03-22",
+      "reports": 0,
+      "outcomes": 3,
+      "convoys": 3,
+      "gifts": 1,
+      "tasks": 1,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 4,
+      "start": "2027-03-22",
+      "endExclusive": "2027-03-29",
+      "reports": 0,
+      "outcomes": 4,
+      "convoys": 4,
+      "gifts": 1,
+      "tasks": 1,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 5,
+      "start": "2027-03-29",
+      "endExclusive": "2027-04-05",
+      "reports": 0,
+      "outcomes": 5,
+      "convoys": 5,
+      "gifts": 1,
+      "tasks": 1,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 6,
+      "start": "2027-04-05",
+      "endExclusive": "2027-04-12",
+      "reports": 0,
+      "outcomes": 6,
+      "convoys": 6,
+      "gifts": 1,
+      "tasks": 1,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 7,
+      "start": "2027-04-12",
+      "endExclusive": "2027-04-19",
+      "reports": 1,
+      "outcomes": 7,
+      "convoys": 7,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 8,
+      "start": "2027-04-19",
+      "endExclusive": "2027-04-26",
+      "reports": 1,
+      "outcomes": 8,
+      "convoys": 8,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 9,
+      "start": "2027-04-26",
+      "endExclusive": "2027-05-03",
+      "reports": 1,
+      "outcomes": 9,
+      "convoys": 9,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 10,
+      "start": "2027-05-03",
+      "endExclusive": "2027-05-10",
+      "reports": 1,
+      "outcomes": 10,
+      "convoys": 10,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": true,
+      "frozenKm": "616",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 11,
+      "start": "2027-05-10",
+      "endExclusive": "2027-05-17",
+      "reports": 1,
+      "outcomes": 11,
+      "convoys": 11,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": true,
+      "frozenKm": "616",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-tpe",
+      "week": 12,
+      "start": "2027-05-17",
+      "endExclusive": "2027-05-24",
+      "reports": 1,
+      "outcomes": 12,
+      "convoys": 12,
+      "gifts": 2,
+      "tasks": 2,
+      "frozen": true,
+      "frozenKm": "616",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 1,
+      "start": "2027-03-01",
+      "endExclusive": "2027-03-08",
+      "reports": 0,
+      "outcomes": 4,
+      "convoys": 1,
+      "gifts": 0,
+      "tasks": 0,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 2,
+      "start": "2027-03-08",
+      "endExclusive": "2027-03-15",
+      "reports": 0,
+      "outcomes": 8,
+      "convoys": 2,
+      "gifts": 4,
+      "tasks": 4,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 3,
+      "start": "2027-03-15",
+      "endExclusive": "2027-03-22",
+      "reports": 0,
+      "outcomes": 12,
+      "convoys": 3,
+      "gifts": 4,
+      "tasks": 4,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 4,
+      "start": "2027-03-22",
+      "endExclusive": "2027-03-29",
+      "reports": 0,
+      "outcomes": 16,
+      "convoys": 4,
+      "gifts": 4,
+      "tasks": 4,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 5,
+      "start": "2027-03-29",
+      "endExclusive": "2027-04-05",
+      "reports": 0,
+      "outcomes": 20,
+      "convoys": 5,
+      "gifts": 4,
+      "tasks": 4,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 6,
+      "start": "2027-04-05",
+      "endExclusive": "2027-04-12",
+      "reports": 0,
+      "outcomes": 24,
+      "convoys": 6,
+      "gifts": 4,
+      "tasks": 4,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 7,
+      "start": "2027-04-12",
+      "endExclusive": "2027-04-19",
+      "reports": 1,
+      "outcomes": 28,
+      "convoys": 7,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 8,
+      "start": "2027-04-19",
+      "endExclusive": "2027-04-26",
+      "reports": 1,
+      "outcomes": 32,
+      "convoys": 8,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 9,
+      "start": "2027-04-26",
+      "endExclusive": "2027-05-03",
+      "reports": 1,
+      "outcomes": 36,
+      "convoys": 9,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 10,
+      "start": "2027-05-03",
+      "endExclusive": "2027-05-10",
+      "reports": 1,
+      "outcomes": 40,
+      "convoys": 10,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": true,
+      "frozenKm": "639",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 11,
+      "start": "2027-05-10",
+      "endExclusive": "2027-05-17",
+      "reports": 1,
+      "outcomes": 44,
+      "convoys": 11,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": true,
+      "frozenKm": "639",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-pme",
+      "week": 12,
+      "start": "2027-05-17",
+      "endExclusive": "2027-05-24",
+      "reports": 1,
+      "outcomes": 48,
+      "convoys": 12,
+      "gifts": 8,
+      "tasks": 8,
+      "frozen": true,
+      "frozenKm": "639",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 1,
+      "start": "2027-03-01",
+      "endExclusive": "2027-03-08",
+      "reports": 0,
+      "outcomes": 3,
+      "convoys": 1,
+      "gifts": 0,
+      "tasks": 0,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 2,
+      "start": "2027-03-08",
+      "endExclusive": "2027-03-15",
+      "reports": 0,
+      "outcomes": 6,
+      "convoys": 2,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 3,
+      "start": "2027-03-15",
+      "endExclusive": "2027-03-22",
+      "reports": 0,
+      "outcomes": 9,
+      "convoys": 3,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 4,
+      "start": "2027-03-22",
+      "endExclusive": "2027-03-29",
+      "reports": 0,
+      "outcomes": 12,
+      "convoys": 4,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 5,
+      "start": "2027-03-29",
+      "endExclusive": "2027-04-05",
+      "reports": 0,
+      "outcomes": 15,
+      "convoys": 5,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 6,
+      "start": "2027-04-05",
+      "endExclusive": "2027-04-12",
+      "reports": 0,
+      "outcomes": 18,
+      "convoys": 6,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 7,
+      "start": "2027-04-12",
+      "endExclusive": "2027-04-19",
+      "reports": 1,
+      "outcomes": 21,
+      "convoys": 7,
+      "gifts": 3,
+      "tasks": 3,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 8,
+      "start": "2027-04-19",
+      "endExclusive": "2027-04-26",
+      "reports": 1,
+      "outcomes": 24,
+      "convoys": 8,
+      "gifts": 6,
+      "tasks": 6,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 9,
+      "start": "2027-04-26",
+      "endExclusive": "2027-05-03",
+      "reports": 1,
+      "outcomes": 27,
+      "convoys": 9,
+      "gifts": 6,
+      "tasks": 6,
+      "frozen": false,
+      "frozenKm": null,
+      "frozenLevel": null
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 10,
+      "start": "2027-05-03",
+      "endExclusive": "2027-05-10",
+      "reports": 1,
+      "outcomes": 30,
+      "convoys": 10,
+      "gifts": 6,
+      "tasks": 6,
+      "frozen": true,
+      "frozenKm": "550",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 11,
+      "start": "2027-05-10",
+      "endExclusive": "2027-05-17",
+      "reports": 1,
+      "outcomes": 33,
+      "convoys": 11,
+      "gifts": 6,
+      "tasks": 6,
+      "frozen": true,
+      "frozenKm": "550",
+      "frozenLevel": 1
+    },
+    {
+      "clientId": "demo-lex-ekho",
+      "week": 12,
+      "start": "2027-05-17",
+      "endExclusive": "2027-05-24",
+      "reports": 1,
+      "outcomes": 36,
+      "convoys": 12,
+      "gifts": 6,
+      "tasks": 6,
+      "frozen": true,
+      "frozenKm": "550",
+      "frozenLevel": 1
+    }
+  ]
+}

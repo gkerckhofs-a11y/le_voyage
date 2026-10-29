@@ -1,19 +1,20 @@
+import {giftScale} from '../src/domain/gift-scale.ts';
 import { pathToFileURL } from 'node:url';
 import { activeWeeks, addDays, planWeeks } from '../src/domain/calendar.ts';
 import { compare, displayKm, exact } from '../src/domain/exact.ts';
-import { closeWeek, convoyDistance, createCampaign, freezeReception, receptionLevel, teamDistance } from '../src/domain/engine.ts';
+import { closeWeek, convoyDistance, createCampaign, freezeReception, postponeWeek, receptionLevel, teamDistance } from '../src/domain/engine.ts';
 import { DEFAULT_WEIGHTS, kpiScore, rollingRegularity, thresholds } from '../src/domain/scoring.ts';
 
 /** Entirely fictional pilot fixtures. No data fetched, sent or ordered. */
-export function simulate() {
+export function simulate({start='2027-01-04',giftScaleVersion='v4-linear-1',reportWeekIndex=null,onCheckpoint=()=>{}}={}) {
   const clients = [
     { id: 'demo-tpe', name: 'TPE fictive', sizes: [2], mode: 'autonomous' },
     { id: 'demo-pme', name: 'PME fictive', sizes: [4,10,7,6], mode: 'autonomous' },
     { id: 'demo-lex-ekho', name: 'Lex EKHO — démonstration fictive', sizes: [6,8,5], mode: 'kpi' },
   ];
-  const weeks = planWeeks('2027-01-04',12,['2027-01-25']);
+  const weeks = planWeeks(start,12,[addDays(start,21)]);
   const cutoffDate = weeks[8].endExclusive;
-  const giftThresholds = thresholds(activeWeeks(weeks),3,'gift');
+  const giftThresholds = giftScale(activeWeeks(weeks),3,giftScaleVersion).thresholds;
   const receptionThresholds = thresholds(activeWeeks(weeks,cutoffDate),2,'reception');
   return {
     disclaimer: 'Simulation déterministe fictive; aucun KPI réel, commande, déploiement ni efficacité RH mesurée.',
@@ -44,8 +45,12 @@ export function simulate() {
             ...(client.mode==='kpi'?{kpis:[kpiScore(String((Number(score)-1)*25),'100','higher'),kpiScore(String((Number(score)-1)*50),'200','higher')]}:{}),
           }};
           if(isJoker) jokers++;
-          state=closeWeek(state,{...scope,teamId:team.id,weekId:week.id,today:week.endExclusive},decision);
+          const command={...scope,teamId:team.id,weekId:week.id,today:weekIndex===reportWeekIndex?addDays(week.endExclusive,7):week.endExclusive};
+          if(week.active&&weekIndex===reportWeekIndex&&teamIndex===0){state=postponeWeek(state,{...command,today:addDays(week.start,2)});}
+          state=closeWeek(state,command,decision);
+          if(closeWeek(state,command,decision)!==state)throw new Error('Duplicate closure changed simulation');
         }
+        onCheckpoint({client,weekIndex,state});
         rows.push({week:weekIndex+1,active:week.active,convoyKm:state.convoys[week.id].km,convoyKmDisplayed:displayKm(state.convoys[week.id].km),giftTasks:Object.keys(state.tasks).length});
       }
       const gifts=Object.values(state.entitlements);
