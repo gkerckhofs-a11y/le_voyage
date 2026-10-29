@@ -4,12 +4,13 @@ const fail=status=>Object.assign(Error('Reservation unavailable'),{status});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
- const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:['revision'])];
+ const keys=[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:action==='resolve-cancellation'?['revision','reference','outcome','responseAcknowledged']:['revision'])];
  if(!input||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw fail(400);
  for(const key of scopeKeys.slice(0,3))if(typeof input[key]!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input[key]))throw fail(400);
  for(const key of ['milestoneNumber',action==='reserve'?'proposalRevision':'revision'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>1000)throw fail(400);
  if(['authorize','confirm'].includes(action)&&((action==='authorize'?input.riskAccepted:input.confirmationAccepted)!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='request-cancellation'&&(input.requestAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
+ if(action==='resolve-cancellation'&&(!['accepted','refused'].includes(input.outcome)||input.responseAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='consume'&&input.consumptionAccepted!==true)throw fail(400);
  if(input.milestoneNumber>100||typeof input.mutationId!=='string'||!/^[a-f0-9-]{36}$/.test(input.mutationId))throw fail(400);
  for(const key of action==='reserve'?['reason','conditions']:['reason'])if(typeof input[key]!=='string'||input[key].trim().length<3||input[key].length>(key==='conditions'?600:240)||/[\u0000-\u001f]/.test(input[key]))throw fail(400);
@@ -59,12 +60,16 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
     if(old.cancellationRequest?.status!=='pending')throw fail(409);
     record={...old,cancellationRequest:{...old.cancellationRequest,status:'withdrawn',withdrawnAt:now(),withdrawnBy:uid,withdrawalReason:input.reason.trim()}};
    }else{
-    if(old.cancellationRequest?.status==='pending'||old.consumption)throw fail(409);
+    if(['pending','accepted'].includes(old.cancellationRequest?.status)||old.consumption)throw fail(409);
     if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id)||fulfillment.status==='delivered'||fulfillment.status==='incident'&&fulfillment.resumeStatus==='delivered')throw fail(409);}
     record={...old,cancellationRequest:{status:'pending',reference:input.reference.trim(),at:now(),actor:uid,reason:input.reason.trim(),orderDigest:hash(old.order)}};
    }
+  }else if(action==='resolve-cancellation'){
+   if(!old||old.status!=='ordered'||!old.order||old.revision!==input.revision||old.consumption||old.cancellationRequest?.status!=='pending'||old.cancellationRequest.orderDigest!==hash(old.order))throw fail(409);
+   if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id)||fulfillment.status==='delivered')throw fail(409);}
+   record={...old,cancellationRequest:{...old.cancellationRequest,status:input.outcome,response:{source:'operator-declared-supplier-response',outcome:input.outcome,reference:input.reference.trim(),at:now(),actor:uid,reason:input.reason.trim(),scope:'whole-order',orderDigest:hash(old.order)}}};
   }else if(action==='consume'){
-   if(old?.cancellationRequest?.status==='pending')throw fail(409);
+   if(['pending','accepted'].includes(old?.cancellationRequest?.status))throw fail(409);
    if(!old||old.status!=='ordered'||old.revision!==input.revision||old.consumption||!old.fulfillmentLink||!old.order)throw fail(409);
    const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);
    const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();
@@ -90,6 +95,7 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
   if(['reserve','release','confirm','consume'].includes(action))tx.set(ledgerRef,{...ledger,counts});tx.set(ref,record);tx.create(auditRef,{digest,action,record});return {revision,alreadyApplied:false};
  });}
  return {
+ resolveOrderCancellation:(header,input)=>write(header,input,'resolve-cancellation'),
  requestOrderCancellation:(header,input)=>write(header,input,'request-cancellation'),
  withdrawOrderCancellation:(header,input)=>write(header,input,'withdraw-cancellation'),
  reserveProposal:(header,input)=>write(header,input,'reserve'),
