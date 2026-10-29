@@ -1,0 +1,31 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {once} from 'node:events';import {resolve} from 'node:path';
+import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';import {createAccessBootstrap} from '../../src/server/bootstrap-access.mjs';import {createFirebaseHttp} from '../../src/server/firebase-http.mjs';import {createDemoServer} from '../../src/server/http.mjs';import {newDemo} from '../../src/server/demo-service.mjs';
+test('pilot identity flow: bootstrap, organizer, director and kiosk grants, immediate revocation and isolated sessions',async t=>{
+ const a=createFirebaseEmulatorAdapter(),suffix=Date.now(),admin='pilot-admin-'+suffix,target='pilot-target-'+suffix,tenantId='pilot-access-'+suffix,password='Fictitious-Pilot-Password-42!';let server;
+ t.after(async()=>{if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}await a.close();});
+ for(const uid of [admin,target])await a.auth.createUser({uid,email:uid+'@example.test',password,emailVerified:true});
+ const record=newDemo();record.ledger.state.config.tenantId=tenantId;const campaignId=record.ledger.state.config.campaignId,teamId=record.ledger.state.config.teams[0].id;
+ await a.db.doc(`tenants/${tenantId}/campaigns/${campaignId}`).set({payload:JSON.stringify(record)});
+ const bootstrap=createAccessBootstrap(a),manifest={uid:admin,email:admin+'@example.test',tenantId,campaignId,teamId,reference:'pilot-integration',reason:'Compte fictif du pilote'},preview=await bootstrap.preview(manifest);assert.equal(preview.canApply,true);await bootstrap.apply(manifest,preview.digest);
+ const app=await createFirebaseHttp({adapter:a,authenticationMode:'provisioned'});server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});server.listen(0,'127.0.0.1');await once(server,'listening');const origin='http://127.0.0.1:'+server.address().port;
+ function client(){let cookie='',csrf='';return {
+  async post(path,input){const r=await fetch(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(input)});if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];return r;},
+  get:path=>fetch(origin+path,{headers:{Cookie:cookie}}),
+  async directory(){const r=await this.get('/api/workspaces');assert.equal(r.status,200);const v=await r.json();csrf=v.csrf;return v;},
+  async login(uid){const r=await this.post('/api/auth/password',{email:uid+'@example.test',password});if(r.status===200)await this.directory();return r;},
+  async select(id){const r=await this.post('/api/workspaces/select',{id});assert.equal(r.status,200);return r;}
+ };}
+ const organizer=client(),employee=client();assert.equal((await employee.login(target)).status,403);assert.equal((await organizer.login(admin)).status,200);await organizer.select('initial-organizer');await organizer.directory();
+ assert.equal((await organizer.get('/api/organizer/overview')).status,200);assert.equal((await organizer.get('/api/gifts/ops')).status,403);
+ async function change(space,enabled,revision,mutationId){const r=await organizer.post('/api/access/save',{uid:target,tenantId,campaignId,space,enabled,revision,mutationId,reason:'Recette fictive'});assert.equal(r.status,200);return r.json();}
+ await change('director',true,0,'director-grant');assert.equal((await employee.login(target)).status,200);let entries=(await employee.directory()).entries;assert.deepEqual(entries.map(e=>e.space),['director']);await employee.select(entries[0].id);await employee.directory();
+ const progress=await employee.get('/api/director/progress');assert.equal(progress.status,200);const data=await progress.json();assert.ok(data.teams.length>0);assert.deepEqual(data.clientBudget,{status:'unavailable'});assert.doesNotMatch(JSON.stringify(data),/"(?:responses|scores|preferences|purchaseCents|supplier|surveyPrivate)"/);
+ assert.equal((await employee.get('/api/gifts/ops')).status,403);assert.equal((await employee.get('/api/my-week')).status,403);assert.equal((await employee.post('/api/access/read',{uid:target})).status,403);
+ await change('director',false,1,'director-revoke');assert.equal((await employee.get('/api/director/progress')).status,403);assert.equal((await employee.login(target)).status,403);
+ await change('kiosk',true,2,'kiosk-grant');assert.equal((await employee.login(target)).status,200);entries=(await employee.directory()).entries;assert.deepEqual(entries.map(e=>e.space),['kiosk']);await employee.select(entries[0].id);
+ const kiosk=await employee.get('/api/kiosk/progress');assert.equal(kiosk.status,200);assert.doesNotMatch(JSON.stringify(await kiosk.json()),/"(?:teams|clientBudget|responses|preferences|purchaseCents)"/);assert.equal((await employee.get('/api/workspaces')).status,403);assert.equal((await employee.get('/api/director/progress')).status,403);
+ await change('kiosk',false,3,'kiosk-revoke');assert.equal((await employee.get('/api/kiosk/progress')).status,403);
+ const audit=await organizer.post('/api/access/read',{uid:target});assert.equal(audit.status,200);const history=(await audit.json()).history;assert.equal(history.length,4);assert.ok(history.every(e=>e.author===admin));
+ await a.db.doc('accessAdministrators/'+admin).update({active:false});assert.equal((await organizer.post('/api/access/read',{uid:target})).status,403);
+ assert.equal((await bootstrap.apply(manifest,preview.digest)).applied,false);assert.equal((await a.db.doc('accessAdministrators/'+admin).get()).data().active,false);
+});
