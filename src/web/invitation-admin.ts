@@ -1,5 +1,5 @@
 import {startDemo} from './demo-client.js';
-let csrf='',invitationId='',provisioned=false,busy=false;
+let csrf='',invitationId='',provisioned=false,busy=false,trackedInvitationId='';
 const recipient=document.getElementById('recipient-uid') as HTMLInputElement;
 function clearInvite(){invitationId='';(document.getElementById('invitation-url') as HTMLInputElement).value='';(document.getElementById('open-invitation') as HTMLAnchorElement).removeAttribute('href');document.getElementById('invitation-expiry')!.textContent='';document.getElementById('invitation-result')!.hidden=true;}
 recipient.addEventListener('input',()=>{clearInvite();});
@@ -10,12 +10,14 @@ revoke.addEventListener('click',async()=>{if(busy||!invitationId)return;busy=tru
 
 const send=document.getElementById('send-invitation') as HTMLButtonElement;
 const deliveryStatus=document.getElementById('delivery-status')!,refreshDelivery=document.getElementById('refresh-delivery') as HTMLButtonElement;
+const linkStatus=document.getElementById('delivery-invitation-status')!,revokeTracked=document.getElementById('revoke-tracked-invitation') as HTMLButtonElement;
+function clearDelivery(){trackedInvitationId='';deliveryStatus.textContent='';linkStatus.textContent='';revokeTracked.hidden=true;}
 const email=document.getElementById('recipient-email') as HTMLInputElement,find=document.getElementById('find-recipient') as HTMLButtonElement,summary=document.getElementById('recipient-summary')!;
-email.addEventListener('input',()=>{recipient.value='';summary.textContent='';deliveryStatus.textContent='';clearInvite();});
-recipient.addEventListener('input',()=>{summary.textContent='';deliveryStatus.textContent='';});
+email.addEventListener('input',()=>{recipient.value='';summary.textContent='';clearDelivery();clearInvite();});
+recipient.addEventListener('input',()=>{summary.textContent='';clearDelivery();});
 find.addEventListener('click',async()=>{
  if(busy)return;const value=email.value.trim();if(!value||!email.checkValidity()){status.textContent='Renseignez une adresse e-mail valide.';return;}
- busy=true;find.disabled=true;create.disabled=true;revoke.disabled=true;email.disabled=true;recipient.disabled=true;recipient.value='';summary.textContent='';deliveryStatus.textContent='';clearInvite();
+ busy=true;find.disabled=true;create.disabled=true;revoke.disabled=true;email.disabled=true;recipient.disabled=true;recipient.value='';summary.textContent='';clearDelivery();clearInvite();
  try{const account=await post('recipient',{email:value});recipient.value=account.uid;summary.textContent='Compte vérifié : '+account.email+' · '+account.uid;status.textContent='Vérifiez le destinataire, puis créez son invitation.';}
  catch{status.textContent='Compte introuvable, non vérifié, désactivé ou recherche refusée. Vérifiez l’adresse et vos permissions.';}
  finally{busy=false;find.disabled=false;create.disabled=false;email.disabled=false;recipient.disabled=false;}
@@ -36,10 +38,10 @@ send.addEventListener('click',async()=>{
   status.textContent='Envoi non confirmé. Vérifiez le suivi avant de créer une autre invitation : aucun renvoi automatique n’est effectué.';
  }finally{await loadDelivery(recipientUid);busy=false;send.disabled=false;create.disabled=false;recipient.disabled=false;email.disabled=false;find.disabled=false;}
 });
-create.disabled=true;void startDemo().then(async()=>{csrf=(await post('session',{})).csrf;const config=await fetch('/api/auth/config');if(!config.ok)throw Error();const settings=await config.json(),mode=settings.mode;if(!['demo','provisioned'].includes(mode))throw Error();provisioned=mode==='provisioned';send.hidden=!(provisioned&&settings.invitationEmailEnabled===true);document.getElementById('delivery-tracking')!.hidden=send.hidden;if(provisioned){document.getElementById('real-recipient')!.hidden=false;document.getElementById('invitation-introduction')!.textContent='Préparez un lien personnel pour rejoindre l’équipe actuellement sélectionnée.';document.getElementById('invitation-link-label')!.textContent='Lien personnel du destinataire';document.getElementById('open-invitation')!.textContent='Ouvrir le lien du destinataire';create.textContent='Créer une invitation';document.getElementById('invitation-help')!.textContent='Lien personnel valable 24 heures, révocable avant acceptation. Aucun message envoyé. Le compte destinataire devra être connecté pour accepter.';}create.disabled=false;}).catch(()=>{status.textContent='Connexion administrative requise.';});
+create.disabled=true;void startDemo().then(async()=>{csrf=(await post('session',{})).csrf;const config=await fetch('/api/auth/config');if(!config.ok)throw Error();const settings=await config.json(),mode=settings.mode;if(!['demo','provisioned'].includes(mode))throw Error();provisioned=mode==='provisioned';send.hidden=!(provisioned&&settings.invitationEmailEnabled===true);document.getElementById('delivery-tracking')!.hidden=send.hidden;if(provisioned){document.getElementById('real-recipient')!.hidden=false;document.getElementById('invitation-introduction')!.textContent='Préparez un lien personnel pour rejoindre l’équipe actuellement sélectionnée.';document.getElementById('invitation-link-label')!.textContent='Lien personnel du destinataire';document.getElementById('open-invitation')!.textContent='Ouvrir le lien du destinataire';create.textContent='Créer une invitation';document.getElementById('invitation-help')!.textContent='Lien personnel valable 24 heures, révocable avant acceptation. Créer le lien n’envoie pas de message ; l’envoi par e-mail est une action distincte. Le compte destinataire devra être connecté pour accepter.';}create.disabled=false;}).catch(()=>{status.textContent='Connexion administrative requise.';});
 
 async function loadDelivery(recipientUid:string){
- deliveryStatus.textContent='Lecture du suivi…';
+ clearDelivery();deliveryStatus.textContent='Lecture du suivi…';
  try{
   const result=await post('delivery-status',{recipientUid});
   const messages:Record<string,string>={
@@ -47,12 +49,17 @@ async function loadDelivery(recipientUid:string){
    unknown:'Le suivi de cet ancien envoi est incomplet. Demandez une vérification avant tout nouvel envoi.',
    preparing:'Préparation enregistrée. Si cet état persiste, demandez une vérification avant tout nouvel envoi.',
    sending:'Transmission en cours ou résultat encore inconnu. Demandez une vérification avant tout nouvel envoi.',
-   sent:'Le service d’envoi a accepté le message. Sa réception dans la boîte e-mail et l’acceptation de l’invitation ne sont pas confirmées.',
+   sent:'Le service d’envoi a accepté le message. Sa réception dans la boîte e-mail n’est pas confirmée.',
    review:result.revoked===true?'Envoi non confirmé ; le lien a été révoqué. Une vérification manuelle est nécessaire.':'Envoi non confirmé ; la révocation du lien n’est pas confirmée. Une vérification manuelle est nécessaire.'
   };
   if(!Object.hasOwn(messages,result.status))throw Error();
   const at=Number.isSafeInteger(result.startedAt)?' Dernière tentative : '+new Intl.DateTimeFormat('fr-BE',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Brussels'}).format(new Date(result.startedAt))+'.':'';
   deliveryStatus.textContent=messages[result.status]+at;
+  const lifecycle:Record<string,string>={pending:'Lien en attente d’acceptation.',accepted:'Invitation acceptée par le compte destinataire. Ce lien accepté ne peut plus être révoqué ici.',revoked:'Lien révoqué : il ne permet plus de rejoindre l’équipe.',expired:'Lien expiré : il ne permet plus de rejoindre l’équipe.',unknown:'État du lien indisponible. Demandez une vérification.'};
+  if(!['none','unknown'].includes(result.status))linkStatus.textContent=lifecycle[result.invitationState]??lifecycle.unknown;
+  if(['pending','expired'].includes(result.invitationState)&&/^[a-f0-9]{64}$/.test(result.revocableInvitationId??'')){
+   trackedInvitationId=result.revocableInvitationId;revokeTracked.hidden=false;
+  }
  }catch{deliveryStatus.textContent='Suivi indisponible. Vérifiez le compte et votre permission d’invitation avant tout nouvel envoi.';}
 }
 refreshDelivery.addEventListener('click',async()=>{
@@ -61,4 +68,19 @@ refreshDelivery.addEventListener('click',async()=>{
  if(!/^[A-Za-z0-9_-]{1,128}$/.test(recipientUid)){deliveryStatus.textContent='Renseignez un identifiant de compte valide.';return;}
  busy=true;refreshDelivery.disabled=true;send.disabled=true;create.disabled=true;revoke.disabled=true;recipient.disabled=true;email.disabled=true;find.disabled=true;
  try{await loadDelivery(recipientUid);}finally{busy=false;refreshDelivery.disabled=false;send.disabled=false;create.disabled=false;revoke.disabled=!invitationId;recipient.disabled=false;email.disabled=false;find.disabled=false;}
+});
+
+revokeTracked.addEventListener('click',async()=>{
+ if(busy||send.hidden||revokeTracked.hidden||!trackedInvitationId)return;
+ const id=trackedInvitationId,recipientUid=recipient.value.trim();
+ busy=true;revokeTracked.disabled=true;refreshDelivery.disabled=true;send.disabled=true;create.disabled=true;revoke.disabled=true;recipient.disabled=true;email.disabled=true;find.disabled=true;
+ try{
+  await post('revoke',{id});
+  if(invitationId===id)clearInvite();
+  status.textContent='Le lien de cet envoi est révoqué. Aucun e-mail supplémentaire n’a été envoyé.';
+ }catch{status.textContent='Révocation non confirmée. Le lien peut avoir été accepté ou vos permissions avoir changé. Consultez son état avant toute autre action.';}
+ finally{
+  await loadDelivery(recipientUid);
+  busy=false;revokeTracked.disabled=false;refreshDelivery.disabled=false;send.disabled=false;create.disabled=false;revoke.disabled=!invitationId;recipient.disabled=false;email.disabled=false;find.disabled=false;
+ }
 });

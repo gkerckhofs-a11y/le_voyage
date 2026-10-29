@@ -22,6 +22,7 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
   async authorizeIssuer(header,scope){
    const viewer=await identity(header);await adapter.read(header,scope);
    await db.runTransaction(async tx=>allowed((await tx.get(member(scope,viewer.uid))).data(),scope,viewer.uid));
+   return viewer.uid;
   },
   async recipient(header,scope,email){
    if(typeof email!=='string'||email.length>254||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))throw Object.assign(Error('Invalid recipient'),{status:400});

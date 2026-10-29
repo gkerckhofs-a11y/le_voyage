@@ -19,7 +19,7 @@ async function setup(t){
  await adapter.db.doc('tenants/'+tenantId+'/campaigns/'+campaignId).set({payload:JSON.stringify(record)});
  const issuer=adapter.db.doc('tenants/'+tenantId+'/members/'+issuerUid);
  await issuer.set({uid:issuerUid,tenantId,active:true,canInvite:true,assignments:[{campaignId,teamId}]});
- return {adapter,header,issuer,recipientUid,scope};
+ return {adapter,header,issuer,issuerUid,password,recipientUid,scope};
 }
 test('staging invitation delivery requires exact verified recipient, sends once and persists throttle without exposing token',async t=>{
  const {adapter,header,issuer,recipientUid,scope}=await setup(t);const messages=[];
@@ -40,11 +40,11 @@ test('staging invitation delivery requires exact verified recipient, sends once 
  await assert.rejects(delivery.send(header,scope,args),{status:409});
  await assert.rejects(delivery.send(header,scope,{...args,mutationId:'mutation-second-'+randomUUID()}),{status:429});
  assert.equal(messages.length,1);
- assert.deepEqual(await delivery.status(header,scope,{recipientUid}),{status:'sent',startedAt:clock,sentAt:clock,retryAfter:600000});
+ assert.deepEqual(await delivery.status(header,scope,{recipientUid}),{status:'sent',startedAt:clock,invitationState:'pending',revocableInvitationId:result.invitationId,sentAt:clock,retryAfter:600000});
  const stored=(await adapter.db.collection('invitationDeliveries').get()).docs.find(d=>d.data().recipientUid===recipientUid);
  await stored.ref.update({text:'private mail body',token:'secret-must-not-leak',providerResponse:'private provider data'});
  const state=await delivery.status(header,scope,{recipientUid});
- assert.deepEqual(Object.keys(state).sort(),['retryAfter','sentAt','startedAt','status']);
+ assert.deepEqual(Object.keys(state).sort(),['invitationState','retryAfter','revocableInvitationId','sentAt','startedAt','status']);
  clock+=600001;
  await adapter.auth.updateUser(recipientUid,{emailVerified:false});
  assert.equal((await delivery.status(header,scope,{recipientUid})).status,'sent');
@@ -93,4 +93,36 @@ test('delivery status distinguishes legacy reservations and rejects a mismatched
  await assert.rejects(delivery.status(header,scope,{recipientUid}),{status:503});
  await lock.ref.set({at:Date.now(),mutationIdHash:'legacy-reservation'});
  assert.deepEqual(await delivery.status(header,scope,{recipientUid}),{status:'unknown'});
+});
+
+test('delivery tracking reflects expiry, issuer-only revocation and atomic acceptance without disclosing the invitation token',async t=>{
+ const {adapter,header,issuerUid,password,recipientUid,scope}=await setup(t);
+ let clock=Date.now();const messages=[];
+ const invitations=createInvitations(adapter,{now:()=>clock,lifetimeMs:60000,provisionWorkspaces:true});
+ const delivery=createInvitationDelivery({adapter,invitations,transport:{send:async m=>messages.push(m)},origin:'https://rc-voyage-test-20261027.web.app',now:()=>clock});
+ const first=await delivery.send(header,scope,{recipientUid,mutationId:'lifecycle-first-'+randomUUID()});
+ const secondIssuer='other-issuer-'+randomUUID(),email=secondIssuer+'@example.test';
+ await adapter.auth.createUser({uid:secondIssuer,email,emailVerified:true,password});
+ await adapter.db.doc('tenants/'+scope.tenantId+'/members/'+secondIssuer).set({uid:secondIssuer,tenantId:scope.tenantId,active:true,canInvite:true,assignments:[{campaignId:scope.campaignId,teamId:scope.teamId}]});
+ const signed=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});
+ const otherHeader='Bearer '+(await signed.json()).idToken;
+ const otherView=await delivery.status(otherHeader,scope,{recipientUid});
+ assert.equal(otherView.invitationState,'pending');assert.equal(Object.hasOwn(otherView,'revocableInvitationId'),false);
+ await assert.rejects(invitations.revoke(otherHeader,scope,first.invitationId),{status:403});
+ clock+=60001;
+ const expired=await delivery.status(header,scope,{recipientUid});assert.equal(expired.invitationState,'expired');assert.equal(expired.revocableInvitationId,first.invitationId);
+ await invitations.revoke(header,scope,first.invitationId);
+ const revoked=await delivery.status(header,scope,{recipientUid});assert.equal(revoked.invitationState,'revoked');assert.equal(Object.hasOwn(revoked,'revocableInvitationId'),false);
+ clock+=600001;
+ const next=await delivery.send(header,scope,{recipientUid,mutationId:'lifecycle-second-'+randomUUID()});
+ const login=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:recipientUid+'@example.test',password,returnSecureToken:true})});
+ const recipientHeader='Bearer '+(await login.json()).idToken;
+ const token=messages[1].text.match(/invitation\.html#([a-f0-9]{64})/)[1];
+ await invitations.accept(recipientHeader,token,'Compte test');
+ const accepted=await delivery.status(header,scope,{recipientUid});assert.equal(accepted.invitationState,'accepted');assert.equal(Object.hasOwn(accepted,'revocableInvitationId'),false);
+ assert.equal(JSON.stringify(accepted).includes(token),false);
+ await assert.rejects(invitations.revoke(header,scope,next.invitationId),{status:403});
+ assert.equal(messages.length,2);
+ await adapter.db.doc('invitations/'+next.invitationId).update({scope:{...scope,teamId:'foreign-team'}});
+ await assert.rejects(delivery.status(header,scope,{recipientUid}),{status:503});
 });
