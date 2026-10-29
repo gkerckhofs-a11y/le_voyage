@@ -12,3 +12,8 @@
 #workspace-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 #workspace-modes .gift-row{margin:0;min-width:0}
 @media(max-width:600px){#workspace-modes{grid-template-columns:1fr}}
+
+#client-budget,#budget-current,#budget-form{overflow-wrap:anywhere}
+#client-budget dl,#budget-current dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;max-width:620px}
+#client-budget dd,#budget-current dd{margin:0;font-weight:600;text-align:right}
+#budget-form{margin-top:24px}#budget-fields{min-width:0}

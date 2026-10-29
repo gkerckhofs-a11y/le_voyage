@@ -1,5 +1,6 @@
 import {createKioskProgress} from './kiosk-progress.mjs';
 import {createWorkspaces} from './workspaces.mjs';
+import {createClientBudget} from './client-budget.mjs';
 import {createOrganizerDashboard} from './organizer-dashboard.mjs';
 import {createDirectorProgress} from './director-progress.mjs';
 import {createKpiPeriods} from './kpi-periods.mjs';
@@ -53,7 +54,7 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
   for(const profile of Object.values(profiles)){
@@ -149,11 +150,13 @@ export async function createFirebaseHttp(options){
   // Strip administrative controls from team responses even for explicitly multi-role accounts.
   const teamView=value=>session.workspaceSpace==='team'?{...value,canOpen:false,canClose:false,...(Object.hasOwn(value,'leaders')?{leaders:null}:{})}:value;
   if(session.organizerOnly&&path!=='/api/auth/logout'){
-   const routes={GET:['/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
+   const routes={GET:['/api/client-budget','/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/client-budget/publish','/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
    if(!routes[req.method]?.includes(path))throw failure(403);
    await organizerDashboard.read(session.header,session.scope);
   }
   if(session.directorOnly&&!['/api/director/progress','/api/demo/session','/api/auth/logout'].includes(path))throw failure(403);
+  if(path==='/api/client-budget'&&req.method==='GET'){json(200,await clientBudget.read(session.header,session.scope));return;}
+  if(path==='/api/client-budget/publish'&&req.method==='POST'){authorized(req,session);json(200,await clientBudget.publish(session.header,session.scope,await body(req,['budget','confirmed','mutationId','reason','revision'])));return;}
   if(path==='/api/organizer/overview'&&req.method==='GET'){json(200,await organizerDashboard.read(session.header,session.scope));return;}
   if(path==='/api/director/progress'&&req.method==='GET'){json(200,await directorProgress.read(session.header,session.scope));return;}
   if(path.startsWith('/api/kpi-periods/')&&req.method==='POST'){

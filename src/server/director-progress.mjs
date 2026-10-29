@@ -1,3 +1,4 @@
+import {projectClientBudget} from './client-budget.mjs';
 import {assertTestAdapter} from './test-environment.mjs';
 import {teamDistance,convoyDistance,receptionLevel} from '../domain/engine.ts';
 import {displayKm} from '../domain/exact.ts';
@@ -34,7 +35,7 @@ export function createDirectorProgress(adapter){
      distance:{...reception.km},displayKm:displayKm(reception.km),
      tiers:state.config.reception.tiers.map((tier,i)=>({level:i+1,km:tier.km,included:i<reception.level,
       status:i<reception.level?'included':state.freeze!==null?'not-included':i===reception.level?'next':'unreached'}))},
-    clientBudget:{status:'unavailable'}};
+    clientBudget:projectClientBudget((await tx.get(snapshot.ref.collection('clientBudgets').doc('current'))).data(),scope)};
   });
  }};
 }
