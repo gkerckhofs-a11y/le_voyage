@@ -1,3 +1,4 @@
+import {summarizeGiftCommitments} from './gift-commitments.mjs';
 import {createGiftReservations,acquiredAnticipatedOrder,anticipatedOrderDigest,attachedAnticipatedOrder} from './gift-reservations.mjs';
 import {createGiftProposals,acquiredProposal} from './gift-proposals.mjs';
 import {anticipatedComposition} from '../operations/anticipated-composition.mjs';
@@ -54,6 +55,10 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString(),c
  return {
  ...createGiftProposals({db,actor,check,campaignRef,build:buildAnticipation,now}),
  ...createGiftReservations({db,actor,check,campaignRef,build:buildAnticipation,now,catalogDocument}),
+ async commitments(header){const uid=await actor(header);return db.runTransaction(async tx=>{const scopes=await check(tx,uid),rows=[];let count=0;
+  for(const scope of scopes){const ref=campaignRef(scope),state=campaign(await tx.get(ref),scope),currentTasks=tasks(state,scope),reservations=await tx.get(ref.collection('giftReservations').limit(201)),fulfillments=await tx.get(ref.collection('giftFulfillments').limit(201));count+=currentTasks.length+reservations.size+fulfillments.size;if(reservations.size>200||fulfillments.size>200||count>600)throw fail(409);
+   rows.push({...scope,client:collectiveIdentity(state).organizationName,...summarizeGiftCommitments({tasks:currentTasks,reservations:reservations.docs.map(d=>({...d.data(),id:d.id})),fulfillments:fulfillments.docs.map(d=>({...d.data(),id:d.id}))})});
+  }return {rows,generatedAt:now(),basis:'recorded-order-costs-not-payments'};});},
  async list(header){const uid=await actor(header);return db.runTransaction(async tx=>{const scopes=await check(tx,uid),rows=[],clients=[];
   for(const scope of scopes){const ref=campaignRef(scope),state=campaign(await tx.get(ref),scope);clients.push({tenantId:scope.tenantId,campaignId:scope.campaignId,name:collectiveIdentity(state).organizationName});for(const task of tasks(state,scope)){if(rows.length>=200)throw fail(409);const current=(await tx.get(ref.collection('giftFulfillments').doc(task.id))).data(),identity=(await tx.get(ref.collection('teamIdentities').doc(task.entitlement.teamId))).data();rows.push(project(state,scope,task,current,identity));}}
   return {clients,rows:rows.sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999')||a.client.localeCompare(b.client)||a.team.localeCompare(b.team)),generatedAt:now()};});},
