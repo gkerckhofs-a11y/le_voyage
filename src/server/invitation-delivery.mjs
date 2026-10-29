@@ -16,12 +16,32 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
  */
 export function createInvitationDelivery({adapter,invitations,transport,origin,now=Date.now,cooldownMs=600000}){
  assertTestAdapter(adapter);
- if(typeof invitations?.recipient!=='function'||typeof invitations?.issue!=='function'||typeof invitations?.revoke!=='function'||typeof transport?.send!=='function'||typeof now!=='function')throw TypeError('Explicit verified invitation service and mail transport required');
+ if(typeof invitations?.authorizeIssuer!=='function'||typeof invitations?.recipient!=='function'||typeof invitations?.issue!=='function'||typeof invitations?.revoke!=='function'||typeof transport?.send!=='function'||typeof now!=='function')throw TypeError('Explicit verified invitation service and mail transport required');
  if(!Number.isSafeInteger(cooldownMs)||cooldownMs<60000)throw TypeError('Delivery throttle required');
  let canonical;
  try{const u=new URL(origin);if(u.protocol!=='https:'||u.origin!==origin||u.username||u.password||u.search||u.hash||u.pathname!=='/')throw Error();canonical=u.origin;}catch{throw TypeError('Explicit canonical HTTPS origin required');}
  const {db,auth}=adapter;
  return {
+  async status(header,scope,{recipientUid}={}){
+   if(!scope||![scope.tenantId,scope.campaignId,scope.teamId,recipientUid].every(validId))throw reject(400);
+   await invitations.authorizeIssuer(header,scope);
+   const scopeKey=[scope.tenantId,scope.campaignId,scope.teamId,recipientUid].join('|');
+   const result=await db.runTransaction(async tx=>{
+    const lock=(await tx.get(db.doc('invitationDeliveryLimits/'+digest(scopeKey)))).data();
+    if(!lock)return {status:'none'};
+    // Older reservations have no record pointer; absence is not proof of no send.
+    if(!/^[a-f0-9]{64}$/.test(lock.deliveryId??''))return {status:'unknown'};
+    const record=(await tx.get(db.doc('invitationDeliveries/'+lock.deliveryId))).data();
+    if(!record||record.tenantId!==scope.tenantId||record.campaignId!==scope.campaignId||record.teamId!==scope.teamId||record.recipientUid!==recipientUid)throw reject(503);
+    if(!['preparing','sending','sent','review'].includes(record.status)||!Number.isSafeInteger(record.at))throw reject(503);
+    return {status:record.status,startedAt:record.at,
+     ...(Number.isSafeInteger(record.sentAt)?{sentAt:record.sentAt}:{}),
+     ...(record.status==='review'?{revoked:record.revoked===true}:{}),
+     ...(Number.isSafeInteger(lock.at)?{retryAfter:Math.max(0,lock.at+cooldownMs-now())}:{})};
+   });
+   await invitations.authorizeIssuer(header,scope);
+   return result;
+  },
   async send(header,scope,{recipientUid,mutationId}={}){
    if(!scope||![scope.tenantId,scope.campaignId,scope.teamId,recipientUid].every(validId)||!validMutation(mutationId))throw reject(400);
    let user;
@@ -39,7 +59,7 @@ export function createInvitationDelivery({adapter,invitations,transport,origin,n
     if(attempt.exists)throw reject(409);
     if(previous.exists&&Number.isSafeInteger(previous.data().at)&&startedAt-previous.data().at<cooldownMs)throw reject(429);
     tx.create(record,{tenantId:scope.tenantId,campaignId:scope.campaignId,teamId:scope.teamId,recipientUid,at:startedAt,status:'preparing'});
-    tx.set(lock,{at:startedAt,mutationIdHash:digest(mutationId)});
+    tx.set(lock,{at:startedAt,mutationIdHash:digest(mutationId),deliveryId:record.id});
    });
    let invitation=null,sent=false;
    try{
