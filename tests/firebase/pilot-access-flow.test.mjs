@@ -30,10 +30,15 @@ test('pilot identity flow: bootstrap, organizer, director and kiosk grants, imme
  const owner=a.db.doc(`tenants/${tenantId}/members/${admin}`);
  assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
  await owner.update({canInvite:true});
+ assert.equal((await organizer.post('/api/invitation/recipient',{email:'invalid'})).status,400);
+ assert.equal((await organizer.post('/api/invitation/recipient',{email:'missing-pilot@example.test'})).status,403);
+ const resolved=await organizer.post('/api/invitation/recipient',{email:target+'@example.test'});assert.equal(resolved.status,200);assert.deepEqual(await resolved.json(),{uid:target,email:target+'@example.test'});
+ await a.auth.updateUser(target,{emailVerified:false});assert.equal((await organizer.post('/api/invitation/recipient',{email:target+'@example.test'})).status,403);await a.auth.updateUser(target,{emailVerified:true});
+
  assert.equal((await organizer.post('/api/invitation/create',{})).status,400);
  assert.equal((await organizer.post('/api/invitation/create',{recipientUid:'../foreign'})).status,400);
  assert.equal((await organizer.post('/api/invitation/create',{recipientUid:'missing-recipient'})).status,403);
- await a.auth.updateUser(target,{disabled:true});assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);await a.auth.updateUser(target,{disabled:false});
+ await a.auth.updateUser(target,{disabled:true});assert.equal((await organizer.post('/api/invitation/recipient',{email:target+'@example.test'})).status,403);assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);await a.auth.updateUser(target,{disabled:false});
  const targetRef=a.db.doc(`tenants/${tenantId}/members/${target}`),beforeInvite=(await targetRef.get()).data();
  const issued=await organizer.post('/api/invitation/create',{recipientUid:target});assert.equal(issued.status,200);const invitation=await issued.json();
  const stored=(await a.db.doc('invitations/'+invitation.id).get()).data();assert.equal(stored.recipientUid,target);assert.equal(stored.scope.tenantId,tenantId);assert.ok(!JSON.stringify(stored).includes(invitation.url.split('#')[1]));assert.deepEqual((await targetRef.get()).data(),beforeInvite);
@@ -52,7 +57,7 @@ test('pilot identity flow: bootstrap, organizer, director and kiosk grants, imme
  const directory=(await a.db.doc('workspaceDirectories/'+target).get()).data();assert.equal(directory.entries.length,1);assert.equal(directory.entries[0].space,'team');
  assert.equal((await employee.login(target)).status,200);entries=(await employee.directory()).entries;await employee.select(entries[0].id);assert.equal((await employee.get('/api/demo/team')).status,200);assert.equal((await employee.get('/api/gifts/ops')).status,403);
  assert.equal((await organizer.post('/api/invitation/revoke',{id:fresh.id})).status,403);
- await owner.update({canInvite:false});assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
+ await owner.update({canInvite:false});assert.equal((await organizer.post('/api/invitation/recipient',{email:target+'@example.test'})).status,403);assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
  await a.db.doc('accessAdministrators/'+admin).update({active:false});assert.equal((await organizer.post('/api/access/read',{uid:target})).status,403);
  assert.equal((await bootstrap.apply(manifest,preview.digest)).applied,false);assert.equal((await a.db.doc('accessAdministrators/'+admin).get()).data().active,false);
 });

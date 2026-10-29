@@ -56,3 +56,9 @@ test('provisioned acceptance validates directory before writes and creates exact
  const results=await Promise.all([1,2,3].map(()=>service.accept(recipient.header,invite.token,'Invité')));assert.equal(results.filter(r=>!r.alreadyAccepted).length,1);const data=(await directory.get()).data();assert.equal(data.entries.length,2);assert.deepEqual(data.entries[0],other);assert.equal(data.revision,5);assert.equal(data.entries[1].space,'team');assert.equal((await a.db.doc(`tenants/${scope.tenantId}/members/${recipient.uid}`).get()).data().participationEnabled,true);
  await directory.update({entries:[other],revision:6});assert.equal((await service.accept(recipient.header,invite.token,'Invité')).alreadyAccepted,true);assert.deepEqual((await directory.get()).data().entries,[other]);
 });
+test('recipient lookup rechecks issuer permission after Auth lookup and never adds rights',async t=>{
+ const {a,issuer,recipient,scope,owner}=await setup(t);await a.auth.updateUser(recipient.uid,{emailVerified:true});const service=createInvitations(a),user=await a.auth.getUser(recipient.uid);
+ assert.deepEqual(await service.recipient(issuer.header,scope,user.email),{uid:recipient.uid,email:user.email});assert.equal((await a.db.doc(`tenants/${scope.tenantId}/members/${recipient.uid}`).get()).exists,false);
+ const original=a.auth.getUserByEmail.bind(a.auth);a.auth.getUserByEmail=async email=>{await owner.update({canInvite:false});return original(email);};
+ await assert.rejects(service.recipient(issuer.header,scope,user.email),{status:403});
+});

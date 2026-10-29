@@ -206,7 +206,7 @@ export async function createFirebaseHttp(options){
   // Strip administrative controls from team responses even for explicitly multi-role accounts.
   const teamView=value=>session.workspaceSpace==='team'?{...value,canOpen:false,canClose:false,...(Object.hasOwn(value,'leaders')?{leaders:null}:{})}:value;
   if(session.organizerOnly&&path!=='/api/auth/logout'){
-   const routes={GET:['/api/client-budget','/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/client-budget/publish','/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
+   const routes={GET:['/api/client-budget','/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/client-budget/publish','/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/recipient','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
    if(!routes[req.method]?.includes(path))throw failure(403);
    await organizerDashboard.read(session.header,session.scope);
   }
@@ -300,6 +300,7 @@ export async function createFirebaseHttp(options){
    if(path==='/api/invitation/session'){await body(req,[]);await adapter.auth.verifyIdToken(session.header.slice(7),true);json(200,{csrf:session.csrf});return;}
    if(path.startsWith('/api/invitation/')){
     authorized(req,session);
+    if(path==='/api/invitation/recipient'){if(authenticationMode!=='provisioned'||!session.scope)throw failure(403);const {email}=await body(req,['email']);json(200,await invitations.recipient(session.header,session.scope,email));return;}
     if(path==='/api/invitation/create'){const input=await body(req,authenticationMode==='provisioned'?['recipientUid']:[]);if(!session.scope)throw failure(403);const recipientUid=authenticationMode==='provisioned'?input.recipientUid:invitedProfile.uid;if(typeof recipientUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(recipientUid))throw failure(400);const invite=await invitations.issue(session.header,session.scope,recipientUid);json(200,{id:invite.id,url:'/invitation.html#'+invite.token,expiresAt:invite.expiresAt});return;}
     if(path==='/api/invitation/revoke'){const {id}=await body(req,['id']);if(!session.scope)throw failure(403);json(200,await invitations.revoke(session.header,session.scope,id));return;}
     if(path==='/api/invitation/preview'){const {token}=await body(req,['token']);json(200,await invitations.preview(session.header,token));return;}

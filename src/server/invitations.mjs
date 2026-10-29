@@ -19,6 +19,14 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
   return invite;
  }
  return {
+  async recipient(header,scope,email){
+   if(typeof email!=='string'||email.length>254||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))throw Object.assign(Error('Invalid recipient'),{status:400});
+   const viewer=await identity(header);await adapter.read(header,scope);
+   const check=()=>db.runTransaction(async tx=>allowed((await tx.get(member(scope,viewer.uid))).data(),scope,viewer.uid));await check();
+   let user;try{user=await auth.getUserByEmail(email);}catch(error){if(error.code==='auth/user-not-found')throw denied();throw error;}
+   await check();if(user.disabled||!user.emailVerified||typeof user.email!=='string'||user.email.toLowerCase()!==email.toLowerCase()||!/^[A-Za-z0-9_-]{1,128}$/.test(user.uid))throw denied();
+   return {uid:user.uid,email:user.email};
+  },
   async issue(header,scope,recipientUid){
    const user=await identity(header);await adapter.read(header,scope);let recipient;try{recipient=await auth.getUser(recipientUid);}catch(error){if(error.code==='auth/user-not-found')throw denied();throw error;}if(recipient.disabled)throw denied();
    const token=randomBytes(32).toString('hex'),id=hash(token),createdAt=now(),expiresAt=createdAt+lifetimeMs;
