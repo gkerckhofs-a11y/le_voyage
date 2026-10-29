@@ -4,6 +4,7 @@ import {createDirectorProgress} from '../../src/server/director-progress.mjs';
 import {createGiftOperations} from '../../src/server/gift-operations.mjs';
 import {exact} from '../../src/domain/exact.ts';
 import {addDays} from '../../src/domain/calendar.ts';
+import {collectiveState} from '../../scripts/demo-collective.mjs';
 import {newDemo} from '../../src/server/demo-service.mjs';
 import {teamDistance,convoyDistance,receptionLevel,freezeReception} from '../../src/domain/engine.ts';
 async function setup(t){const a=createFirebaseEmulatorAdapter();t.after(()=>a.close());const uid='director-'+randomUUID(),email=uid+'@example.test',password='Fictitious-test-42!';await a.auth.createUser({uid,email,password});const token=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const header='Bearer '+(await token.json()).idToken;
@@ -51,4 +52,19 @@ test('director keeps base reception guaranteed when frozen without an acquired t
  record.ledger.state=freezeReception(record.ledger.state,scope,'2027-01-01');await ref.update({payload:JSON.stringify(record)});
  const view=await service.read(header,scope);assert.equal(view.reception.level,0);assert.equal(view.reception.baseGuaranteed,true);
  assert.equal(view.reception.displayKm,'0');assert.ok(view.reception.tiers.every(t=>!t.included&&t.status==='not-included'));
+});
+
+test('director collective reuses route and frozen reception without weekly series, teams, budgets or private data',async t=>{
+ const {service,header,scope,ref,record,member}=await setup(t);
+ for(const scenario of ['journey','frozen','tpe']){
+  const state=collectiveState(scenario);state.config.tenantId=scope.tenantId;state.config.campaignId=scope.campaignId;state.privateSurvey={answers:['FORBIDDEN']};record.ledger.state=state;await ref.set({payload:JSON.stringify(record)});
+  const before=(await ref.get()).data(),view=await service.collective(header,scope);
+  assert.deepEqual(view.distance,convoyDistance(state));assert.deepEqual(view.history,[]);assert.equal(view.reception.level,receptionLevel(state).level);assert.equal(view.reception.frozen,scenario==='frozen');
+  assert.equal(view.reception.tiers.length,state.config.reception.tiers.length);assert.equal(view.closure!==null,scenario==='frozen');
+  assert.deepEqual(Object.keys(view).sort(),['activeWeeks','closure','completedWeeks','displayKm','distance','history','maximumKm','organizationName','reception','routeId','schemaVersion','timeZone']);
+  assert.doesNotMatch(JSON.stringify(view),/FORBIDDEN|answers|scores|weights|preferences|budget|purchase|margin|private-person|private-tier|private-gift|teamId/);
+  assert.deepEqual((await ref.get()).data(),before);
+ }
+ for(const other of [{...scope,tenantId:'foreign'},{...scope,campaignId:'foreign'}])await assert.rejects(service.collective(header,other),{status:403});
+ await member.update({directorCampaigns:[]});await assert.rejects(service.collective(header,scope),{status:403});
 });

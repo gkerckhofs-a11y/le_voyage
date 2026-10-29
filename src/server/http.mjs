@@ -7,7 +7,7 @@ import { newDemo, readTeam, readCollective, advance, claim } from './demo-servic
 
 const failure=(status)=>Object.assign(new Error('Demo request refused'),{status});
 const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"};
-const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8'};
+const types={'.svg':'image/svg+xml','.png':'image/png','.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8'};
 const sessionToken=req=>req.headers.cookie?.match(/(?:^|;\s*)rc_demo=([a-f0-9]{64})(?:;|$)/)?.[1];
 function checkOrigin(req,remoteOrigins=[]){
   const host=req.headers.host;

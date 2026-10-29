@@ -7,11 +7,12 @@ import type { CollectiveJourneyView } from '../presentation/collective-view.ts';
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const format=(n:string|number)=>Number(n).toLocaleString('fr-BE');
 const date=(s:string)=>new Intl.DateTimeFormat('fr-BE',{day:'numeric',month:'long',timeZone:'Europe/Brussels'}).format(new Date(s+'T12:00:00Z'));
+const directorPage=document.body.hasAttribute('data-director-collective');
 const limitedKioskPage=document.body.hasAttribute('data-limited-kiosk');
 const params=new URLSearchParams(location.search),scenarios=['journey','before-freeze','frozen','tpe'];
-const scenario=scenarios.includes(params.get('scenario')??'')?params.get('scenario')!:'journey';
+const scenario=!directorPage&&scenarios.includes(params.get('scenario')??'')?params.get('scenario')!:'journey';
 let kiosk=limitedKioskPage||params.get('kiosk')==='1',lockedKiosk=limitedKioskPage;
-function kioskStyle(){document.body.classList.toggle('kiosk',kiosk);$('kiosk-toggle').textContent=kiosk?'Quitter l’écran collectif':'Écran collectif';$('kiosk-toggle').setAttribute('aria-pressed',String(kiosk));$('kiosk-note').hidden=!kiosk;}
+function kioskStyle(){document.body.classList.toggle('kiosk',kiosk);$('kiosk-toggle').textContent=kiosk?(directorPage?'Quitter le plein écran':'Quitter l’écran collectif'):directorPage?'Présentation plein écran':'Écran collectif';$('kiosk-toggle').setAttribute('aria-pressed',String(kiosk));$('kiosk-note').hidden=!kiosk;}
 kioskStyle();
 ($('scenario') as HTMLSelectElement).value=scenario;
 $('scenario').addEventListener('change',()=>{const url=new URL(location.href);url.searchParams.set('scenario',($('scenario') as HTMLSelectElement).value);location.assign(url);});
@@ -20,9 +21,12 @@ $('about-close').addEventListener('click',()=>($('about') as HTMLDialogElement).
 $('retry').addEventListener('click',()=>location.reload());
 async function start(){
   let data:CollectiveJourneyView;
-  if(limitedKioskPage||scenario==='journey'){
+  if(directorPage||limitedKioskPage||scenario==='journey'){
     const session=await startDemo();lockedKiosk=session.workspace==='kiosk';if(limitedKioskPage&&!lockedKiosk)throw Error('Limited session required');
-    if(lockedKiosk){kiosk=true;kioskStyle();$('kiosk-toggle').hidden=true;$('scenario').hidden=true;document.querySelector('label[for="scenario"]')?.setAttribute('hidden','');
+    if(directorPage){
+      if(session.workspace!=='director')throw Error('Director session required');
+      const response=await fetch('/api/director/collective',{cache:'no-store'});if(!response.ok)throw Error('Director collective unavailable');data=await response.json();
+    }else if(lockedKiosk){kiosk=true;kioskStyle();$('kiosk-toggle').hidden=true;$('scenario').hidden=true;document.querySelector('label[for="scenario"]')?.setAttribute('hidden','');
       const response=await fetch('/api/kiosk/progress',{cache:'no-store'});if(!response.ok)throw Error('Kiosk unavailable');data=await response.json();
     }else data=await readDemo<CollectiveJourneyView>('collective');
   }
@@ -65,6 +69,6 @@ async function start(){
     button.addEventListener('click',()=>{map.focusRatio(tier.km/data.maximumKm);$('map-status').textContent=`${tier.title}. ${stopStatus(tier,reception.frozen)}.`;});
   }
   $('collective-content').dataset.ready='true';
-  if(lockedKiosk)window.setTimeout(()=>location.reload(),60000);
+  if(lockedKiosk||directorPage)window.setTimeout(()=>location.reload(),60000);
 }
 start().catch(()=>{$('fallback').hidden=false;$('collective-content').hidden=true;($('kiosk-toggle') as HTMLButtonElement).disabled=true;});

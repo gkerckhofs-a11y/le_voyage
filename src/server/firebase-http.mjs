@@ -154,10 +154,11 @@ export async function createFirebaseHttp(options){
    if(!routes[req.method]?.includes(path))throw failure(403);
    await organizerDashboard.read(session.header,session.scope);
   }
-  if(session.directorOnly&&!['/api/director/progress','/api/demo/session','/api/auth/logout'].includes(path))throw failure(403);
+  if(session.directorOnly&&!['/api/director/collective','/api/director/progress','/api/demo/session','/api/auth/logout'].includes(path))throw failure(403);
   if(path==='/api/client-budget'&&req.method==='GET'){json(200,await clientBudget.read(session.header,session.scope));return;}
   if(path==='/api/client-budget/publish'&&req.method==='POST'){authorized(req,session);json(200,await clientBudget.publish(session.header,session.scope,await body(req,['budget','confirmed','mutationId','reason','revision'])));return;}
   if(path==='/api/organizer/overview'&&req.method==='GET'){json(200,await organizerDashboard.read(session.header,session.scope));return;}
+  if(path==='/api/director/collective'&&req.method==='GET'){json(200,await directorProgress.collective(session.header,session.scope));return;}
   if(path==='/api/director/progress'&&req.method==='GET'){json(200,await directorProgress.read(session.header,session.scope));return;}
   if(path.startsWith('/api/kpi-periods/')&&req.method==='POST'){
    if(!session.scope)throw failure(403);authorized(req,session);
