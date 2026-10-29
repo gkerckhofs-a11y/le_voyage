@@ -7,12 +7,17 @@ export function stagingConfig(env=process.env){
  const authenticationMode=env.RC_AUTHENTICATION_MODE??'demo';
  if(!['demo','provisioned'].includes(authenticationMode))throw Error('Unknown authentication mode');
  const googleAccess=env.RC_TEST_ACCESS_MODE==='google';
+ if(env.RC_TEST_EMAIL_LINK_MODE&&!['disabled','enabled'].includes(env.RC_TEST_EMAIL_LINK_MODE))throw Error('Unknown e-mail link mode');
+ const emailLinkEnabled=env.RC_TEST_EMAIL_LINK_MODE==='enabled';
+ // Email-link login is independent of the Google test gate: never expose
+ // another authentication route through the Google-only cookie boundary.
+ if(emailLinkEnabled&&(authenticationMode!=='provisioned'||googleAccess||env.RC_TEST_ACCESS_MODE!=='basic'))throw Error('Isolated Basic + provisioned mode required for e-mail link pilot');
  const testerEmails=(env.RC_TESTER_EMAILS??'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
  if(googleAccess&&(!testerEmails.length||testerEmails.length>10||testerEmails.some(x=>!/^[-a-z0-9._+]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(x))))throw Error('Explicit Google tester allowlist required');
  if(env.RC_TEST_ACCESS_MODE&&!['google','basic'].includes(env.RC_TEST_ACCESS_MODE))throw Error('Unknown access mode');
  for(const key of googleAccess?(authenticationMode==='demo'?['RC_TEST_AUTH_PASSWORD']:[]):(authenticationMode==='demo'?['RC_TEST_ACCESS_PASSWORD','RC_TEST_AUTH_PASSWORD']:['RC_TEST_ACCESS_PASSWORD']))if(typeof env[key]!=='string'||env[key].length<32)throw Error('Test secrets required');
  if(!/^[A-Za-z0-9_-]{20,100}$/.test(env.RC_FIREBASE_API_KEY??''))throw Error('Firebase test API key required');
- return {projectId:stagingProjectId,authenticationMode,origins,googleAccess,testerEmails,accessPassword:env.RC_TEST_ACCESS_PASSWORD,authPassword:env.RC_TEST_AUTH_PASSWORD,apiKey:env.RC_FIREBASE_API_KEY};
+ return {projectId:stagingProjectId,authenticationMode,origins,googleAccess,emailLinkEnabled,testerEmails,accessPassword:env.RC_TEST_ACCESS_PASSWORD,authPassword:env.RC_TEST_AUTH_PASSWORD,apiKey:env.RC_FIREBASE_API_KEY};
 }
 export function testGate(password){
  const expected=Buffer.from('voyage:'+password);

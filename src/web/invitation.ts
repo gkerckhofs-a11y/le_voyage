@@ -1,5 +1,5 @@
 const token=location.hash.slice(1),status=document.getElementById('invitation-status')!,login=document.getElementById('recipient-login') as HTMLButtonElement,form=document.getElementById('accept-form') as HTMLFormElement;
-let csrf='',hasGiftPreferences=false,provisioned=false,googleTestGate=false;
+let csrf='',hasGiftPreferences=false,provisioned=false,googleTestGate=false,emailLinkEnabled=false;
 const accountForm=document.getElementById('invitation-login') as HTMLFormElement;
 const tastes=document.getElementById('signup-preferences')!,surprise=document.getElementById('signup-surprise') as HTMLInputElement,alcoholFree=document.getElementById('signup-alcohol-free') as HTMLInputElement;
 const choices=[...document.querySelectorAll<HTMLInputElement>('[name="signup-choice"]')];
@@ -23,7 +23,7 @@ accountForm.addEventListener('submit',async event=>{
  finally{password.value='';button.disabled=false;}
 });
 login.hidden=true;
-void(async()=>{try{const response=await fetch('/api/auth/config');if(!response.ok)throw Error();const config=await response.json(),mode=config.mode;if(!['demo','provisioned'].includes(mode))throw Error();provisioned=mode==='provisioned';googleTestGate=config.googleTestGate===true;if(provisioned){document.querySelector('.demo-label')!.textContent='Invitation personnelle';document.getElementById('invitation-private-help')!.textContent='Acceptez avec le compte destinataire. Votre profil gourmand reste privé et ne sera pas communiqué au dirigeant.';(document.getElementById('journey-link') as HTMLAnchorElement).href='/connexion.html';}await load();}catch{status.textContent='Lecture indisponible. Rechargez la page.';}})();
+void(async()=>{try{const response=await fetch('/api/auth/config');if(!response.ok)throw Error();const config=await response.json(),mode=config.mode;if(!['demo','provisioned'].includes(mode))throw Error();provisioned=mode==='provisioned';googleTestGate=config.googleTestGate===true;emailLinkEnabled=config.emailLinkEnabled===true;const link=document.getElementById('invitation-email-link');if(link)link.hidden=!emailLinkEnabled;if(provisioned){document.querySelector('.demo-label')!.textContent='Invitation personnelle';document.getElementById('invitation-private-help')!.textContent='Acceptez avec le compte destinataire. Votre profil gourmand reste privé et ne sera pas communiqué au dirigeant.';(document.getElementById('journey-link') as HTMLAnchorElement).href='/connexion.html';}await load();}catch{status.textContent='Lecture indisponible. Rechargez la page.';}})();
 
 const journeyLink=document.getElementById('journey-link') as HTMLAnchorElement;
 journeyLink.addEventListener('click',async event=>{
@@ -37,5 +37,17 @@ journeyLink.addEventListener('click',async event=>{
  }catch{
   status.textContent='La session d’inscription ne peut pas être fermée. Réessayez avant de vous reconnecter.';
   journeyLink.removeAttribute('aria-disabled');
+ }
+});
+
+const emailLinkEntry=document.getElementById('invitation-email-link') as HTMLAnchorElement;
+emailLinkEntry.addEventListener('click',event=>{
+ if(!emailLinkEnabled||!provisioned||!/^[a-f0-9]{64}$/.test(token)){
+  event.preventDefault();status.textContent='Ce lien d’invitation ne peut pas être utilisé.';return;
+ }
+ try{
+  localStorage.setItem('rc-pilot-email-link-invitation',JSON.stringify({token,at:Date.now()}));
+ }catch{
+  event.preventDefault();status.textContent='Ce navigateur ne permet pas de conserver votre invitation. Utilisez la connexion classique.';
  }
 });

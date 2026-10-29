@@ -12,6 +12,7 @@ const accountForm=document.querySelector<HTMLFormElement>('#account-login')!;
   const response=await fetch('/api/auth/config');if(!response.ok)throw Error();
   const config=await response.json();if(!['demo','provisioned'].includes(config.mode))throw Error();
   if(config.mode==='provisioned'){
+   const link=document.getElementById('email-link-entry');if(link)link.hidden=config.emailLinkEnabled!==true;
    buttons.forEach(b=>b.hidden=true);
    document.querySelectorAll<HTMLElement>('.extra-teams,.demo-label,#demo-introduction,.login-card small').forEach(e=>e.hidden=true);
    accountForm.hidden=false;
