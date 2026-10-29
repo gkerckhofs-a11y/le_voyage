@@ -11,7 +11,7 @@ const config=stagingConfig();
 const adapter=createFirestoreAdapter(initializeApp({projectId:config.projectId,credential:applicationDefault()}));
 const integration=await createFirebaseHttp({adapter,authenticationMode:config.authenticationMode,sheetsSource:createMasterSheetsSource(masterSheetsConfig()),cookieName:'__session',password:config.authPassword,...(config.emailLinkEnabled?{emailLink:{projectId:config.projectId,apiKey:config.apiKey,canonical:`https://${config.projectId}.web.app`}}:{}),loginEndpoint:'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+config.apiKey});
 const googleGate=config.googleAccess?await createGoogleTestGate({auth:adapter.auth,config,...(config.authenticationMode==='provisioned'?{identityLogin:integration.identityLogin,identityInvitationLogin:integration.identityInvitationLogin,identityLogout:integration.identityLogout,sessionStore:createSessionStore(adapter)}:{})}):null;
-const server=createDemoServer({root:resolve('dist-web'),directory:'/tmp/rc-unused-local-store',apiHandler:googleGate?googleGate.apiHandler(integration.handler):integration.handler,remoteOrigins:config.origins});
+const server=createDemoServer({root:resolve('dist-web'),directory:'/tmp/rc-unused-local-store',apiHandler:googleGate?googleGate.apiHandler(integration.handler):integration.handler,remoteOrigins:config.origins,...(config.emailLinkEnabled?{emailLinkProjectId:config.projectId}:{})});
 const handler=server.listeners('request')[0],gate=googleGate?.gate??testGate(config.accessPassword);server.removeAllListeners('request');
 server.on('request',async(req,res)=>{if(await gate(req,res))handler(req,res);});
 server.listen(Number(process.env.PORT||8080),'0.0.0.0',()=>console.log('Isolated test application ready.'));
