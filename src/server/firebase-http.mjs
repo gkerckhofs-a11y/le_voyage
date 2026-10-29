@@ -166,7 +166,7 @@ export async function createFirebaseHttp(options){
   }
   if(path==='/api/access/read'&&req.method==='POST'){
    if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);
-   const {uid}=await body(req,['uid']);json(200,await workspaceAccess.read(session.header,session.scope,uid));return;
+   const {uid,beforeRevision}=await body(req,['uid'],4096,['beforeRevision']);json(200,await workspaceAccess.read(session.header,session.scope,uid,beforeRevision??null));return;
   }
   if(path==='/api/access/save'&&req.method==='POST'){
    if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);

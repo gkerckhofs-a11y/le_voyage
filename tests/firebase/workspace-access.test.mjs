@@ -40,4 +40,9 @@ test('explicit tenant administrator grants and revokes read-only spaces atomical
  const events=a.db.collection(`tenants/${tenantId}/campaigns/${campaignId}/accessHistory/${uid}/events`);
  const batch=a.db.batch();for(let i=0;i<21;i++)batch.set(events.doc('page-'+i),{revision:100+i,space:'director',enabled:false,reason:'Motif',author:admin,recordedAt:new Date().toISOString()});await batch.commit();
  const latest=await service.read(header,{tenantId,campaignId},uid);assert.equal(latest.history.length,20);assert.equal(latest.historyTruncated,true);assert.equal(latest.history[0].revision,120);assert.equal(latest.history.at(-1).revision,101);
+ const older=await service.read(header,{tenantId,campaignId},uid,latest.nextBeforeRevision);
+ assert.equal(latest.nextBeforeRevision,101);assert.equal(older.history[0].revision,100);assert.equal(older.history.at(-1).revision,1);assert.equal(older.nextBeforeRevision,null);assert.equal(older.historyTruncated,false);
+ assert.ok(!older.history.some(e=>latest.history.some(v=>v.revision===e.revision)));
+ for(const cursor of [0,-1,1.5,'101'])await assert.rejects(service.read(header,{tenantId,campaignId},uid,cursor),{status:400});
+ await grant.update({active:false});await assert.rejects(service.read(header,{tenantId,campaignId},uid,101),{status:403});
 });
