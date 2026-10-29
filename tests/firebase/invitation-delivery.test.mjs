@@ -64,5 +64,7 @@ test('missing mail transport, insecure origin and unauthorized organizer cannot 
  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:stranger.email,password:'Fictitious-Sender-42!',returnSecureToken:true})});
  const token=(await response.json()).idToken;
  await assert.rejects(delivery.send('Bearer '+token,scope,{recipientUid,mutationId:'mutation-denied-'+randomUUID()}),{status:403});
- assert.equal((await adapter.db.collection('invitationDeliveries').get()).size,0);
+ const deliveries=await adapter.db.collection('invitationDeliveries').get();
+ assert.equal(deliveries.docs.filter(doc=>doc.data().recipientUid===recipientUid).length,0);
+ // Other parallel tests may legitimately share this emulator collection.
 });
