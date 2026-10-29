@@ -19,7 +19,8 @@ export async function startDemo(){
   }
   if(result.canSimulate===false){const simulate=document.getElementById('advance');if(simulate)simulate.hidden=true;}if(result.authenticated){const nav=document.querySelector('.demo-label');if(nav&&!document.getElementById('logout')){const button=document.createElement('button');button.id='logout';button.textContent='Se déconnecter';button.addEventListener('click',async()=>{try{const r=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:'{}'});if(r.ok||r.status===401)location.replace('/connexion.html');else button.textContent='Réessayer la déconnexion';}catch{button.textContent='Réessayer la déconnexion';}});const badge=document.createElement('span');badge.hidden=true;while(nav.firstChild)badge.append(nav.firstChild);nav.append(badge,button);}}
   const teamSurface=!result.workspace||result.workspace==='team';
-  if(teamSurface&&(result.authenticated||['/','/index.html','/collectif.html','/choix.html','/preferences.html','/equipe.html','/semaine.html'].includes(location.pathname))){
+  const teamPage=['/','/index.html','/collectif.html','/choix.html','/preferences.html','/equipe.html','/semaine.html'].includes(location.pathname);
+  if(teamSurface&&teamPage){
    installTeamNavigation();
    if(result.authenticated){
     void fetch('/api/demo/team').then(r=>r.ok?r.json():null).then(feed=>{if(feed?.journey?.organizationName)setNavigationCompany(feed.journey.organizationName);}).catch(()=>{});

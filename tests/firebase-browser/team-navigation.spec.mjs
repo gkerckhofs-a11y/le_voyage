@@ -9,6 +9,8 @@ test('four top destinations, grouped choices and a once-only weekly popup with m
  await page.route('**/api/my-week/answer',r=>{expect(r.request().postDataJSON()).toEqual({weekId:week.id,answers:[3,3,3]});answered=true;return r.fulfill({json:{myAnswers:[3,3,3]}});});
  await page.goto('/choix.html');
  const popup=page.getByRole('dialog',{name:'Ma semaine'});await expect(popup).toBeVisible();
+ const initialNav=await page.locator('.header nav').boundingBox(),initialPopup=await popup.boundingBox();expect(initialPopup.y).toBeGreaterThanOrEqual(initialNav.height);
+ await page.screenshot({path:`test-results/r9f1-popup-${info.project.name}.png`,fullPage:true});
  await page.getByRole('button',{name:'Fermer Ma semaine'}).click();await page.reload();await expect(page.getByRole('heading',{name:'Nos choix.',exact:true})).toBeVisible();
  await expect.poll(()=>claims).toBe(2);await expect(popup).toHaveCount(0);
  const nav=page.getByRole('navigation',{name:'Navigation principale'});
