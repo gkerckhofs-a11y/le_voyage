@@ -24,7 +24,7 @@ export function createInvitationDelivery({adapter,invitations,transport,origin,n
  return {
   async status(header,scope,{recipientUid}={}){
    if(!scope||![scope.tenantId,scope.campaignId,scope.teamId,recipientUid].every(validId))throw reject(400);
-   await invitations.authorizeIssuer(header,scope);
+   const viewerUid=await invitations.authorizeIssuer(header,scope);
    const scopeKey=[scope.tenantId,scope.campaignId,scope.teamId,recipientUid].join('|');
    const result=await db.runTransaction(async tx=>{
     const lock=(await tx.get(db.doc('invitationDeliveryLimits/'+digest(scopeKey)))).data();
@@ -34,9 +34,21 @@ export function createInvitationDelivery({adapter,invitations,transport,origin,n
     const record=(await tx.get(db.doc('invitationDeliveries/'+lock.deliveryId))).data();
     if(!record||record.tenantId!==scope.tenantId||record.campaignId!==scope.campaignId||record.teamId!==scope.teamId||record.recipientUid!==recipientUid)throw reject(503);
     if(!['preparing','sending','sent','review'].includes(record.status)||!Number.isSafeInteger(record.at))throw reject(503);
-    return {status:record.status,startedAt:record.at,
+    let invitationState='unknown',revocableInvitationId=null;
+    if(/^[a-f0-9]{64}$/.test(record.invitationId??'')){
+     const invite=(await tx.get(db.doc('invitations/'+record.invitationId))).data();
+     if(invite){
+      if(invite.recipientUid!==recipientUid||!invite.scope||['tenantId','campaignId','teamId'].some(k=>invite.scope[k]!==scope[k]))throw reject(503);
+      if(!['pending','accepted','revoked'].includes(invite.status)||!Number.isSafeInteger(invite.expiresAt))throw reject(503);
+      if(invite.status==='accepted'&&invite.acceptedBy!==recipientUid)throw reject(503);
+      invitationState=invite.status==='pending'?(invite.expiresAt<=now()?'expired':'pending'):invite.status;
+      if(invite.issuerUid===viewerUid&&['pending','expired'].includes(invitationState)&&['sent','review'].includes(record.status))revocableInvitationId=record.invitationId;
+     }
+    }
+    return {status:record.status,startedAt:record.at,invitationState,
+     ...(revocableInvitationId?{revocableInvitationId}:{}),
      ...(Number.isSafeInteger(record.sentAt)?{sentAt:record.sentAt}:{}),
-     ...(record.status==='review'?{revoked:record.revoked===true}:{}),
+     ...(record.status==='review'?{revoked:invitationState==='revoked'}:{}),
      ...(Number.isSafeInteger(lock.at)?{retryAfter:Math.max(0,lock.at+cooldownMs-now())}:{})};
    });
    await invitations.authorizeIssuer(header,scope);

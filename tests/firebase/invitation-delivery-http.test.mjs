@@ -73,7 +73,12 @@ test('organizer explicitly sends one addressed invitation through HTTP and an is
  assert.equal(result.length,1);assert.equal(result[0].data().status,'sent');
  const tracked=await post('/api/invitation/delivery-status',{recipientUid:recipient});assert.equal(tracked.status,200);
  const tracking=await tracked.json();assert.equal(tracking.status,'sent');
- assert.deepEqual(Object.keys(tracking).sort(),['retryAfter','sentAt','startedAt','status']);
+ assert.deepEqual(Object.keys(tracking).sort(),['invitationState','retryAfter','revocableInvitationId','sentAt','startedAt','status']);
+ assert.equal(tracking.invitationState,'pending');
+ assert.equal((await post('/api/invitation/revoke',{id:tracking.revocableInvitationId})).status,200);
+ const afterRevoke=await(await post('/api/invitation/delivery-status',{recipientUid:recipient})).json();
+ assert.equal(afterRevoke.invitationState,'revoked');assert.equal(Object.hasOwn(afterRevoke,'revocableInvitationId'),false);
+ assert.equal(delivered.length,1);
  await adapter.db.doc('tenants/'+tenantId+'/members/'+admin).update({canInvite:false});
  assert.equal((await post('/api/invitation/delivery-status',{recipientUid:recipient})).status,403);
  assert.equal(JSON.stringify(result[0].data()).includes('#'),false);
