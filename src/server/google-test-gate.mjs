@@ -6,7 +6,7 @@ const opaque=()=>randomBytes(32).toString('hex');
 const cookie=(value,age)=>`__session=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`;
 const equal=(a,b)=>typeof a==='string'&&typeof b==='string'&&a.length===b.length&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 const context=Symbol('test-access');
-export async function createGoogleTestGate({auth,config,now=Date.now,identityLogin,identityLogout,sessionStore}){
+export async function createGoogleTestGate({auth,config,now=Date.now,identityLogin,identityInvitationLogin,identityLogout,sessionStore}){
  const provisioned=config.authenticationMode==='provisioned';
  if(provisioned&&(typeof identityLogin!=='function'||typeof identityLogout!=='function'||!sessionStore||!['get','issue','update','revoke'].every(k=>typeof sessionStore[k]==='function')))throw Error('Explicit identity session bridge required');
  const canonical=`https://${config.projectId}.web.app`,allowed=new Set(config.testerEmails),sessions=new Map(),ttl=provisioned?3300000:8*60*60*1000;
@@ -35,13 +35,15 @@ export async function createGoogleTestGate({auth,config,now=Date.now,identityLog
    }
    if(path==='/test-access/session'&&req.method==='POST'&&!url.search){
     sameOrigin(req);if(!s||s.credential||!equal(req.headers['x-test-csrf'],s.csrf))throw fail(403);
-    const {idToken}=await body(req,['idToken']);if(typeof idToken!=='string'||idToken.length>3800)throw fail(400);
+    const {idToken,invitationToken}=await body(req,['idToken'],4096,['invitationToken']);if(typeof idToken!=='string'||idToken.length>3800)throw fail(400);
+    const invited=invitationToken!==undefined;
+    if(invited&&(typeof invitationToken!=='string'||!/^[a-f0-9]{64}$/.test(invitationToken)||!provisioned||typeof identityInvitationLogin!=='function'))throw fail(403);
     let claims;try{claims=await auth.verifyIdToken(idToken,true);}catch{throw fail(401);}
     if(!allowedClaims(claims))throw fail(403);
     if(!Number.isFinite(claims.auth_time)||claims.auth_time*1000>now()+60000||now()-claims.auth_time*1000>300000)throw fail(401);
-    const identity=provisioned?await identityLogin(idToken):null;
+    const identity=provisioned?(invited?await identityInvitationLogin(idToken,invitationToken):await identityLogin(idToken)):null;
     if(provisioned&&(!identity||!/^[a-f0-9]{64}$/.test(identity.token)||!Number.isSafeInteger(identity.expires)||identity.expires<=now()||identity.expires>now()+ttl))throw fail(503);
-    const credential=await auth.createSessionCookie(idToken,{expiresIn:ttl}),expires=identity?.expires??now()+ttl,next=opaque();try{await put(token,next,{kind:'google-gate',credential,uid:claims.uid,expires,demoToken:identity?.token??null},s);}catch(error){if(provisioned)await identityLogout(identity.token).catch(()=>{});throw error;}send(200,{connected:true,destination:provisioned?'/espaces.html':'/connexion.html'},{'Set-Cookie':cookie(next,Math.max(0,Math.floor((expires-now())/1000)))});return false;
+    const credential=await auth.createSessionCookie(idToken,{expiresIn:ttl}),expires=identity?.expires??now()+ttl,next=opaque();try{await put(token,next,{kind:'google-gate',credential,uid:claims.uid,expires,demoToken:identity?.token??null},s);}catch(error){if(provisioned)await identityLogout(identity.token).catch(()=>{});throw error;}send(200,{connected:true,destination:provisioned?(invited?'/invitation.html#'+invitationToken:'/espaces.html'):'/connexion.html'},{'Set-Cookie':cookie(next,Math.max(0,Math.floor((expires-now())/1000)))});return false;
    }
    if(path==='/test-access/logout'&&req.method==='POST'&&!url.search){sameOrigin(req);if(provisioned&&s?.demoToken)await identityLogout(s.demoToken);await remove(token,s);send(200,{disconnected:true},{'Set-Cookie':cookie('',0)});return false;}
    if(path.startsWith('/test-access'))throw fail(404);
