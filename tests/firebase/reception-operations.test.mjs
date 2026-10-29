@@ -75,3 +75,27 @@ test('reception publication validates review, concurrency and grants before idem
  for(const patch of [{tenantId:'foreign'},{campaignId:'foreign'}])await assert.rejects(h.service.publishReception(h.header,{...i,...patch}),{status:403});
  await h.grant.update({active:false});await assert.rejects(h.service.publishReception(h.header,i),{status:403});
 });
+const incident=h=>({...h.scope,revision:1,mutationId:randomUUID(),action:'open',reason:'Prestataire indisponible',reference:'INC-01',confirmed:true});
+test('reception incident suspends progression and publication while preserving frozen rights and costs',async t=>{
+ const h=await setup(t);h.record.ledger.state=freezeReception(h.record.ledger.state,h.scope,'2026-10-27');await h.ref.set({payload:JSON.stringify(h.record)});const campaignBefore=(await h.ref.get()).data();
+ for(const [revision,status] of ['options','frozen'].entries())await h.service.saveReception(h.header,{...h.input,revision,status,mutationId:randomUUID()});
+ await h.service.saveReceptionCosts(h.header,costs(h));const originalCosts=(await h.service.receptionDetail(h.header,h.scope)).costs;
+ await h.service.publishReception(h.header,{...publication(h),sourceRevision:2});const i={...incident(h),revision:2};await h.service.receptionIncident(h.header,i);
+ let detail=await h.service.receptionDetail(h.header,h.scope);assert.equal(detail.record.incident.open,true);assert.equal(detail.publication.current,null);assert.deepEqual(detail.record.recordedFreeze.distance,h.record.ledger.state.freeze.km);assert.deepEqual(detail.costs,originalCosts);
+ await assert.rejects(h.service.saveReception(h.header,{...h.input,status:'confirmed',revision:3,mutationId:randomUUID()}),{status:409});await assert.rejects(h.service.publishReception(h.header,{...publication(h),revision:1,sourceRevision:3,mutationId:randomUUID()}),{status:409});
+ await h.service.saveReception(h.header,{...h.input,status:'frozen',revision:3,mutationId:randomUUID(),providers:'Solution alternative'});assert.equal((await h.service.receptionDetail(h.header,h.scope)).record.incident.open,true);
+ await h.service.receptionIncident(h.header,{...i,revision:4,mutationId:randomUUID(),action:'resolve',reason:'Solution équivalente vérifiée',reference:'SOL-01'});assert.equal((await h.service.receptionIncident(h.header,i)).alreadyApplied,true);
+ detail=await h.service.receptionDetail(h.header,h.scope);assert.equal(detail.record.revision,5);assert.equal(detail.record.incident.open,false);assert.equal(detail.publication.current,null);assert.equal(detail.history.filter(x=>x.event).length,2);
+ await h.service.publishReception(h.header,{...publication(h),revision:1,sourceRevision:5,mutationId:randomUUID()});assert.ok((await h.service.receptionDetail(h.header,h.scope)).publication.current);
+ await h.service.saveReception(h.header,{...h.input,status:'confirmed',revision:5,mutationId:randomUUID()});assert.deepEqual((await h.ref.get()).data(),campaignBefore);assert.deepEqual((await h.service.receptionDetail(h.header,h.scope)).costs,originalCosts);
+});
+test('reception incidents reject invalid transitions, concurrent changes, closed records and revoked access',async t=>{
+ const h=await setup(t),i=incident(h);await assert.rejects(h.service.receptionIncident(h.header,i),{status:409});await h.service.saveReception(h.header,h.input);
+ for(const patch of [{action:'cancel'},{confirmed:false},{reason:''},{reference:''},{revision:-1},{extra:1},{mutationId:'bad'}])await assert.rejects(h.service.receptionIncident(h.header,{...i,...patch}),{status:400});
+ await assert.rejects(h.service.receptionIncident(h.header,{...i,action:'resolve'}),{status:409});
+ const results=await Promise.allSettled([i,{...i,mutationId:randomUUID()}].map(x=>h.service.receptionIncident(h.header,x)));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.status,409);
+ await assert.rejects(h.service.receptionIncident(h.header,{...i,revision:2,mutationId:randomUUID()}),{status:409});
+ for(const patch of [{tenantId:'foreign'},{campaignId:'foreign'}])await assert.rejects(h.service.receptionIncident(h.header,{...i,...patch}),{status:403});
+ await h.ref.collection('receptionOperations').doc('main').update({status:'closed'});await assert.rejects(h.service.receptionIncident(h.header,{...i,revision:2,action:'resolve',mutationId:randomUUID()}),{status:409});
+ await h.grant.update({active:false});await assert.rejects(h.service.receptionIncident(h.header,i),{status:403});
+});

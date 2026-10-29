@@ -27,16 +27,26 @@ function normalizeCosts(i){
 }
 export function createReceptionOperations({db,actor,check,campaignRef,now}){
  const refFor=s=>campaignRef(s).collection('receptionOperations').doc('main');
- function project(state,s,r){const reception=receptionLevel(state);return {...s,client:collectiveIdentity(state).organizationName,revision:r?.revision??0,status:r?.status??'planned',...Object.fromEntries(fields.map(k=>[k,r?.[k]??empty()[k]])),updatedAt:r?.updatedAt??null,
+ function project(state,s,r){const reception=receptionLevel(state);return {...s,client:collectiveIdentity(state).organizationName,revision:r?.revision??0,status:r?.status??'planned',...Object.fromEntries(fields.map(k=>[k,r?.[k]??empty()[k]])),updatedAt:r?.updatedAt??null,incident:r?.incident??null,
   reception:{level:reception.level,displayKm:displayKm(reception.km),frozen:!!state.freeze,frozenOn:state.freeze?.frozenOn??null,cutoffDate:state.config.reception.cutoffDate},recordedFreeze:r?.recordedFreeze??null};}
  return {
   async receptions(header){const uid=await actor(header);return db.runTransaction(async tx=>{const grants=await check(tx,uid),rows=[];for(const s of grants){const state=stateOf(await tx.get(campaignRef(s)),s),r=(await tx.get(refFor(s))).data();rows.push(project(state,s,r));}return {rows};});},
-  async receptionDetail(header,i){scope(i);if(Object.keys(i).sort().join()!=='campaignId,tenantId')throw fail(400);const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,i);const state=stateOf(await tx.get(campaignRef(i)),i),ref=refFor(i),r=(await tx.get(ref)).data(),history=await tx.get(ref.collection('history').orderBy('revision','desc').limit(20));const costRef=ref.collection('costs').doc('current'),costs=(await tx.get(costRef)).data(),costHistory=await tx.get(costRef.collection('history').orderBy('revision','desc').limit(20));const publication=(await tx.get(ref.collection('publication').doc('current'))).data();return {publication:{revision:publication?.revision??0,active:publication?.active===true,current:projectReceptionPublication(publication,r,i)},record:project(state,i,r),costs:costs??null,costHistory:costHistory.docs.map(d=>d.data().record),history:history.docs.map(d=>{const v=d.data();return {revision:v.revision,at:v.at,actor:v.actor,reason:v.reason,status:v.record.status};})};});},
+  async receptionDetail(header,i){scope(i);if(Object.keys(i).sort().join()!=='campaignId,tenantId')throw fail(400);const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,i);const state=stateOf(await tx.get(campaignRef(i)),i),ref=refFor(i),r=(await tx.get(ref)).data(),history=await tx.get(ref.collection('history').orderBy('revision','desc').limit(20));const costRef=ref.collection('costs').doc('current'),costs=(await tx.get(costRef)).data(),costHistory=await tx.get(costRef.collection('history').orderBy('revision','desc').limit(20));const publication=(await tx.get(ref.collection('publication').doc('current'))).data();return {publication:{revision:publication?.revision??0,active:publication?.active===true,current:projectReceptionPublication(publication,r,i)},record:project(state,i,r),costs:costs??null,costHistory:costHistory.docs.map(d=>d.data().record),history:history.docs.map(d=>{const v=d.data();return {revision:v.revision,at:v.at,actor:v.actor,reason:v.reason,event:v.event??null,status:v.record.status};})};});},
+  async receptionIncident(header,i){scope(i);
+   if(Object.keys(i).sort().join()!==['tenantId','campaignId','revision','mutationId','action','reason','reference','confirmed'].sort().join()||!['open','resolve'].includes(i.action)||i.confirmed!==true||!Number.isSafeInteger(i.revision)||i.revision<0||i.revision>=1000||!['reason','reference'].every(k=>typeof i[k]==='string'&&i[k].trim().length>=3&&i[k].length<=240&&!/[\x00-\x1f\x7f]/.test(i[k]))||typeof i.mutationId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(i.mutationId))throw fail(400);
+   const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,i);const s={tenantId:i.tenantId,campaignId:i.campaignId};stateOf(await tx.get(campaignRef(s)),s);const ref=refFor(s),old=(await tx.get(ref)).data(),audit=ref.collection('history').doc(i.mutationId),prior=(await tx.get(audit)).data(),reason=i.reason.trim(),reference=i.reference.trim(),digest=hash({kind:'incident',uid,revision:i.revision,action:i.action,reason,reference});
+    if(prior){if(prior.digest!==digest)throw fail(409);return {revision:prior.revision,alreadyApplied:true};}
+    if(!old||old.revision!==i.revision||old.status==='closed'||(i.action==='open')===(old.incident?.open===true))throw fail(409);
+    const at=now(),revision=i.revision+1,incident=i.action==='open'?{open:true,reason,reference,openedAt:at,openedBy:uid,resolution:null}:{...old.incident,open:false,resolution:{reason,reference,at,actor:uid}},record={...old,incident,revision,updatedAt:at,actor:uid};
+    tx.set(ref,record);tx.create(audit,{digest,revision,at,actor:uid,reason,event:i.action==='open'?'incident-opened':'incident-resolved',record});return {revision,alreadyApplied:false};
+   });
+  },
   async publishReception(header,i){scope(i);
    if(Object.keys(i).sort().join()!==['tenantId','campaignId','revision','sourceRevision','mutationId','action','reason','confirmed'].sort().join()||!['publish','withdraw'].includes(i.action)||i.confirmed!==true||![i.revision,i.sourceRevision].every(n=>Number.isSafeInteger(n)&&n>=0&&n<1000)||typeof i.reason!=='string'||i.reason.trim().length<3||i.reason.length>240||/[\x00-\x1f\x7f]/.test(i.reason)||typeof i.mutationId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(i.mutationId))throw fail(400);
    const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,i);const s={tenantId:i.tenantId,campaignId:i.campaignId};stateOf(await tx.get(campaignRef(s)),s);const operation=refFor(s),r=(await tx.get(operation)).data(),ref=operation.collection('publication').doc('current'),old=(await tx.get(ref)).data(),audit=ref.collection('history').doc(i.mutationId),prior=(await tx.get(audit)).data(),digest=hash({uid,revision:i.revision,sourceRevision:i.sourceRevision,action:i.action,reason:i.reason.trim()});
     if(prior){if(prior.digest!==digest)throw fail(409);return {revision:prior.revision,alreadyApplied:true};}
     if((old?.revision??0)!==i.revision||!r||r.revision!==i.sourceRevision)throw fail(409);
+    if(i.action==='publish'&&r.incident?.open===true)throw fail(409);
     if(i.action==='publish'&&(!r.date||!r.venue||!r.guests||!statuses.includes(r.status)||r.status==='planned'))throw fail(422);
     if(i.action==='withdraw'&&old?.active!==true)throw fail(409);
     const revision=i.revision+1,publishedAt=now(),record=i.action==='publish'?{...s,revision,active:true,sourceRevision:r.revision,date:r.date,venue:r.venue,guests:r.guests,status:['completed','closed'].includes(r.status)?'completed':['confirmed','preparing'].includes(r.status)?'confirmed':'planned',publishedAt}:{...s,revision,active:false,sourceRevision:r.revision,publishedAt};
@@ -54,7 +64,7 @@ export function createReceptionOperations({db,actor,check,campaignRef,now}){
    await check(tx,uid,i);const s={tenantId:i.tenantId,campaignId:i.campaignId},state=stateOf(await tx.get(campaignRef(s)),s),ref=refFor(s),old=(await tx.get(ref)).data(),audit=ref.collection('history').doc(i.mutationId),prior=(await tx.get(audit)).data(),digest=hash({uid,revision:i.revision,value});
    if(prior){if(prior.digest!==digest)throw fail(409);return {revision:prior.revision,alreadyApplied:true};}
    if((old?.revision??0)!==i.revision||old?.status==='closed')throw fail(409);
-   const from=statuses.indexOf(old?.status??'planned'),to=statuses.indexOf(value.status);if(to<from||to>from+1)throw fail(409);
+   const from=statuses.indexOf(old?.status??'planned'),to=statuses.indexOf(value.status);if(to<from||to>from+1||old?.incident?.open===true&&to!==from)throw fail(409);
    if(to>=1&&(!value.date||!value.venue||!value.guests||!value.owner||!value.providers||!value.bookingReference))throw fail(422);
    if(to>=1&&value.date<=state.config.reception.cutoffDate)throw fail(422);
    if(to>=2&&!state.freeze)throw fail(409);
@@ -62,7 +72,7 @@ export function createReceptionOperations({db,actor,check,campaignRef,now}){
    if(old?.recordedFreeze&&hash(old.recordedFreeze)!==hash(frozen))throw fail(409);
    if(to>=3&&!value.fallback)throw fail(422);
    const at=now();if(to>=5&&(!value.completionReference||value.date>campaignDate(at,state.config.calendar?.timeZone??'Europe/Brussels')))throw fail(422);
-   const {reason,...content}=value,revision=i.revision+1,record={...content,revision,updatedAt:at,actor:uid,recordedFreeze:old?.recordedFreeze??(to>=2?frozen:null)};
+   const {reason,...content}=value,revision=i.revision+1,record={...content,incident:old?.incident??null,revision,updatedAt:at,actor:uid,recordedFreeze:old?.recordedFreeze??(to>=2?frozen:null)};
    tx.set(ref,record);tx.create(audit,{digest,revision,at,actor:uid,reason,record});return {revision,alreadyApplied:false};
   });},
  };
