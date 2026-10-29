@@ -26,6 +26,11 @@ test('a verified employee can accept an addressed invitation using Firebase iden
  await a.db.doc('tenants/'+tenantId+'/members/'+issuerUid).set({uid:issuerUid,tenantId,active:true,canInvite:true,assignments:[{campaignId,teamId}]});
  const invitation=await createInvitations(a,{provisionWorkspaces:true}).issue('Bearer '+issuerToken,scope,recipientUid);
  app=await createFirebaseHttp({adapter:a,authenticationMode:'provisioned'});
+ await assert.rejects(app.identityInvitationLogin(otherToken,invitation.token),{status:403});
+ const invitedBridge=await app.identityInvitationLogin(recipientToken,invitation.token);
+ assert.match(invitedBridge.token,/^[a-f0-9]{64}$/);
+ assert.ok(invitedBridge.expires>Date.now());
+ await app.identityLogout(invitedBridge.token);
  server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  const origin='http://127.0.0.1:'+server.address().port;let cookie='',csrf='';
