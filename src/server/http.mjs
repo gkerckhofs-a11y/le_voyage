@@ -28,7 +28,9 @@ export function authorized(req,record){
   const csrf=req.headers['x-demo-csrf'];
   if(typeof csrf!=='string'||!/^[a-f0-9]{64}$/.test(csrf)||!timingSafeEqual(Buffer.from(csrf),Buffer.from(record.csrf)))throw failure(403);
 }
-export function createDemoServer({root,directory,apiHandler,remoteOrigins=[]}){
+export function createDemoServer({root,directory,apiHandler,remoteOrigins=[],emailLinkProjectId=null}){
+  if(emailLinkProjectId!==null&&(!/^[a-z][a-z0-9-]{5,60}$/.test(emailLinkProjectId)||!remoteOrigins.length))throw new Error('E-mail link page requires an explicit isolated HTTPS origin');
+  const emailCsp=emailLinkProjectId?`default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://${emailLinkProjectId}.firebaseapp.com https://${emailLinkProjectId}.web.app; object-src 'none'; frame-ancestors 'none'; base-uri 'none'`:null;
   if(remoteOrigins.length&&(!apiHandler||remoteOrigins.some(o=>new URL(o).protocol!=='https:')))throw new Error('Explicit HTTPS API deployment required');
   if(process.env.NODE_ENV==='production'&&!remoteOrigins.length)throw new Error('Local demo server must not run in production');
   root=resolve(root);directory=resolve(directory);
@@ -75,7 +77,7 @@ export function createDemoServer({root,directory,apiHandler,remoteOrigins=[]}){
       const decoded=decodeURIComponent(path),file=resolve(root,'.'+(decoded==='/'?'/index.html':decoded));
       if(!file.startsWith(root+sep))throw failure(403);
       let content;try{content=await readFile(file);}catch(e){if(e.code==='ENOENT'||e.code==='EISDIR')throw failure(404);throw e;}
-      res.writeHead(200,{...headers,'Content-Type':types[extname(file)]||'application/octet-stream'});res.end(req.method==='HEAD'?undefined:content);
+      res.writeHead(200,{...headers,...(path==='/email-link.html'&&emailCsp?{'Content-Security-Policy':emailCsp}:{}),'Content-Type':types[extname(file)]||'application/octet-stream'});res.end(req.method==='HEAD'?undefined:content);
     }catch(error){if(!res.headersSent)json(error.status??500,{error:error.status===401?'Session de démonstration à rouvrir.':'La demande ne peut pas être traitée.'});else res.end();}
   });
   server.requestTimeout=15000;return server;
