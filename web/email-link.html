@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Connexion par e-mail · Le Voyage</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+  <script defer src="assets/web/email-link.js"></script>
+</head>
+<body class="login-page">
+ <header class="header">
+  <a class="brand-link" href="https://rougeclemence.be/" target="_blank" rel="noopener noreferrer" aria-label="Rouge Clémence — site officiel">
+   <img class="brand-logo" src="assets/brand/rouge-clemence.png" alt="Rouge Clémence" width="300" height="100">
+   <span class="brand-signature">Ensemble, allons plus loin.</span>
+  </a>
+  <span class="demo-label">Connexion e-mail · test privé</span>
+ </header>
+ <main class="invitation-layout">
+  <section class="login-card">
+   <p class="eyebrow">LE VOYAGE DE VOTRE ENTREPRISE</p>
+   <h1>Un lien pour prendre la route.</h1>
+   <p>Pas besoin de mot de passe. Utilisez l'adresse e-mail associée à votre invitation.</p>
+   <form id="email-request" hidden>
+    <label for="email-request-address">Votre adresse e-mail</label>
+    <input id="email-request-address" type="email" autocomplete="email" required maxlength="254">
+    <button type="submit">Recevoir mon lien de connexion</button>
+   </form>
+   <form id="email-complete" hidden>
+    <p id="email-complete-help">Pour terminer, confirmez l'adresse qui a reçu le lien.</p>
+    <label for="email-complete-address">Adresse e-mail destinataire</label>
+    <input id="email-complete-address" type="email" autocomplete="email" required maxlength="254">
+    <button type="submit">Terminer ma connexion</button>
+   </form>
+   <p id="email-status" role="status" aria-live="polite">Vérification du service de connexion…</p>
+   <p><a href="/connexion.html">Retour à la connexion classique</a></p>
+   <small>Ce parcours est limité au serveur de test. Si vous ouvrez le lien sur un autre appareil, vous devrez saisir votre adresse et, si nécessaire, rouvrir votre invitation après connexion.</small>
+  </section>
+ </main>
+</body>
+</html>
