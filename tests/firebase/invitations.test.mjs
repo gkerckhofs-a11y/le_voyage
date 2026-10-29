@@ -48,3 +48,11 @@ test('absence of tastes never prevents signup and explicitly leaves the surprise
  await service.accept(recipient.header,invite.token,'Camille');
  const p=(await a.db.doc(`tenants/${scope.tenantId}/giftPreferences/${recipient.uid}`).get()).data();assert.equal(p.value.surprise,true);assert.deepEqual(p.value.choices,[]);assert.equal(p.revision,1);
 });
+test('provisioned acceptance validates directory before writes and creates exactly one team entry without restoring revoked entries',async t=>{
+ const {a,issuer,recipient,scope}=await setup(t),service=createInvitations(a,{provisionWorkspaces:true}),invite=await service.issue(issuer.header,scope,recipient.uid),directory=a.db.doc('workspaceDirectories/'+recipient.uid),preferences=a.db.doc(`tenants/${scope.tenantId}/giftPreferences/${recipient.uid}`);
+ await directory.set({uid:recipient.uid,active:false,entries:[],revision:0});await assert.rejects(service.accept(recipient.header,invite.token,'Invité'),{status:403});assert.equal((await preferences.get()).exists,false);
+ await directory.set({uid:recipient.uid,active:true,entries:Array.from({length:20},(_,i)=>({id:'old-'+i,space:'gifts',label:'Autre espace'})),revision:4});await assert.rejects(service.accept(recipient.header,invite.token,'Invité'),{status:403});assert.equal((await preferences.get()).exists,false);
+ const other={id:'other-gifts',space:'gifts',label:'Autre espace'};await directory.set({uid:recipient.uid,active:true,entries:[other],revision:4});
+ const results=await Promise.all([1,2,3].map(()=>service.accept(recipient.header,invite.token,'Invité')));assert.equal(results.filter(r=>!r.alreadyAccepted).length,1);const data=(await directory.get()).data();assert.equal(data.entries.length,2);assert.deepEqual(data.entries[0],other);assert.equal(data.revision,5);assert.equal(data.entries[1].space,'team');assert.equal((await a.db.doc(`tenants/${scope.tenantId}/members/${recipient.uid}`).get()).data().participationEnabled,true);
+ await directory.update({entries:[other],revision:6});assert.equal((await service.accept(recipient.header,invite.token,'Invité')).alreadyAccepted,true);assert.deepEqual((await directory.get()).data().entries,[other]);
+});

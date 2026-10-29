@@ -12,6 +12,7 @@ test('pilot identity flow: bootstrap, organizer, director and kiosk grants, imme
   async post(path,input){const r=await fetch(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(input)});if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];return r;},
   get:path=>fetch(origin+path,{headers:{Cookie:cookie}}),
   async directory(){const r=await this.get('/api/workspaces');assert.equal(r.status,200);const v=await r.json();csrf=v.csrf;return v;},
+  async invitationLogin(uid,invitationToken){const r=await this.post('/api/auth/password',{email:uid+'@example.test',password,invitationToken});if(r.status===200){const session=await this.post('/api/invitation/session',{});assert.equal(session.status,200);csrf=(await session.json()).csrf;}return r;},
   async login(uid){const r=await this.post('/api/auth/password',{email:uid+'@example.test',password});if(r.status===200)await this.directory();return r;},
   async select(id){const r=await this.post('/api/workspaces/select',{id});assert.equal(r.status,200);return r;}
  };}
@@ -37,6 +38,20 @@ test('pilot identity flow: bootstrap, organizer, director and kiosk grants, imme
  const issued=await organizer.post('/api/invitation/create',{recipientUid:target});assert.equal(issued.status,200);const invitation=await issued.json();
  const stored=(await a.db.doc('invitations/'+invitation.id).get()).data();assert.equal(stored.recipientUid,target);assert.equal(stored.scope.tenantId,tenantId);assert.ok(!JSON.stringify(stored).includes(invitation.url.split('#')[1]));assert.deepEqual((await targetRef.get()).data(),beforeInvite);
  assert.equal((await organizer.post('/api/invitation/revoke',{id:invitation.id})).status,200);assert.equal((await a.db.doc('invitations/'+invitation.id).get()).data().status,'revoked');
+ const fresh=await(await organizer.post('/api/invitation/create',{recipientUid:target})).json(),freshToken=fresh.url.split('#')[1];
+ const another=await(await organizer.post('/api/invitation/create',{recipientUid:target})).json();
+ const wrong=client();assert.equal((await wrong.invitationLogin(admin,freshToken)).status,403);
+ assert.equal((await employee.invitationLogin(target,freshToken)).status,200);
+ assert.equal((await employee.get('/api/workspaces')).status,403);assert.equal((await employee.get('/api/demo/team')).status,403);assert.equal((await employee.get('/api/gifts/ops')).status,403);
+ assert.equal((await employee.post('/api/invitation/preview',{token:another.url.split('#')[1]})).status,403);
+ assert.equal((await employee.post('/api/invitation/preview',{token:freshToken})).status,200);
+ const acceptance={token:freshToken,displayName:'Pilote invité'},accepted=await employee.post('/api/invitation/accept',acceptance);assert.equal(accepted.status,200);assert.equal((await accepted.json()).destination,'/connexion.html');
+ const replay=await employee.post('/api/invitation/accept',acceptance);assert.equal(replay.status,200);assert.equal((await replay.json()).alreadyAccepted,true);
+ assert.equal((await employee.get('/api/workspaces')).status,403);
+ const joined=(await targetRef.get()).data();assert.equal(joined.participationEnabled,true);assert.deepEqual(joined.assignments,[{campaignId,teamId}]);
+ const directory=(await a.db.doc('workspaceDirectories/'+target).get()).data();assert.equal(directory.entries.length,1);assert.equal(directory.entries[0].space,'team');
+ assert.equal((await employee.login(target)).status,200);entries=(await employee.directory()).entries;await employee.select(entries[0].id);assert.equal((await employee.get('/api/demo/team')).status,200);assert.equal((await employee.get('/api/gifts/ops')).status,403);
+ assert.equal((await organizer.post('/api/invitation/revoke',{id:fresh.id})).status,403);
  await owner.update({canInvite:false});assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
  await a.db.doc('accessAdministrators/'+admin).update({active:false});assert.equal((await organizer.post('/api/access/read',{uid:target})).status,403);
  assert.equal((await bootstrap.apply(manifest,preview.digest)).applied,false);assert.equal((await a.db.doc('accessAdministrators/'+admin).get()).data().active,false);

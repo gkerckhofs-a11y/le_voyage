@@ -4,7 +4,7 @@ import {assertTestAdapter} from './test-environment.mjs';
 const denied=()=>Object.assign(new Error('Invitation unavailable'),{status:403});
 const hash=token=>{if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))throw denied();return createHash('sha256').update(token).digest('hex');};
 const same=(a,b)=>a.tenantId===b.tenantId&&a.campaignId===b.campaignId&&a.teamId===b.teamId;
-export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=86400000}={}){
+export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=86400000,provisionWorkspaces=false}={}){
  assertTestAdapter(adapter);const {db,auth}=adapter;
  const member=(scope,uid)=>db.doc(`tenants/${scope.tenantId}/members/${uid}`);
  async function identity(header){try{if(typeof header!=='string'||!header.startsWith('Bearer '))throw denied();return await auth.verifyIdToken(header.slice(7),true);}catch{throw denied();}}
@@ -29,7 +29,7 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
    const user=await identity(header);if(!/^[a-f0-9]{64}$/.test(id))throw denied();
    return db.runTransaction(async tx=>{allowed((await tx.get(member(scope,user.uid))).data(),scope,user.uid);const ref=db.doc(`invitations/${id}`),invite=(await tx.get(ref)).data();if(!invite||invite.issuerUid!==user.uid||!same(invite.scope,scope)||invite.status==='accepted')throw denied();tx.update(ref,{status:'revoked',revokedAt:now()});return {revoked:true};});
   },
-  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);const teamIdentity=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/campaigns/${invite.scope.campaignId}/teamIdentities/${invite.scope.teamId}`))).data();const hasGiftPreferences=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/giftPreferences/${user.uid}`))).exists;return {hasGiftPreferences,status:invite.status,expiresAt:invite.expiresAt,organizationName:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:teamIdentity?.teamName??'Les Explorateurs'};});},
+  async preview(header,token){const user=await identity(header);return db.runTransaction(async tx=>{const invite=await inspect(tx,db.doc(`invitations/${hash(token)}`),user.uid);const teamIdentity=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/campaigns/${invite.scope.campaignId}/teamIdentities/${invite.scope.teamId}`))).data();const hasGiftPreferences=(await tx.get(db.doc(`tenants/${invite.scope.tenantId}/giftPreferences/${user.uid}`))).exists;return {hasGiftPreferences,status:invite.status,expiresAt:invite.expiresAt,organizationName:provisionWorkspaces?'Voyage '+invite.scope.campaignId:invite.scope.tenantId==='fiction-lex-ekho'?'Lex EKHO':'Entreprise fictive',teamName:teamIdentity?.teamName??'Les Explorateurs'};});},
   async accept(header,token,displayName,preferences=null){
    const value=normalizeGiftPreferences(preferences??{choices:[],alcoholFree:false,surprise:true,birthday:null,privateContactRequested:false,revision:0});
    if(typeof displayName!=='string'||displayName.trim().length<2||displayName.trim().length>60||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Object.assign(new Error('Invalid display name'),{status:400});
@@ -45,9 +45,19 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
      return {scope:invite.scope,alreadyAccepted:true};
     }
     const preferenceRef=db.doc(`tenants/${invite.scope.tenantId}/giftPreferences/${user.uid}`),existingPreferences=await tx.get(preferenceRef);
+    const directoryRef=db.doc('workspaceDirectories/'+user.uid),directorySnapshot=provisionWorkspaces?await tx.get(directoryRef):null;
+    let directory;
+    if(provisionWorkspaces){
+     directory=directorySnapshot.data()??{uid:user.uid,active:true,entries:[],revision:0};
+     if(directory.uid!==user.uid||directory.active!==true||!Array.isArray(directory.entries)||directory.entries.length>20||!Number.isSafeInteger(directory.revision??0))throw denied();
+     const entry={id:'team-'+ref.id,space:'team',...invite.scope,label:'Mon équipe · '+invite.scope.campaignId};
+     const present=directory.entries.some(e=>e.space==='team'&&same(e,invite.scope));
+     if(!present){if(directory.entries.length>=20||directory.entries.some(e=>e.id===entry.id))throw denied();directory={...directory,revision:(directory.revision??0)+1,entries:[...directory.entries,entry]};}
+    }
     if(!existingPreferences.exists){const at=now();tx.create(preferenceRef,{value,revision:1,updatedAt:at,history:[{revision:1,at}]});}
-    tx.set(membershipRef,{...(membership??{}),uid:user.uid,tenantId:invite.scope.tenantId,active:true,assignments:assignments.some(a=>a.campaignId===assignment.campaignId&&a.teamId===assignment.teamId)?assignments:[...assignments,assignment]});
+    tx.set(membershipRef,{...(membership??{}),uid:user.uid,tenantId:invite.scope.tenantId,active:true,...(provisionWorkspaces?{participationEnabled:true}:{}),assignments:assignments.some(a=>a.campaignId===assignment.campaignId&&a.teamId===assignment.teamId)?assignments:[...assignments,assignment]});
     tx.set(db.doc(`tenants/${invite.scope.tenantId}/profiles/${user.uid}`),{displayName:displayName.trim(),updatedAt:now()},{merge:true});
+    if(provisionWorkspaces)tx.set(directoryRef,directory);
     tx.update(ref,{status:'accepted',acceptedBy:user.uid,acceptedAt:now()});
     return {scope:invite.scope,alreadyAccepted:false};
    });
