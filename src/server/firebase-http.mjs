@@ -1,3 +1,4 @@
+import {createSessionStore} from './session-store.mjs';
 import {createKioskProgress} from './kiosk-progress.mjs';
 import {createWorkspaces} from './workspaces.mjs';
 import {createClientBudget} from './client-budget.mjs';
@@ -54,7 +55,7 @@ export async function createFirebaseHttp(options){
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
- const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=new Map(),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
   for(const profile of Object.values(profiles)){
@@ -97,7 +98,7 @@ export async function createFirebaseHttp(options){
  }catch(e){await adapter.close();throw e;}
  const cookie=(value,req,age=3300)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
  async function handler(req,json,path){
-  const now=clock();for(const [key,s] of sessions)if(s.expires<=now)sessions.delete(key);
+  const now=clock();
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
   if(path==='/api/auth/login'&&req.method==='POST'){
    const {profile:id}=await body(req,['profile']);if(id!=='camille'&&!Object.hasOwn(profiles,id))throw failure(400);
@@ -109,10 +110,10 @@ export async function createFirebaseHttp(options){
    if(id==='camille'){const m=(await adapter.db.doc(`tenants/fiction-lex-ekho/members/${profile.uid}`).get()).data();if(m?.active&&m.assignments?.length)scope={tenantId:'fiction-lex-ekho',...m.assignments[0]};}
    if(scope){if(id==='kpi')await kpiCollection.list(header,scope);else if(id==='director')await directorProgress.read(header,scope);else if(id==='organizer')await organizerDashboard.read(header,scope);else await adapter.read(header,scope);}
    const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
-   if(token)sessions.delete(token);sessions.set(next,{header,scope,csrf,workspaceEnabled:profile.workspaces===true,...(id==='kpi'?{workspaceSpace:'kpi'}:{}),directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
+   await sessions.issue(token,next,{header,scope,csrf,workspaceEnabled:profile.workspaces===true,...(id==='kpi'?{workspaceSpace:'kpi'}:{}),directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
    json(200,{connected:true,...(profile.workspaces?{destination:'/espaces.html'}:id==='organizer'?{destination:'/organisateur.html'}:id==='director'?{destination:'/entreprise.html'}:['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
-  const session=sessions.get(token);if(!session)throw failure(401);
+  const session=await sessions.get(token);if(!session)throw failure(401);
   // Once handed to a shared display, this session cannot reopen the role selector.
   if(session.workspaceSpace==='kiosk'&&!((req.method==='GET'&&path==='/api/kiosk/progress')||(req.method==='POST'&&['/api/demo/session','/api/auth/logout'].includes(path))))throw failure(403);
   if(session.workspaceSpace==='kpi'&&!((req.method==='GET'&&path==='/api/workspaces')||(req.method==='POST'&&['/api/workspaces/select','/api/demo/session','/api/auth/logout','/api/kpi/list','/api/kpi/read','/api/kpi/submit'].includes(path))))throw failure(403);
@@ -123,11 +124,10 @@ export async function createFirebaseHttp(options){
   if(path==='/api/workspaces/select'&&req.method==='POST'){
    if(!session.workspaceEnabled)throw failure(403);authorized(req,session);const {id}=await body(req,['id']);
    const chosen=await workspaces.select(session.header,id);
-   // Compare after the async check: two concurrent selections cannot both succeed.
-   if(sessions.get(token)!==session)throw failure(409);
-   const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');sessions.delete(token);
-   sessions.set(next,{...session,scope:chosen.scope,workspaceId:chosen.id,workspaceSpace:chosen.space,csrf,directorOnly:chosen.space==='director',organizerOnly:chosen.space==='organizer'});
-   json(200,{destination:chosen.destination},{'Set-Cookie':cookie(next,req)});return;
+   // Atomic shared-store rotation: only one concurrent selection can succeed across instances.
+   const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+   await sessions.rotate(token,next,{...session,scope:chosen.scope,workspaceId:chosen.id,workspaceSpace:chosen.space,csrf,directorOnly:chosen.space==='director',organizerOnly:chosen.space==='organizer'});
+   json(200,{destination:chosen.destination},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((session.expires-clock())/1000)))});return;
   }
   if(session.workspaceEnabled&&path!=='/api/auth/logout'){
    if(!session.workspaceId)throw failure(403);
@@ -254,7 +254,7 @@ export async function createFirebaseHttp(options){
    if(!session.scope&&path!=='/api/auth/logout')throw failure(403);
    if(path==='/api/demo/session'){await body(req,[]);if(session.organizerOnly){json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:'organizer',workspaceEnabled:session.workspaceEnabled===true});return;}if(session.directorOnly){await directorProgress.read(session.header,session.scope);json(200,{csrf:session.csrf,authenticated:true,canSimulate:false,workspace:'director',workspaceEnabled:session.workspaceEnabled===true});return;}await adapter.read(session.header,session.scope);const campaign=await adapter.db.doc(`tenants/${session.scope.tenantId}/campaigns/${session.scope.campaignId}`).get();json(200,{csrf:session.csrf,authenticated:true,canSimulate:campaign.data()?.collectionMode!=='weekly-questionnaire'});return;}
    authorized(req,session);
-   if(path==='/api/auth/logout'){await body(req,[]);sessions.delete(token);json(200,{disconnected:true},{'Set-Cookie':cookie('',req,0)});return;}
+   if(path==='/api/auth/logout'){await body(req,[]);await sessions.revoke(token,session._version);json(200,{disconnected:true},{'Set-Cookie':cookie('',req,0)});return;}
    if(path==='/api/demo/advance'){
     const input=await body(req,['revision']);if(!Number.isSafeInteger(input.revision)||input.revision<0)throw failure(400);
     json(200,await adapter.simulate(session.header,session.scope,input.revision));return;
@@ -269,5 +269,5 @@ export async function createFirebaseHttp(options){
   if(req.method==='GET'&&path==='/api/demo/collective'){json(200,await adapter.collective(session.header,session.scope));return;}
   throw failure(404);
  }
- return {handler,close:()=>{sessions.clear();return adapter.close();}};
+ return {handler,close:()=>adapter.close()};
 }
