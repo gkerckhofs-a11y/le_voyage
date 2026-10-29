@@ -40,6 +40,7 @@ test('organizer explicitly sends one addressed invitation through HTTP and an is
   const response=await fetch(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(data)});
   const next=response.headers.get('set-cookie');if(next)cookie=next.split(';')[0];return response;
  };
+ assert.equal((await post('/api/invitation/delivery-status',{recipientUid:recipient})).status,401);
  assert.deepEqual(await(await get('/api/auth/config')).json(),{mode:'provisioned',invitationEmailEnabled:true});
  // An unauthenticated caller cannot reach invitation delivery.
  assert.equal((await post('/api/invitation/send',{recipientUid:recipient,mutationId:'mutation-no-session'})).status,401);
@@ -52,6 +53,10 @@ test('organizer explicitly sends one addressed invitation through HTTP and an is
  assert.equal((await post('/api/workspaces/select',{id:directory.entries[0].id})).status,200);
  const selected=await get('/api/workspaces');assert.equal(selected.status,200);
  csrf=(await selected.json()).csrf;
+ assert.deepEqual(await(await post('/api/invitation/delivery-status',{recipientUid:recipient})).json(),{status:'none'});
+ const savedCsrf=csrf;csrf='invalid-csrf';
+ assert.equal((await post('/api/invitation/delivery-status',{recipientUid:recipient})).status,403);csrf=savedCsrf;
+ assert.equal((await post('/api/invitation/delivery-status',{recipientUid:recipient,tenantId:'other-tenant'})).status,400);
  const mutationId='mutation-'+randomUUID();
  const dispatched=await post('/api/invitation/send',{recipientUid:recipient,mutationId});
  assert.equal(dispatched.status,200);
@@ -66,5 +71,10 @@ test('organizer explicitly sends one addressed invitation through HTTP and an is
  assert.equal(delivered.length,1);
  const result=(await adapter.db.collection('invitationDeliveries').get()).docs.filter(d=>d.data().recipientUid===recipient);
  assert.equal(result.length,1);assert.equal(result[0].data().status,'sent');
+ const tracked=await post('/api/invitation/delivery-status',{recipientUid:recipient});assert.equal(tracked.status,200);
+ const tracking=await tracked.json();assert.equal(tracking.status,'sent');
+ assert.deepEqual(Object.keys(tracking).sort(),['retryAfter','sentAt','startedAt','status']);
+ await adapter.db.doc('tenants/'+tenantId+'/members/'+admin).update({canInvite:false});
+ assert.equal((await post('/api/invitation/delivery-status',{recipientUid:recipient})).status,403);
  assert.equal(JSON.stringify(result[0].data()).includes('#'),false);
 });
