@@ -1,3 +1,4 @@
+import {provisionedLogin} from './provisioned-login.mjs';
 import {createSessionStore} from './session-store.mjs';
 import {createKioskProgress} from './kiosk-progress.mjs';
 import {createWorkspaces} from './workspaces.mjs';
@@ -50,6 +51,8 @@ async function ensureFixtureUser(auth,profile,password){
 const failure=status=>Object.assign(new Error('Request refused'),{status});
 export async function createFirebaseHttp(options){
  if(!options)assertEmulators();
+ const authenticationMode=options?.authenticationMode??'demo';
+ if(!['demo','provisioned'].includes(authenticationMode))throw new Error('Unknown authentication mode');
  const clock=options?.now??Date.now;
  const cookieName=options?.cookieName??'rc_auth';
  if(!['rc_auth','__session'].includes(cookieName))throw new Error('Unsupported session cookie');
@@ -58,6 +61,7 @@ export async function createFirebaseHttp(options){
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
+  if(authenticationMode==='demo'){
   for(const profile of Object.values(profiles)){
    await ensureFixtureUser(adapter.auth,profile,password);
    const record=['fiction-operations-demo','fiction-four-spaces'].includes(profile.tenantId)?newOperationsDemo():profile.tenantId==='fiction-tpe-auto'?newAutonomousTpeDemo():newDemo();record.ledger.state.config.tenantId=profile.tenantId;
@@ -95,12 +99,22 @@ export async function createFirebaseHttp(options){
   const operationsRef=adapter.db.doc('giftOperators/demo-operations-user');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(operationsRef)).exists)tx.set(operationsRef,{uid:'demo-operations-user',active:true,campaigns:['lex','atelier','tpe','operations'].map(id=>({tenantId:profiles[id].scope.tenantId,campaignId:profiles[id].scope.campaignId}))});});
   const catalogRef=adapter.db.doc('supplierCatalog/main');await adapter.db.runTransaction(async tx=>{if(!(await tx.get(catalogRef)).exists)tx.set(catalogRef,demoSupplierCatalog());});
   await ensureFixtureUser(adapter.auth,invitedProfile,password);
+  }
  }catch(e){await adapter.close();throw e;}
  const cookie=(value,req,age=3300)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${req.headers.origin?.startsWith('https:')?'; Secure':''}`;
  async function handler(req,json,path){
   const now=clock();
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
+  if(path==='/api/auth/identity'&&req.method==='POST'){
+   if(authenticationMode!=='provisioned')throw failure(404);
+   const {idToken}=await body(req,['idToken'],12288);
+   const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken,now});
+   const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+   await sessions.issue(token,next,{...identity,csrf,authenticationMode});
+   json(200,{connected:true,destination:'/espaces.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((identity.expires-clock())/1000)))});return;
+  }
   if(path==='/api/auth/login'&&req.method==='POST'){
+   if(authenticationMode!=='demo')throw failure(404);
    const {profile:id}=await body(req,['profile']);if(id!=='camille'&&!Object.hasOwn(profiles,id))throw failure(400);
    const profile=id==='camille'?invitedProfile:profiles[id];
    const response=await fetch(loginEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:profile.email,password,returnSecureToken:true})});
@@ -113,7 +127,7 @@ export async function createFirebaseHttp(options){
    await sessions.issue(token,next,{header,scope,csrf,workspaceEnabled:profile.workspaces===true,...(id==='kpi'?{workspaceSpace:'kpi'}:{}),directorOnly:id==='director',organizerOnly:id==='organizer',expires:now+3300000});
    json(200,{connected:true,...(profile.workspaces?{destination:'/espaces.html'}:id==='organizer'?{destination:'/organisateur.html'}:id==='director'?{destination:'/entreprise.html'}:['bocage1','bocage2'].includes(id)?{destination:'/preferences.html'}:id==='kpiadmin'?{destination:'/kpi-access.html'}:id==='kpi'?{destination:'/kpi.html'}:id==='operations'?{destination:'/cockpit.html'}:id==='clem'?{destination:'/invitations.html'}:id==='tpeadmin'?{destination:'/coordination.html'}:{})},{'Set-Cookie':cookie(next,req)});return;
   }
-  const session=await sessions.get(token);if(!session)throw failure(401);
+  const session=await sessions.get(token);if(!session||(session.authenticationMode??'demo')!==authenticationMode)throw failure(401);
   // Once handed to a shared display, this session cannot reopen the role selector.
   if(session.workspaceSpace==='kiosk'&&!((req.method==='GET'&&path==='/api/kiosk/progress')||(req.method==='POST'&&['/api/demo/session','/api/auth/logout'].includes(path))))throw failure(403);
   if(session.workspaceSpace==='kpi'&&!((req.method==='GET'&&path==='/api/workspaces')||(req.method==='POST'&&['/api/workspaces/select','/api/demo/session','/api/auth/logout','/api/kpi/list','/api/kpi/read','/api/kpi/submit'].includes(path))))throw failure(403);
