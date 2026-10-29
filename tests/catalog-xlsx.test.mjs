@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {decodeMasterXlsx} from '../src/server/catalog-xlsx.mjs';import {parseMasterCsv} from '../src/server/catalog-import.mjs';import {masterXlsx} from './helpers/master-xlsx.mjs';
+const decode=async edit=>decodeMasterXlsx((await masterXlsx(edit)).toString('base64'));
+test('XLSX preserves text SKUs and exact values through the CSV domain validator',async()=>{const result=await decode(),parsed=parseMasterCsv(result.csv);assert.deepEqual(parsed.errors,[]);assert.equal(parsed.records[0].sku,'001-A');assert.equal(parsed.records[0].product.purchaseCents,1325);assert.equal(parsed.records[0].master.vatBasisPoints,600);assert.equal(parsed.records[0].master.stockQuantity,12);});
+test('XLSX refuses ambiguity, executable cell expressions and unsupported workbook structures',async()=>{
+ for(const edit of [(_,s)=>{s.getCell('A2').value=12;s.getCell('A2').numFmt='00000';},(_,s)=>{s.getCell('F2').value={formula:'1+2',result:3};},(_,s)=>{s.getCell('G2').numFmt='0%';},(b)=>b.addWorksheet('Autre'),(_,s)=>{s.state='hidden';},(_,s)=>{s.getRow(2).hidden=true;},(_,s)=>{s.getColumn(1).hidden=true;},(_,s)=>s.mergeCells('A2:B2'),(_,s)=>{s.getCell('A102').value='beyond';},(_,s)=>{s.getCell('T1').value='extra';},(_,s)=>{s.getCell('B2').value={text:'Externe',hyperlink:'https://example.test/'};}])assert.ok((await decode(edit)).error);
+});
+test('XLSX bounds malformed input, inflated archives and concurrent decoders',async()=>{
+ for(const input of ['', 'bad', '!!!!', 'A'.repeat(666672)])assert.throws(()=>decodeMasterXlsx(input),{status:400});assert.ok((await decodeMasterXlsx(Buffer.from('not a workbook').toString('base64'))).error);assert.ok((await decode((_,s)=>{s.getCell('B2').value='X'.repeat(2100000);})).error);
+ const input=(await masterXlsx()).toString('base64'),a=decodeMasterXlsx(input),b=decodeMasterXlsx(input);assert.throws(()=>decodeMasterXlsx(input),{status:429});assert.ok((await a).csv);assert.ok((await b).csv);assert.ok((await decodeMasterXlsx(input)).csv);
+});

@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('login, private journey, refresh, logout and another company',async({page},info)=>{
+ await page.goto('/');await expect(page).toHaveURL(/connexion.html/);
+ await expect(page.getByRole('heading',{name:'Prenez la route.'})).toBeVisible();
+ await page.screenshot({path:info.outputPath(`login-${info.project.name}.png`),fullPage:true});
+ await page.getByRole('button',{name:'Explorer Lex EKHO'}).click();await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
+ await expect(page.locator('#company')).toHaveText('Lex EKHO');await expect(page.getByTestId('team-car')).toHaveCount(1);
+ const before=await(await page.request.get('/api/demo/team')).json();
+ await page.getByRole('button',{name:'Simuler une semaine',exact:true}).click();await expect(page.locator('#advance-status')).toHaveText('La progression est enregistrée.');
+ await page.reload();await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
+ const after=await(await page.request.get('/api/demo/team')).json();expect(after.revision).toBe(before.revision+1);
+ await page.getByRole('link',{name:'Le collectif',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
+ await expect(page.locator('#distance')).toHaveText(Number(after.journey.displayKm).toLocaleString('fr-BE'));
+ await page.route('**/api/auth/logout',async route=>{await route.fetch();await route.abort();},{times:1});
+ await page.getByRole('button',{name:'Se déconnecter',exact:true}).click();await page.getByRole('button',{name:'Réessayer la déconnexion',exact:true}).click();await expect(page).toHaveURL(/connexion.html/);expect((await page.request.get('/api/demo/team')).status()).toBe(401);
+ await page.getByRole('button',{name:'Explorer l’Atelier'}).click();await expect(page.locator('#company')).toHaveText('Atelier fictif');
+ await expect(page.getByTestId('team-car')).toHaveCount(1);await expect(page.locator('#distance')).toHaveText('1 680');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:info.outputPath(`authenticated-${info.project.name}.png`),fullPage:true});
+});

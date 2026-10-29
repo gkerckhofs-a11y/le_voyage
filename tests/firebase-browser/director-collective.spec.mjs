@@ -1,0 +1,17 @@
+import {test,expect} from '@playwright/test';import {mkdir} from 'node:fs/promises';
+test('director collective uses scoped bus route, ignores fictional scenarios, and clears on revoked refresh',async({page},info)=>{
+ await page.clock.install();await page.goto('/connexion.html');await page.getByRole('button',{name:'Espace directeur · démo',exact:true}).click();await page.getByRole('link',{name:'Notre collectif',exact:true}).click();
+ await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');await expect(page.getByTestId('collective-car')).toHaveCount(1);
+ const r=await page.request.get('/api/director/collective');expect(r.status()).toBe(200);const data=await r.json();expect(data.history).toEqual([]);expect(JSON.stringify(data)).not.toMatch(/answers|scores|preferences|budget|purchase|margin|teamId/);
+ await expect(page.locator('#distance')).toHaveText(Number(data.displayKm).toLocaleString('fr-BE'));await expect(page.locator('#tier-list li')).toHaveCount(data.reception.tiers.length);await expect(page.locator('#scenario')).toBeHidden();await expect(page.locator('.week-block')).toBeHidden();await expect(page.locator('#replay')).toBeHidden();
+ expect((await page.request.get('/assets/brand/piment.svg')).headers()['content-type']).toBe('image/svg+xml');await expect(page.locator('.brand-pepper')).toHaveJSProperty('complete',true);expect(await page.locator('.brand-pepper').evaluate(i=>i.naturalWidth)).toBeGreaterThan(0);
+ await page.getByRole('button',{name:'Voir tout le parcours',exact:true}).click();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByRole('navigation')).toHaveCount(1);
+ await mkdir('docs/evidence',{recursive:true});await page.screenshot({path:`docs/evidence/v5-r8c-director-${info.project.name}.png`,fullPage:info.project.name==='desktop'});
+ await page.getByRole('button',{name:'Présentation plein écran',exact:true}).click();await expect(page.locator('body')).toHaveClass(/kiosk/);await page.screenshot({path:`docs/evidence/v5-r8c-presentation-${info.project.name}.png`,fullPage:info.project.name==='desktop'});
+ await page.goto('/entreprise-collectif.html?scenario=frozen');await expect(page.locator('#collective-content')).toHaveAttribute('data-ready','true');await expect(page.locator('#distance')).toHaveText(Number(data.displayKm).toLocaleString('fr-BE'));
+ for(const path of ['/api/demo/team','/api/demo/collective','/api/gifts/ops','/api/kiosk/progress'])expect((await page.request.get(path)).status()).toBe(403);
+ expect((await page.request.get('/api/director/collective?tenantId=foreign')).status()).toBe(400);
+ await page.route('**/api/director/collective',r=>r.fulfill({status:403,json:{error:'revoked'}}));await page.clock.fastForward(60001);await expect(page.locator('#fallback')).toBeVisible();await expect(page.locator('#collective-content')).toBeHidden();await expect(page.getByTestId('collective-car')).toHaveCount(0);await page.unroute('**/api/director/collective');
+ await page.getByRole('button',{name:'Se déconnecter'}).click();await expect(page).toHaveURL(/connexion\.html$/);
+ for(const name of ['Espace organisateur · démo','Explorer Lex EKHO','Cockpit Clem · démo','Référent KPI · démo']){await page.goto('/connexion.html');await page.getByRole('button',{name,exact:!name.startsWith('Explorer')}).click();await expect(page).not.toHaveURL(/connexion\.html$/);expect((await page.request.get('/api/director/collective')).status(),name).toBe(403);}
+});

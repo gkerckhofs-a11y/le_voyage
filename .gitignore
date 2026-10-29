@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+.env*
+!.env.example
+.firebase/
+*-debug.log
+dist-web/
+playwright-report/
+test-results/
+.openai/
+.web-compiled/
+.demo-state/

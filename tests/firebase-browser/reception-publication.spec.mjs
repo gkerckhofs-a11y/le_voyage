@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';import {mkdir} from 'node:fs/promises';import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';
+test('Clem publishes reviewed reception information and director loses stale information',async({page},info)=>{
+ const a=createFirebaseEmulatorAdapter();let ref,old,pub,oldPub;const ids=[];
+ const login=async name=>{await page.goto('/connexion.html');await page.getByRole('button',{name,exact:true}).click();await expect(page).not.toHaveURL(/connexion\.html$/);};
+ const logout=async()=>{await page.getByRole('button',{name:'Se déconnecter'}).click();await expect(page).toHaveURL(/connexion\.html$/);};
+ try{
+ await login('Espace directeur · démo');const campaign=(await(await page.request.get('/api/director/progress')).json()).campaignId;await logout();
+ await login('Cockpit Clem · démo');await page.getByRole('link',{name:'Réceptions',exact:true}).click();await expect(page.locator('#reception-fields')).toHaveJSProperty('disabled',false);
+ const rows=(await(await page.request.get('/api/gifts/receptions')).json()).rows,row=rows.find(r=>r.campaignId===campaign);expect(row).toBeTruthy();
+ ref=a.db.doc(`tenants/${row.tenantId}/campaigns/${row.campaignId}/receptionOperations/main`);old=(await ref.get()).data();pub=ref.collection('publication').doc('current');oldPub=(await pub.get()).data();
+ await ref.set({revision:1,status:'options',date:'2026-11-27',venue:'Salle du verger',guests:40,owner:'PRIVATE-OWNER',providers:'PRIVATE-PROVIDER',bookingReference:'PRIVATE-REF'});
+ await page.getByRole('button',{name:'Actualiser les réceptions'}).click();await page.locator('#reception-campaign').selectOption(row.tenantId+'/'+row.campaignId);await expect(page.locator('#publication-preview')).toContainText('Salle du verger');
+ page.on('request',r=>{if(r.url().endsWith('/api/gifts/receptions/publish'))ids.push(r.postDataJSON().mutationId);});
+ await page.locator('#publication-form [name="reason"]').fill('Informations vérifiées');await page.locator('#publication-form [name="confirmed"]').check();await page.route('**/api/gifts/receptions/publish',async r=>{await r.fetch();await r.abort();});await page.getByRole('button',{name:'Valider la communication',exact:true}).click();await expect(page.locator('#reception-status')).toContainText('non confirmée');await page.unroute('**/api/gifts/receptions/publish');await page.getByRole('button',{name:'Actualiser les réceptions'}).click();await expect(page.locator('#publication-state')).toHaveText('Informations publiées au directeur.');
+ await mkdir('docs/evidence',{recursive:true});await page.screenshot({path:`docs/evidence/v5-r8f-clem-${info.project.name}.png`,fullPage:true});await logout();await login('Espace directeur · démo');await expect(page.locator('#reception-published')).toContainText('Salle du verger');await expect(page.locator('#reception-published')).toContainText('40 personnes');expect(await page.locator('body').innerText()).not.toMatch(/PRIVATE-/);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:`docs/evidence/v5-r8f-director-${info.project.name}.png`,fullPage:true});
+ expect((await page.request.post('/api/gifts/receptions/publish',{data:{}})).status()).toBe(403);
+ await ref.update({revision:2,venue:'Nouveau lieu privé'});await page.getByRole('button',{name:'Actualiser',exact:true}).click();await expect(page.locator('#reception-published')).toContainText('après validation');await expect(page.locator('#reception-published')).not.toContainText('Salle du verger');
+ await page.route('**/api/director/progress',r=>r.fulfill({status:403,body:'{}'}));await page.getByRole('button',{name:'Actualiser',exact:true}).click();await expect(page.locator('#reception-published')).toBeEmpty();
+ }finally{if(pub){if(oldPub)await pub.set(oldPub);else await pub.delete();for(const id of ids)await pub.collection('history').doc(id).delete();}if(ref){if(old)await ref.set(old);else await ref.delete();}await a.close();}
+});

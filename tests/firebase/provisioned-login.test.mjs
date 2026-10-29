@@ -1,0 +1,38 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {once} from 'node:events';import {resolve} from 'node:path';
+import {randomBytes} from 'node:crypto';
+import {createSessionStore} from '../../src/server/session-store.mjs';
+import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';import {createFirebaseHttp} from '../../src/server/firebase-http.mjs';import {createDemoServer} from '../../src/server/http.mjs';
+test('provisioned HTTP mode does not seed, rejects demo login and enforces identity, rights and revocation',async t=>{
+ const cleanups=[];
+ const adapter=createFirebaseEmulatorAdapter(),originalCreate=adapter.auth.createUser.bind(adapter.auth);let seeds=0;
+ adapter.auth.createUser=async()=>{seeds++;throw Error('No fixtures allowed');};
+ const app=await createFirebaseHttp({adapter,authenticationMode:'provisioned'});assert.equal(seeds,0);adapter.auth.createUser=originalCreate;
+ const server=createDemoServer({root:resolve('dist-web'),directory:resolve('.demo-state'),apiHandler:app.handler});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));for(const cleanup of cleanups)await cleanup();await app.close();});
+ const origin='http://127.0.0.1:'+server.address().port;let cookie='',csrf='';
+ const post=(path,data,originHeader=origin)=>fetch(origin+path,{method:'POST',headers:{Origin:originHeader,Cookie:cookie,'X-Demo-CSRF':csrf,'Content-Type':'application/json'},body:JSON.stringify(data)});
+ const get=path=>fetch(origin+path,{headers:{Cookie:cookie}});
+ assert.equal((await post('/api/auth/login',{profile:'fourspaces'})).status,404);
+ assert.equal((await post('/api/auth/identity',{idToken:'invalid'})).status,401);
+ assert.equal((await post('/api/auth/identity',{idToken:'invalid'},'https://foreign.example')).status,403);
+ // Only the test harness provisions this fictitious account, directory and grant.
+ const uid='identity-'+Date.now(),email=uid+'@example.test',password='Test-Identity-Password-42!';
+ await adapter.auth.createUser({uid,email,password,emailVerified:true});cleanups.push(()=>adapter.auth.deleteUser(uid));
+ const login=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const {idToken}=await login.json();assert.ok(idToken);
+ assert.equal((await post('/api/auth/identity',{idToken})).status,403);
+ const directory=adapter.db.doc('workspaceDirectories/'+uid),grant=adapter.db.doc('giftOperators/'+uid);
+ await directory.set({uid,active:true,entries:[{id:'gifts',space:'gifts',label:'Cadeaux autorisés'}]});
+ assert.equal((await post('/api/auth/identity',{idToken})).status,403);
+ await grant.set({uid,active:true,campaigns:[{tenantId:'fiction-identity',campaignId:'test'}]});cleanups.push(async()=>{await directory.delete();await grant.delete();});
+ assert.deepEqual(await(await get('/api/auth/config')).json(),{mode:'provisioned'});
+ assert.equal((await post('/api/auth/password',{email,password:'incorrect'})).status,401);
+ const response=await post('/api/auth/password',{email,password});assert.equal(response.status,200);assert.deepEqual(await response.json(),{connected:true,destination:'/espaces.html'});cookie=response.headers.get('set-cookie').split(';')[0];assert.match(response.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
+ const identityCookie=cookie,legacy=randomBytes(32).toString('hex');
+ await createSessionStore(adapter).issue(null,legacy,{header:'Bearer '+idToken,csrf:randomBytes(32).toString('hex'),workspaceEnabled:true,expires:Date.now()+300000});
+ cookie='rc_auth='+legacy;assert.equal((await get('/api/workspaces')).status,401);cookie=identityCookie;
+ const spaces=await(await get('/api/workspaces')).json();assert.deepEqual(spaces.entries,[{id:'gifts',space:'gifts',label:'Cadeaux autorisés'}]);csrf=spaces.csrf;
+ assert.equal((await get('/api/gifts/ops')).status,403);
+ const selected=await post('/api/workspaces/select',{id:'gifts'});assert.equal(selected.status,200);cookie=selected.headers.get('set-cookie').split(';')[0];
+ assert.equal((await get('/api/director/progress')).status,403);
+ await grant.update({active:false});assert.equal((await get('/api/gifts/ops')).status,403);
+ await adapter.auth.updateUser(uid,{disabled:true});assert.equal((await post('/api/auth/identity',{idToken})).status,401);
+});

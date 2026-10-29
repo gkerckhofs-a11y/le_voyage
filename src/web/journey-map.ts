@@ -1,0 +1,146 @@
+import { parkingPose, parkingMarkup } from './parking.ts';
+import { distanceRatio, positionAt, roadsideMarkers, markerInterval } from '../map/geometry.ts';
+import { journeyRoute as route, landscapeZones } from '../map/route.ts';
+import { applySeason, seasonAt, seasonThemes } from './seasons.ts';
+import { MapCamera } from './camera.ts';
+import { landscape, carMarkup, minibusMarkup } from './landscape.ts';
+import type { TeamJourneyView } from '../presentation/journey-view.ts';
+const $ = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
+const format = (n:string|number) => Number(n).toLocaleString('fr-BE');
+type MapData = Pick<TeamJourneyView,'distance'|'displayKm'|'maximumKm'|'history'|'timeZone'>;
+type Options = { kind:'team'|'collective'; color:string; label:string; decorate?:(world:SVGGElement)=>void; autoRecenter?:()=>boolean };
+/** Shared renderer/camera only. Distances and states are supplied by server projections. */
+export function mountJourneyMap(data:MapData,options:Options){
+  if(!/^#[a-fA-F0-9]{6}$/.test(options.color))throw new Error('Invalid vehicle color');
+  const vehicleName=options.kind==='collective'?'Minibus collectif':'Voiture';
+  let ratio=distanceRatio(data.distance,data.maximumKm),last=data.history.at(-1);
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let frame=0,statusTimer=0,finishAnimation:(()=>void)|undefined;
+  function announce(message:string){$('map-status').textContent=message;$('map-status').classList.add('visible');clearTimeout(statusTimer);statusTimer=window.setTimeout(()=>$('map-status').classList.remove('visible'),2400);}
+  const world=document.getElementById('world') as unknown as SVGGElement;
+  world.innerHTML=landscape(route)+`
+    <g aria-hidden="true"><path d="${route.path}" fill="none" stroke="#5e7653" stroke-width="66" opacity=".18" transform="translate(4 6)"/>
+    <path d="${route.path}" fill="none" stroke="#f3e6c5" stroke-width="61" stroke-linecap="round"/>
+    <path id="road" d="${route.path}" fill="none" stroke="#c6b28e" stroke-width="45" stroke-linecap="round"/>
+    <path d="${route.path}" fill="none" stroke="#f6ebce" stroke-width="2.5" stroke-dasharray="16 17" opacity=".9"/>
+    <g transform="translate(240 2180) rotate(-8)"><path d="M-45 24V58M45 24V58" stroke="#76684c" stroke-width="7"/><rect x="-68" y="-10" width="136" height="42" rx="4" fill="#ecddac" stroke="#887b55" stroke-width="3"/><text text-anchor="middle" y="17" fill="#5d6548" font-family="Georgia" font-size="20">Le départ</text></g>
+    <g transform="translate(${positionAt(route,1).x} ${positionAt(route,1).y})"><circle r="34" fill="#355e49"/><text y="6" text-anchor="middle" font-size="18" fill="white">FIN</text></g>
+    ${roadsideMarkers(route,data.maximumKm).map(m=>`<g class="road-marker" data-marker="${m.km}" data-major="${m.major}" data-terminal="${m.terminal}" transform="translate(${m.x} ${m.y})"><g class="marker-sign"><rect x="-27" y="-24" width="54" height="34" rx="8" fill="#f8f2d8" stroke="#818d70" stroke-width="1.3"/><path d="M-22-15H22" stroke="${m.major?'#a94433':'#718260'}" stroke-width="${m.major?5:2}"/><text y="3" text-anchor="middle" fill="#243b32" font-size="11">${m.km} km</text></g></g>`).join('')}
+    </g>
+    <g id="${options.kind}-car" data-testid="${options.kind}-car" role="img" aria-label="${vehicleName}"><circle class="car-shadow-ring" r="67"/><g id="car-heading">${options.kind==='collective'?minibusMarkup(options.color):carMarkup(options.color)}</g><g transform="translate(0 90)"><rect x="-48" y="-17" width="96" height="25" rx="12" fill="#fffbee" stroke="#d0d9b6"/><text class="car-location-label" y="0">Nous sommes ici</text></g></g>`;
+  function refreshSeason(){
+    const season=seasonAt(new Date(),data.timeZone);
+    if(world.dataset.season===season)return;
+    applySeason(world,season);
+    seasonLabel.textContent=seasonThemes[season].label;
+  }
+  const seasonLabel=document.createElement('span');seasonLabel.className='season-label';
+  seasonLabel.setAttribute('aria-label','Saison du paysage');
+  $('chapter').parentElement!.append(seasonLabel);
+  refreshSeason();
+  // Long-lived kiosk: update around civil midnight without touching camera/progression.
+  window.setInterval(refreshSeason,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshSeason();});
+  const car=document.getElementById(`${options.kind}-car`)!,heading=document.getElementById('car-heading')!;
+  car.setAttribute('aria-label',`${vehicleName} de ${options.label}, ${format(data.displayKm)} kilomètres`);
+  options.decorate?.(world);
+  let follow=true,visualRatio=ratio,idleTimer=0,completed=false;
+  const viewPoint=(r:number)=>completed&&r===ratio?parkingPose(route,r):positionAt(route,r);
+  function scheduleIdle(){clearTimeout(idleTimer);if(!follow&&options.autoRecenter?.())idleTimer=window.setTimeout(recenter,30000);}
+  function manual(){follow=false;scheduleIdle();}
+  // Reset while exploring or using controls, not only at the beginning of a drag.
+  for(const event of ['pointermove','pointerdown','pointerup','wheel','keydown','click'])
+    $('map').parentElement!.addEventListener(event,scheduleIdle,{passive:true});
+  function position(r:number){
+    visualRatio=r;const p=viewPoint(r);car.setAttribute('transform',`translate(${p.x} ${p.y})`);heading.setAttribute('transform',`rotate(${completed&&r===ratio?p.angle:p.angle+90})`);
+    const earned=positionAt(route,r);car.setAttribute('data-earned-x',String(earned.x));car.setAttribute('data-earned-y',String(earned.y));
+    car.setAttribute('data-ratio',String(r));car.setAttribute('data-x',String(p.x));car.setAttribute('data-y',String(p.y));
+    $('chapter').textContent=(landscapeZones.find(z=>r>=z.from&&r<z.to)??landscapeZones.at(-1)!).name;
+    return p;
+  }
+  const initial=position(ratio);
+  const camera=new MapCamera($('map'),world,route.width,route.height,{x:initial.x,y:initial.y,zoom:innerWidth<=700?.85:.78},manual);
+  camera.center(initial);
+  const markers=[...world.querySelectorAll<SVGGElement>('.road-marker')];
+  function updateMarkers(){
+    const interval=markerInterval(data.maximumKm,camera.state.zoom);$('map').dataset.markerInterval=String(interval);
+    for(const marker of markers){const km=Number(marker.dataset.marker);marker.toggleAttribute('hidden',km%interval!==0&&marker.dataset.terminal!=='true');marker.querySelector('.marker-sign')!.setAttribute('transform',`scale(${1/camera.state.zoom})`);}
+    // Read after other camera listeners resize gift symbols. Never move a business threshold.
+    queueMicrotask(()=>{
+      const obstacles=[car,...world.querySelectorAll<SVGElement>('.gift-route-marker,.gift-cluster,.festive-stop')].map(el=>el.getBoundingClientRect());
+      for(const marker of markers){if(marker.hasAttribute('hidden')||marker.dataset.terminal==='true')continue;const box=marker.getBoundingClientRect();
+        if(obstacles.some(o=>box.left<o.right+3&&box.right>o.left-3&&box.top<o.bottom+3&&box.bottom>o.top-3))marker.setAttribute('hidden','');
+      }
+    });
+  }
+  $('map').addEventListener('camera-change',updateMarkers);updateMarkers();
+  function leaveOverview(){const was=$('map').parentElement!.classList.contains('overview');$('map').parentElement!.classList.remove('overview');return was;}
+  function recenter(){clearTimeout(idleTimer);follow=true;const p=viewPoint(visualRatio);if(leaveOverview())camera.follow(p);else camera.center(p);announce(options.kind==='collective'?'Vous avez retrouvé le minibus collectif.':'Vous avez retrouvé votre voiture.');}
+  $('fit-route').addEventListener('click',()=>{manual();$('map').parentElement!.classList.add('overview');camera.fit();announce('Tout le parcours, du départ au terminus.');});
+  $('recenter').addEventListener('click',recenter);
+  $('map').addEventListener('keydown',e=>{if(e.key==='Home'){e.preventDefault();recenter();}});
+  $('zoom-in').addEventListener('click',()=>{camera.zoom(1.2);if(follow)camera.center(viewPoint(visualRatio));});
+  $('zoom-out').addEventListener('click',()=>{camera.zoom(1/1.2);if(follow)camera.center(viewPoint(visualRatio));});
+  $('map').addEventListener('camera-change',()=>{
+    ($('zoom-in') as HTMLButtonElement).disabled=camera.state.zoom>=1.799;
+    ($('zoom-out') as HTMLButtonElement).disabled=camera.state.zoom<=camera.minimumZoom()+.001;
+  });
+  let collapsed=false;
+  $('collapse').addEventListener('click',()=>{
+    collapsed=!collapsed;$('card-details').hidden=collapsed;$('collapse').textContent=collapsed?'+':'−';
+    $('collapse').setAttribute('aria-expanded',String(!collapsed));$('collapse').setAttribute('aria-label',collapsed?'Déplier le panneau de progression':'Replier le panneau de progression');
+    document.querySelector('.journey-shell')!.classList.toggle('panel-collapsed',collapsed);
+  });
+  $('simple-toggle').addEventListener('click',()=>{
+    const simple=$('map').classList.toggle('simplified');$('simple-toggle').setAttribute('aria-pressed',String(simple));
+    $('simple-toggle').textContent=simple?'Vue illustrée':'Vue simplifiée';announce(simple?'Les détails du paysage sont masqués.':'Le paysage est de nouveau visible.');
+  });
+  function stopReplay(){cancelAnimationFrame(frame);frame=0;position(ratio);if(follow)camera.center(viewPoint(ratio));$('map').classList.remove('is-replaying');($('replay') as HTMLButtonElement).disabled=!last;const complete=finishAnimation;finishAnimation=undefined;complete?.();}
+  function move(from:number,message:string):Promise<void>{
+    follow=true;if(leaveOverview())camera.follow(positionAt(route,from));
+    if(reduced.matches||from===ratio){stopReplay();announce(message);return Promise.resolve();}
+    ($('replay') as HTMLButtonElement).disabled=true;$('map').classList.add('is-replaying');announce(message);
+    const started=performance.now();
+    return new Promise(resolve=>{
+      finishAnimation=resolve;
+      const animate=(now:number)=>{const t=Math.min(1,(now-started)/2400),eased=t*t*(3-2*t),p=position(from+(ratio-from)*eased);if(follow)camera.center(p);if(t<1)frame=requestAnimationFrame(animate);else stopReplay();};
+      frame=requestAnimationFrame(animate);
+    });
+  }
+  reduced.addEventListener('change',()=>{if(reduced.matches&&frame)stopReplay();});
+  $('replay').addEventListener('click',()=>{
+    if(!last)return;stopReplay();follow=true;
+    if(reduced.matches){recenter();announce(`Dernière avancée : ${last.displayKm} kilomètres. Animation désactivée.`);return;}
+    const before=data.history.at(-2)?.cumulative??{numerator:'0',denominator:'1'},from=distanceRatio(before,data.maximumKm);
+    void move(from,`Relecture de notre dernière avancée : ${last.displayKm} km.`);
+  });
+  // Resize recenters only while following. Free exploration preserves the user's camera.
+  window.addEventListener('resize',()=>{if(follow)camera.center(viewPoint(visualRatio));});
+  ($('replay') as HTMLButtonElement).disabled=!last;
+  $('map').dataset.ready='true';
+  async function park(animate=false){
+    stopReplay();completed=true;
+    if(!document.getElementById('arrival-parking'))car.insertAdjacentHTML('beforebegin',parkingMarkup(route,ratio));
+    car.dataset.parked='true';
+    if(!animate||reduced.matches){stopReplay();return;}
+    follow=true;leaveOverview();camera.follow(parkingPose(route,ratio));
+    ($('replay') as HTMLButtonElement).disabled=true;$('map').classList.add('is-replaying');
+    announce('Votre année de voyage s’achève. Une dernière halte, ensemble.');
+    const started=performance.now();
+    await new Promise<void>(resolve=>{
+      finishAnimation=resolve;
+      const tick=(now:number)=>{const t=Math.min(1,(now-started)/1800),eased=1-(1-t)**3,p=parkingPose(route,ratio,eased);
+        car.setAttribute('transform',`translate(${p.x} ${p.y})`);heading.setAttribute('transform',`rotate(${p.angle})`);
+        if(follow)camera.center(p);if(t<1)frame=requestAnimationFrame(tick);else stopReplay();};
+      frame=requestAnimationFrame(tick);
+    });
+  }
+  return { recenter, park, focusRatio:(r:number)=>{manual();const p=positionAt(route,r);if(leaveOverview())camera.follow(p);else camera.center(p);},
+    update:async(next:MapData,animate=false)=>{
+      const target=distanceRatio(next.distance,next.maximumKm);if(target<ratio)throw new Error('Journey cannot move backwards');
+      stopReplay();const from=ratio;data=next;ratio=target;last=data.history.at(-1);
+      car.setAttribute('aria-label',`${vehicleName} de ${options.label}, ${format(data.displayKm)} kilomètres`);
+      if(animate)await move(from,`Notre équipe avance. ${format(data.displayKm)} kilomètres parcourus.`);else stopReplay();
+    },
+  };
+}

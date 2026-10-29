@@ -1,0 +1,40 @@
+name: Journey map V3
+on:
+  pull_request:
+    paths: ['src/map/**', 'src/web/**', 'src/presentation/**', 'src/application/**', 'src/server/**', 'web/**', 'scripts/build-web.mjs', 'scripts/demo-*.mjs', 'scripts/serve-web.mjs', 'tests/visual/**', 'tests/browser/**', 'tests/events/**', 'playwright.config.mjs', 'package*.json', 'tsconfig*.json', '.github/workflows/visual.yml']
+permissions:
+  contents: read
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build:web
+      - run: npm run test:events
+      - run: npm run test:visual
+      # The standard runner already supplies Chromium's system libraries.
+      # Avoid unrelated font/system upgrades through slow Ubuntu mirrors.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-shell-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --only-shell chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-map-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14

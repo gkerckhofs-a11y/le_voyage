@@ -1,0 +1,13 @@
+import {test,expect} from '@playwright/test';
+test('nearby gifts group visually, keep exact thresholds and open an accessible legend',async({page},info)=>{
+ await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');const original=await(await page.request.get('/api/demo/team')).json(),fixture=structuredClone(original);
+ fixture.journey.stages.slice(0,3).forEach((s,i)=>{s.thresholdKm=2100+i*10;s.remainingKm=s.thresholdKm-Number(fixture.journey.displayKm);});
+ await page.route('**/api/demo/team',r=>r.fulfill({json:fixture}));await page.goto('/');await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
+ const markers=page.locator('.gift-route-marker'),anchors=await markers.evaluateAll(ms=>ms.map(m=>m.getAttribute('transform').split(' scale')[0])),car=await page.getByTestId('team-car').getAttribute('transform');
+ await expect(markers).toHaveCount(5);await expect(page.locator('.gift-cluster')).toHaveCount(0);await page.locator('#fit-route').click();const cluster=page.locator('.gift-cluster').filter({hasText:'3'});await expect(cluster).toHaveCount(1);await expect(cluster).toHaveAttribute('data-members','1,2,3');await expect(page.locator('.gift-route-marker[hidden]')).toHaveCount(3);await expect(page.locator('#gift-map-legend')).toBeVisible();
+ expect(await markers.evaluateAll(ms=>ms.map(m=>m.getAttribute('transform').split(' scale')[0]))).toEqual(anchors);expect(await page.getByTestId('team-car').getAttribute('transform')).toBe(car);expect(await(await page.request.get('/api/demo/team')).json()).toEqual(original);
+ for(const km of ['2 100','2 110','2 120'])await expect(page.locator('#stage-list')).toContainText(km);
+ await page.screenshot({path:info.project.name==='desktop-1440'||info.project.name==='mobile-390'?`docs/evidence/v5-r4c-clusters-${info.project.name}.png`:info.outputPath('clusters.png')});
+ await cluster.focus();await page.keyboard.press('Enter');await expect(page.locator('#gift-stage-1')).toBeFocused();await page.keyboard.press('Enter');await expect(page.locator('.gift-cluster')).toHaveCount(0);await expect(page.locator('.gift-route-marker[hidden]')).toHaveCount(0);await expect(page.getByTestId('team-car')).toHaveAttribute('transform',car);
+ await page.locator('#fit-route').click();await expect(page.locator('.gift-cluster')).toHaveCount(1);if(info.project.name==='mobile-390')await page.locator('.gift-cluster').tap();else await page.locator('.gift-cluster').click();await expect(page.locator('#gift-stage-1')).toBeFocused();await page.locator('#recenter').click();await expect(page.locator('#gift-map-legend')).toBeHidden();await expect(page.locator('#reveal')).not.toBeVisible();
+});

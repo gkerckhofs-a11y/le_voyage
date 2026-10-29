@@ -1,0 +1,40 @@
+{
+  "name": "rouge-clemence-le-voyage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:engine": "node --test tests/exact-scoring.test.mjs tests/calendar.test.mjs tests/engine.test.mjs",
+    "simulate": "node scripts/simulate.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:visual": "node --test tests/visual/*.test.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "dev": "node scripts/serve-web.mjs",
+    "test:browser": "playwright test",
+    "test:events": "node --test tests/events/*.test.mjs",
+    "test:firebase": "firebase emulators:exec --project demo-rc-voyage --config firebase/emulators.json --only auth,firestore \"node --test tests/firebase/*.test.mjs\"",
+    "dev:firebase": "firebase emulators:exec --project demo-rc-voyage --config firebase/emulators.json --only auth,firestore \"node scripts/serve-firebase.mjs\"",
+    "test:firebase:web": "firebase emulators:exec --project demo-rc-voyage --config firebase/emulators.json --only auth,firestore \"node --test tests/firebase/*.test.mjs && playwright test --config playwright.firebase.config.mjs\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "firebase-admin": "14.5.0",
+    "firebase-tools": "15.34.1",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "google-auth-library": "11.3.1",
+    "yauzl": "3.4.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  }
+}
