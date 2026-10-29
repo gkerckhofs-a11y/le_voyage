@@ -31,11 +31,14 @@
     <p id="email-complete-help">Pour terminer, confirmez l'adresse qui a reçu le lien.</p>
     <label for="email-complete-address">Adresse e-mail destinataire</label>
     <input id="email-complete-address" type="email" autocomplete="email" required maxlength="254">
+    <label for="email-complete-invitation">Lien d’invitation à votre équipe (facultatif si déjà ouvert sur cet appareil)</label>
+    <input id="email-complete-invitation" type="text" autocomplete="off" spellcheck="false" maxlength="500" placeholder="Collez le lien d’invitation reçu de Rouge Clémence" aria-describedby="email-invitation-help">
+    <small id="email-invitation-help">Sur un autre appareil, copiez votre lien d’invitation personnel. Il ne sera pas transmis à Firebase lors de la connexion.</small>
     <button type="submit">Terminer ma connexion</button>
    </form>
    <p id="email-status" role="status" aria-live="polite">Vérification du service de connexion…</p>
    <p><a href="/connexion.html">Retour à la connexion classique</a></p>
-   <small>Ce parcours est limité au serveur de test. Si vous ouvrez le lien sur un autre appareil, vous devrez saisir votre adresse et, si nécessaire, rouvrir votre invitation après connexion.</small>
+   <small>Ce parcours est limité au serveur de test. Si vous ouvrez le lien sur un autre appareil, indiquez votre adresse et collez le lien d’invitation pour rejoindre votre équipe.</small>
   </section>
  </main>
 </body>
