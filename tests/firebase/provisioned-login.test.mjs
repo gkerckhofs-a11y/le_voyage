@@ -23,7 +23,9 @@ test('provisioned HTTP mode does not seed, rejects demo login and enforces ident
  await directory.set({uid,active:true,entries:[{id:'gifts',space:'gifts',label:'Cadeaux autorisés'}]});
  assert.equal((await post('/api/auth/identity',{idToken})).status,403);
  await grant.set({uid,active:true,campaigns:[{tenantId:'fiction-identity',campaignId:'test'}]});cleanups.push(async()=>{await directory.delete();await grant.delete();});
- const response=await post('/api/auth/identity',{idToken});assert.equal(response.status,200);assert.deepEqual(await response.json(),{connected:true,destination:'/espaces.html'});cookie=response.headers.get('set-cookie').split(';')[0];assert.match(response.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
+ assert.deepEqual(await(await get('/api/auth/config')).json(),{mode:'provisioned'});
+ assert.equal((await post('/api/auth/password',{email,password:'incorrect'})).status,401);
+ const response=await post('/api/auth/password',{email,password});assert.equal(response.status,200);assert.deepEqual(await response.json(),{connected:true,destination:'/espaces.html'});cookie=response.headers.get('set-cookie').split(';')[0];assert.match(response.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
  const identityCookie=cookie,legacy=randomBytes(32).toString('hex');
  await createSessionStore(adapter).issue(null,legacy,{header:'Bearer '+idToken,csrf:randomBytes(32).toString('hex'),workspaceEnabled:true,expires:Date.now()+300000});
  cookie='rc_auth='+legacy;assert.equal((await get('/api/workspaces')).status,401);cookie=identityCookie;

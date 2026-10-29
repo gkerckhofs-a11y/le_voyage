@@ -105,6 +105,19 @@ export async function createFirebaseHttp(options){
  async function handler(req,json,path){
   const now=clock();
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
+  if(path==='/api/auth/config'&&req.method==='GET'){json(200,{mode:authenticationMode});return;}
+  if(path==='/api/auth/password'&&req.method==='POST'){
+   if(authenticationMode!=='provisioned')throw failure(404);
+   const {email,password:credential}=await body(req,['email','password']);
+   if(typeof email!=='string'||email.length>254||!email.includes('@')||typeof credential!=='string'||credential.length<1||credential.length>1024)throw failure(400);
+   let response;try{response=await fetch(loginEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:credential,returnSecureToken:true}),signal:AbortSignal.timeout(10000)});}catch{throw failure(503);}
+   if(!response.ok)throw failure(response.status===429?429:401);
+   const result=await response.json();
+   const identity=await provisionedLogin({auth:adapter.auth,workspaces,idToken:result.idToken,now});
+   const next=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+   await sessions.issue(token,next,{...identity,csrf,authenticationMode});
+   json(200,{connected:true,destination:'/espaces.html'},{'Set-Cookie':cookie(next,req,Math.max(0,Math.floor((identity.expires-clock())/1000)))});return;
+  }
   if(path==='/api/auth/identity'&&req.method==='POST'){
    if(authenticationMode!=='provisioned')throw failure(404);
    const {idToken}=await body(req,['idToken'],12288);

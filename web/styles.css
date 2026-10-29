@@ -56,3 +56,6 @@ body.kiosk .brand-signature{display:none}
 }
 .login-road .brand-pepper{width:72px;height:72px}
 .gift-route-marker[hidden]{display:none}.gift-cluster{cursor:pointer;pointer-events:auto}.gift-cluster:focus-visible circle{stroke:#205c84;stroke-width:5}#gift-map-legend{max-width:760px;padding:12px;border-left:3px solid #a94433;background:#fffaf0}
+
+#account-login label{display:block;margin-top:1rem}#account-login input{display:block;width:100%;box-sizing:border-box;padding:.8rem;border:1px solid #777;border-radius:.4rem;font:inherit}#account-login button{margin-top:1rem}
+[hidden]{display:none!important}
