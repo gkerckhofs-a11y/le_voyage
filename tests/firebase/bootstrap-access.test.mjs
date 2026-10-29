@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createFirebaseEmulatorAdapter} from '../../src/server/firebase-emulator.mjs';import {createAccessBootstrap} from '../../src/server/bootstrap-access.mjs';import {newDemo} from '../../src/server/demo-service.mjs';
+test('initial setup previews without writes and applies once without overwriting or restoring revoked rights',async t=>{
+ const a=createFirebaseEmulatorAdapter();t.after(()=>a.close());const stamp=Date.now(),uid='bootstrap-'+stamp,tenantId='bootstrap-tenant-'+stamp,record=newDemo();record.ledger.state.config.tenantId=tenantId;const campaignId=record.ledger.state.config.campaignId,teamId=record.ledger.state.config.teams[0].id;
+ await a.auth.createUser({uid,email:uid+'@example.test',emailVerified:true});await a.db.doc(`tenants/${tenantId}/campaigns/${campaignId}`).set({payload:JSON.stringify(record)});
+ const input={uid,email:uid+'@example.test',tenantId,campaignId,teamId,reference:'operator-test',reason:'Pilote fictif'},service=createAccessBootstrap(a),preview=await service.preview(input);
+ assert.equal(preview.canApply,true);assert.equal((await a.db.doc('accessBootstraps/'+tenantId).get()).exists,false);assert.equal((await a.db.doc('workspaceDirectories/'+uid).get()).exists,false);
+ await assert.rejects(service.apply({...input,reason:'Changed'},preview.digest),{status:409});await assert.rejects(service.preview({...input,email:'other@example.test'}),{status:403});await assert.rejects(service.preview({...input,teamId:'foreign'}),{status:403});
+ const results=await Promise.all([service.apply(input,preview.digest),service.apply(input,preview.digest)]);assert.equal(results.filter(r=>r.applied).length,1);
+ const member=(await a.db.doc(`tenants/${tenantId}/members/${uid}`).get()).data();assert.equal(member.participationEnabled,false);assert.deepEqual(member.organizerCampaigns,[campaignId]);assert.equal(member.canPlanCampaign,undefined);assert.equal(member.directorCampaigns,undefined);
+ const grant=a.db.doc('accessAdministrators/'+uid);assert.deepEqual((await grant.get()).data().tenants,[tenantId]);await grant.update({active:false});assert.equal((await service.apply(input,preview.digest)).applied,false);assert.equal((await grant.get()).data().active,false);
+ const nextTenant=tenantId+'-next',next=newDemo();next.ledger.state.config.tenantId=nextTenant;await a.db.doc(`tenants/${nextTenant}/campaigns/${campaignId}`).set({payload:JSON.stringify(next)});const conflicting={...input,tenantId:nextTenant};const blocked=await service.preview(conflicting);assert.equal(blocked.canApply,false);await assert.rejects(service.apply(conflicting,blocked.digest),{status:409});assert.equal((await a.db.doc('accessBootstraps/'+nextTenant).get()).exists,false);
+ await a.auth.updateUser(uid,{disabled:true});await assert.rejects(service.preview(input),{status:403});
+});
