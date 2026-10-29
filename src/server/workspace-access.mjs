@@ -10,11 +10,11 @@ export function createWorkspaceAccess(adapter){
   let actor;try{actor=await auth.verifyIdToken(header.slice(7),true);}catch{throw fail(401);}if(!id(actor.uid))throw fail(403);
   const grant=db.doc('accessAdministrators/'+actor.uid);
   return db.runTransaction(async tx=>{
-   const [g,d,m]=await Promise.all([tx.get(grant),tx.get(db.doc('workspaceDirectories/'+uid)),tx.get(db.doc(`tenants/${scope.tenantId}/members/${uid}`))]);
+   const [g,d,m,h]=await Promise.all([tx.get(grant),tx.get(db.doc('workspaceDirectories/'+uid)),tx.get(db.doc(`tenants/${scope.tenantId}/members/${uid}`)),tx.get(db.collection(`tenants/${scope.tenantId}/campaigns/${scope.campaignId}/accessHistory/${uid}/events`).orderBy('revision','desc').limit(21))]);
    const access=g.data();if(access?.uid!==actor.uid||access.active!==true||!Array.isArray(access.tenants)||!access.tenants.includes(scope.tenantId))throw fail(403);
    const directory=d.data(),membership=m.data();
    if((directory&&(directory.uid!==uid||directory.active!==true))||(membership&&(membership.uid!==uid||membership.tenantId!==scope.tenantId||membership.active!==true)))throw fail(403);
-   return {uid,tenantId:scope.tenantId,campaignId:scope.campaignId,revision:directory?.revision??0,director:membership?.directorCampaigns?.includes(scope.campaignId)===true,kiosk:membership?.kioskCampaigns?.includes(scope.campaignId)===true};
+   return {history:h.docs.slice(0,20).map(d=>{const e=d.data();return {revision:e.revision,space:e.space,enabled:e.enabled,reason:e.reason,author:e.author,recordedAt:e.recordedAt};}),historyTruncated:h.size>20,uid,tenantId:scope.tenantId,campaignId:scope.campaignId,revision:directory?.revision??0,director:membership?.directorCampaigns?.includes(scope.campaignId)===true,kiosk:membership?.kioskCampaigns?.includes(scope.campaignId)===true};
   });
  },async save(header,input){
   if(!input||Object.keys(input).sort().join(',')!=='campaignId,enabled,mutationId,reason,revision,space,tenantId,uid'||![input.uid,input.tenantId,input.campaignId,input.mutationId].every(id)||!['director','kiosk'].includes(input.space)||typeof input.enabled!=='boolean'||!Number.isSafeInteger(input.revision)||input.revision<0||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>1000)throw fail(400);
@@ -42,7 +42,9 @@ export function createWorkspaceAccess(adapter){
    const revision=input.revision+1;
    tx.set(member,{...membership,[field]:[...assigned.filter(x=>x!==input.campaignId),...(input.enabled?[input.campaignId]:[])]});
    tx.set(directory,{...previous,entries,revision});
-   tx.create(event,{author:actor.uid,fingerprint,revision,recordedAt:new Date().toISOString()});return {applied:true,revision};
+   const recordedAt=new Date().toISOString();
+   tx.create(event,{author:actor.uid,fingerprint,revision,recordedAt});
+   tx.create(db.doc(`tenants/${input.tenantId}/campaigns/${input.campaignId}/accessHistory/${input.uid}/events/${input.mutationId}`),{revision,space:input.space,enabled:input.enabled,reason:input.reason.trim(),author:actor.uid,recordedAt});return {applied:true,revision};
   });
  }};
 }

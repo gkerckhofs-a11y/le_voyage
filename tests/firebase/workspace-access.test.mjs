@@ -11,12 +11,13 @@ test('explicit tenant administrator grants and revokes read-only spaces atomical
  await assert.rejects(service.save(header,input),{status:403});await grant.set({uid:admin,active:true,tenants:['foreign']});await assert.rejects(service.save(header,input),{status:403});await grant.update({tenants:[tenantId]});
  assert.deepEqual(await service.save(header,input),{applied:true,revision:1});assert.deepEqual(await service.save(header,input),{applied:false,revision:1});
  assert.deepEqual((await member.get()).data().directorCampaigns,[campaignId]);assert.equal((await member.get()).data().participationEnabled,false);assert.equal((await directory.get()).data().entries.length,1);
- assert.equal((await service.read(header,{tenantId,campaignId},uid)).director,true);
+ const viewed=await service.read(header,{tenantId,campaignId},uid);assert.equal(viewed.director,true);assert.equal(viewed.history.length,1);assert.equal(viewed.history[0].reason,input.reason);assert.equal(viewed.history[0].author,admin);assert.equal(viewed.historyTruncated,false);
  await assert.rejects(service.read(header,{tenantId:'foreign',campaignId},uid),{status:403});
  await assert.rejects(service.save(header,{...input,space:'organizer'}),{status:400});await assert.rejects(service.save(header,{...input,reason:'different'}),{status:409});
  const results=await Promise.allSettled([service.save(header,{...input,space:'kiosk',revision:1,mutationId:'tv'}),service.save(header,{...input,enabled:false,revision:1,mutationId:'revoke'})]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.status,409);
  const current=(await directory.get()).data();assert.equal(current.revision,2);
- await service.save(header,{...input,enabled:false,revision:2,mutationId:'final-revoke'});assert.deepEqual((await member.get()).data().directorCampaigns,[]);assert.ok(!(await directory.get()).data().entries.some(x=>x.space==='director'));
+ await service.save(header,{...input,enabled:false,revision:2,mutationId:'final-revoke'});assert.deepEqual((await member.get()).data().directorCampaigns,[]);
+ const history=(await service.read(header,{tenantId,campaignId},uid)).history;assert.equal(history.length,3);assert.equal(history[0].enabled,false);assert.deepEqual(history.map(x=>x.revision),[3,2,1]);assert.ok(!(await directory.get()).data().entries.some(x=>x.space==='director'));
  await grant.update({active:false});await assert.rejects(service.save(header,input),{status:403});
  await assert.rejects(service.read(header,{tenantId,campaignId},uid),{status:403});
  await grant.update({active:true});await a.auth.updateUser(uid,{disabled:true});await assert.rejects(service.save(header,{...input,revision:3,mutationId:'disabled'}),{status:403});
@@ -35,4 +36,8 @@ test('explicit tenant administrator grants and revokes read-only spaces atomical
  assert.equal((await post('/api/access/save',{...input,tenantId:'foreign'})).status,403);
  const original=csrf;csrf='0'.repeat(64);assert.equal((await post('/api/access/read',{uid})).status,403);csrf=original;
  await grant.update({active:false});assert.equal((await post('/api/access/read',{uid})).status,403);
+ await grant.update({active:true});
+ const events=a.db.collection(`tenants/${tenantId}/campaigns/${campaignId}/accessHistory/${uid}/events`);
+ const batch=a.db.batch();for(let i=0;i<21;i++)batch.set(events.doc('page-'+i),{revision:100+i,space:'director',enabled:false,reason:'Motif',author:admin,recordedAt:new Date().toISOString()});await batch.commit();
+ const latest=await service.read(header,{tenantId,campaignId},uid);assert.equal(latest.history.length,20);assert.equal(latest.historyTruncated,true);assert.equal(latest.history[0].revision,120);assert.equal(latest.history.at(-1).revision,101);
 });
