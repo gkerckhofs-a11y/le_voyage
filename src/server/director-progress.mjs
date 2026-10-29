@@ -1,3 +1,4 @@
+import {projectReceptionPublication} from './reception-publication.mjs';
 import {collectiveJourneyView} from '../presentation/collective-view.ts';
 import {projectClientBudget} from './client-budget.mjs';
 import {assertTestAdapter} from './test-environment.mjs';
@@ -32,11 +33,12 @@ export function createDirectorProgress(adapter){
     teams.push({id:team.id,name:identity?.teamName??demoTeamIdentity(team.id).teamName,distance:{...distance},displayKm:displayKm(distance),
      milestones:state.config.giftMilestones.map((m,i)=>({number:i+1,km:m.km,acquired:Object.values(state.entitlements).some(e=>e.teamId===team.id&&e.milestoneId===m.id)}))});
    }
-   const distance=convoyDistance(state),reception=receptionLevel(state);
+   const distance=convoyDistance(state),reception=receptionLevel(state),operation=snapshot.ref.collection('receptionOperations').doc('main');
+   const published=projectReceptionPublication((await tx.get(operation.collection('publication').doc('current'))).data(),(await tx.get(operation)).data(),scope);
    // Allowlist only: no weekly history, outcome source, questionnaire, tastes or costs.
    return {schemaVersion:1,organizationName:collectiveIdentity(state).organizationName,campaignId:scope.campaignId,teams,
     collective:{distance:{...distance},displayKm:displayKm(distance)},
-    reception:{baseGuaranteed:true,level:reception.level,frozen:state.freeze!==null,cutoffDate:state.config.reception.cutoffDate,
+    reception:{published,baseGuaranteed:true,level:reception.level,frozen:state.freeze!==null,cutoffDate:state.config.reception.cutoffDate,
      freezeDate:addDays(state.config.reception.cutoffDate,1),frozenOn:state.freeze?.frozenOn??null,
      distance:{...reception.km},displayKm:displayKm(reception.km),
      tiers:state.config.reception.tiers.map((tier,i)=>({level:i+1,km:tier.km,included:i<reception.level,

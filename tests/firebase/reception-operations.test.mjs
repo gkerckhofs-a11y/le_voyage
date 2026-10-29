@@ -51,3 +51,27 @@ test('reception costs validate amounts, evidence, revisions and permissions befo
  for(const patch of [{tenantId:'foreign'},{campaignId:'foreign'}])await assert.rejects(h.service.saveReceptionCosts(h.header,{...i,...patch}),{status:403});
  await h.grant.update({active:false});await assert.rejects(h.service.saveReceptionCosts(h.header,i),{status:403});await assert.rejects(h.service.receptionDetail(h.header,h.scope),{status:403});
 });
+const publication=h=>({...h.scope,revision:0,sourceRevision:1,mutationId:randomUUID(),action:'publish',reason:'Informations pratiques vérifiées',confirmed:true});
+test('reception publication allowlists client data, hides stale logistics and supports audited withdrawal',async t=>{
+ const h=await setup(t),director=(await import('../../src/server/director-progress.mjs')).createDirectorProgress(h.a);
+ await h.a.db.doc(`tenants/${h.scope.tenantId}/members/${h.scope.tenantId}`).set({uid:h.scope.tenantId,tenantId:h.scope.tenantId,active:true,directorCampaigns:[h.scope.campaignId]});
+ await h.service.saveReception(h.header,{...h.input,status:'options',owner:'PRIVATE-OWNER',providers:'PRIVATE-PROVIDER',bookingReference:'PRIVATE-REF'});
+ assert.equal((await director.read(h.header,h.scope)).reception.published,null);
+ const i=publication(h);await h.service.publishReception(h.header,i);
+ const view=await director.read(h.header,h.scope);assert.deepEqual(Object.keys(view.reception.published).sort(),['date','guests','publishedAt','status','venue']);assert.equal(view.reception.published.venue,h.input.venue);assert.equal(view.reception.published.status,'planned');assert.doesNotMatch(JSON.stringify(view),/PRIVATE-|sourceRevision|actor|reason|costHistory/);
+ const detail=await h.service.receptionDetail(h.header,h.scope);assert.equal(detail.publication.current.venue,h.input.venue);
+ await h.service.saveReception(h.header,{...h.input,status:'options',revision:1,mutationId:randomUUID(),venue:'Autre lieu'});
+ assert.equal((await director.read(h.header,h.scope)).reception.published,null);assert.equal((await h.service.publishReception(h.header,i)).alreadyApplied,true);assert.equal((await director.read(h.header,h.scope)).reception.published,null);
+ await assert.rejects(h.service.publishReception(h.header,{...i,revision:1,mutationId:randomUUID()}),{status:409});
+ await h.service.publishReception(h.header,{...i,revision:1,sourceRevision:2,mutationId:randomUUID()});assert.equal((await director.read(h.header,h.scope)).reception.published.venue,'Autre lieu');
+ await h.service.publishReception(h.header,{...i,revision:2,sourceRevision:2,mutationId:randomUUID(),action:'withdraw'});assert.equal((await director.read(h.header,h.scope)).reception.published,null);
+ const audits=await h.ref.collection('receptionOperations').doc('main').collection('publication').doc('current').collection('history').get();assert.equal(audits.size,3);assert.equal(audits.docs.find(d=>d.data().revision===1).data().record.venue,h.input.venue);
+});
+test('reception publication validates review, concurrency and grants before idempotent replay',async t=>{
+ const h=await setup(t),i=publication(h);await h.service.saveReception(h.header,h.input);await assert.rejects(h.service.publishReception(h.header,i),{status:422});
+ await h.service.saveReception(h.header,{...h.input,status:'options',revision:1,mutationId:randomUUID()});i.sourceRevision=2;
+ for(const patch of [{confirmed:false},{reason:''},{action:'other'},{revision:-1},{sourceRevision:'2'},{extra:'private'},{mutationId:'bad'}])await assert.rejects(h.service.publishReception(h.header,{...i,...patch}),{status:400});
+ const results=await Promise.allSettled([i,{...i,mutationId:randomUUID()}].map(x=>h.service.publishReception(h.header,x)));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.status,409);
+ for(const patch of [{tenantId:'foreign'},{campaignId:'foreign'}])await assert.rejects(h.service.publishReception(h.header,{...i,...patch}),{status:403});
+ await h.grant.update({active:false});await assert.rejects(h.service.publishReception(h.header,i),{status:403});
+});

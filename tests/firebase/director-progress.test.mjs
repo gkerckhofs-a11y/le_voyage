@@ -43,7 +43,7 @@ test('director reception uses exact eligible distance and frozen level, never la
  assert.deepEqual(frozen.reception.distance,receptionLevel(state).km);
  assert.equal(frozen.reception.tiers[1].status,'not-included');assert.equal(frozen.reception.tiers[1].included,false);
  assert.deepEqual(frozen.collective.distance,convoyDistance(state));assert.notDeepEqual(frozen.collective.distance,frozen.reception.distance);
- assert.deepEqual(Object.keys(frozen.reception).sort(),['baseGuaranteed','cutoffDate','displayKm','distance','freezeDate','frozen','frozenOn','level','tiers']);
+ assert.deepEqual(Object.keys(frozen.reception).sort(),['baseGuaranteed','cutoffDate','displayKm','distance','freezeDate','frozen','frozenOn','level','published','tiers']);
  for(const tier of frozen.reception.tiers)assert.deepEqual(Object.keys(tier).sort(),['included','km','level','status']);
  assert.doesNotMatch(JSON.stringify(frozen),/budgetCents|purchase|answers|scores|preferences|FORBIDDEN/);
 });
