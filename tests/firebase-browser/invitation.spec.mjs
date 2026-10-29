@@ -18,7 +18,7 @@ test('controlled invitation, personal welcome, retry and access to the assigned 
  await page.getByRole('button',{name:'Rejoindre mon équipe'}).click();await expect(page.locator('#invitation-status')).toContainText('n’a pas pu être confirmée');
  await page.getByRole('button',{name:'Rejoindre mon équipe'}).click();await expect(page.locator('#invitation-status')).toContainText('Bon voyage');
  await expect(page).toHaveURL(/\/invitation.html$/);await page.getByRole('link',{name:'Découvrir notre voyage'}).click();await expect(page.locator('#company')).toHaveText('Lex EKHO');await expect(page.getByTestId('team-car')).toHaveCount(1);
- await page.getByRole('link',{name:'Mes goûts',exact:true}).click();await expect(page.getByLabel('Thé et infusions',{exact:true})).toBeChecked();await expect(page.getByLabel('Chocolat',{exact:true})).toBeChecked();await expect(page.getByLabel('Uniquement sans alcool',{exact:true})).toBeChecked();
+ await page.getByRole('link',{name:'Nos choix',exact:true}).click();await page.getByRole('link',{name:/^01 Mes goûts/}).click();await expect(page.getByLabel('Thé et infusions',{exact:true})).toBeChecked();await expect(page.getByLabel('Chocolat',{exact:true})).toBeChecked();await expect(page.getByLabel('Uniquement sans alcool',{exact:true})).toBeChecked();
  await expect(page.locator('main')).toContainText('pas encore préparés ou confirmés');
  await page.screenshot({path:`docs/evidence/v5-r5-profile-${info.project.name}.png`,fullPage:true});
 });

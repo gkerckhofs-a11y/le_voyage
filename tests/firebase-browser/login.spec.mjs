@@ -9,7 +9,7 @@ test('login, private journey, refresh, logout and another company',async({page},
  await page.getByRole('button',{name:'Simuler une semaine',exact:true}).click();await expect(page.locator('#advance-status')).toHaveText('La progression est enregistrée.');
  await page.reload();await expect(page.locator('#map')).toHaveAttribute('data-ready','true');
  const after=await(await page.request.get('/api/demo/team')).json();expect(after.revision).toBe(before.revision+1);
- await page.getByRole('link',{name:'Le collectif',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
+ await page.getByRole('link',{name:'Le Voyage Lex EKHO',exact:true}).click();await expect(page.getByTestId('collective-car')).toHaveCount(1);
  await expect(page.locator('#distance')).toHaveText(Number(after.journey.displayKm).toLocaleString('fr-BE'));
  await page.route('**/api/auth/logout',async route=>{await route.fetch();await route.abort();},{times:1});
  await page.getByRole('button',{name:'Se déconnecter',exact:true}).click();await page.getByRole('button',{name:'Réessayer la déconnexion',exact:true}).click();await expect(page).toHaveURL(/connexion.html/);expect((await page.request.get('/api/demo/team')).status()).toBe(401);

@@ -1,0 +1,27 @@
+import {test,expect} from '@playwright/test';
+test('four top destinations, grouped choices and a once-only weekly popup with manual recovery',async({page},info)=>{
+ const questions=['Entraide dans mon équipe','Qualité de mon travail','Mes initiatives'],week={id:'week-test',start:'2026-10-26',endExclusive:'2026-11-02'};
+ let prompted=false,answered=false,claims=0;
+ await page.route('**/api/demo/session',r=>r.fulfill({json:{csrf:'a'.repeat(64),authenticated:true,workspace:'team'}}));
+ await page.route('**/api/demo/team',r=>r.fulfill({json:{journey:{organizationName:'Lex EKHO'}}}));
+ await page.route('**/api/my-week/prompt',r=>{claims++;const show=!prompted;prompted=true;return r.fulfill({json:show?{show,week,questions}:{show:false}});});
+ await page.route('**/api/my-week',r=>r.fulfill({json:{status:'open',eligible:true,week,questions,myAnswers:answered?[3,3,3]:null}}));
+ await page.route('**/api/my-week/answer',r=>{expect(r.request().postDataJSON()).toEqual({weekId:week.id,answers:[3,3,3]});answered=true;return r.fulfill({json:{myAnswers:[3,3,3]}});});
+ await page.goto('/choix.html');
+ const popup=page.getByRole('dialog',{name:'Ma semaine'});await expect(popup).toBeVisible();
+ await page.getByRole('button',{name:'Fermer Ma semaine'}).click();await page.reload();await expect(page.getByRole('heading',{name:'Nos choix.',exact:true})).toBeVisible();
+ await expect.poll(()=>claims).toBe(2);await expect(popup).toHaveCount(0);
+ const nav=page.getByRole('navigation',{name:'Navigation principale'});
+ await expect(nav.locator('a,button')).toHaveText(['Le voyage d’équipe','Le Voyage Lex EKHO','Mes attentions','Nos choix']);
+ await expect(page.getByRole('link',{name:/^01 Mes goûts/})).toHaveAttribute('href','/preferences.html#gouts');
+ await expect(page.getByRole('link',{name:/^02 Anniversaire/})).toHaveAttribute('href','/preferences.html#anniversaire');
+ await expect(page.getByRole('link',{name:/^03 Choix d’équipe/})).toHaveAttribute('href','/equipe.html');
+ await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+ const box=await nav.boundingBox();expect(Math.abs(box.y)).toBeLessThan(2);expect(await nav.evaluate(n=>getComputedStyle(n).position)).toBe('fixed');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByRole('button',{name:'Reprendre mes réponses'}).click();await expect(popup).toBeVisible();
+ for(let i=0;i<3;i++)await popup.locator(`input[name="popup-q${i}"][value="3"]`).check();
+ await popup.getByRole('button',{name:'Valider mes trois réponses'}).click();await expect(popup).toContainText('Vos trois réponses sont enregistrées');
+ await page.getByRole('button',{name:'Fermer Ma semaine'}).click();
+ await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:`test-results/r9f1-choices-${info.project.name}.png`,fullPage:true});
+});
