@@ -42,7 +42,9 @@ test('organizer revokes the tracked link once, then sees its current state witho
  await page.getByLabel('Identifiant du compte destinataire').fill('other-test');await expect(cancel).toBeHidden();await expect(lifecycle).toHaveText('');
  await page.getByRole('button',{name:'Consulter le suivi'}).click();await cancel.click();
  await expect(lifecycle).toContainText('Lien révoqué');await expect(cancel).toBeHidden();expect(revocations).toBe(1);expect(sends).toBe(0);
+ await expect(page.locator('#admin-status')).toContainText('Le lien de cet envoi est révoqué');
  state='accepted';await page.getByRole('button',{name:'Consulter le suivi'}).click();
+ await expect(page.locator('#admin-status')).toHaveText('');
  await expect(lifecycle).toContainText('Invitation acceptée');await expect(cancel).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/r9e5-lifecycle-${info.project.name}.png`,fullPage:true});

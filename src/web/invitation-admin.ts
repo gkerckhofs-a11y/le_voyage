@@ -13,8 +13,8 @@ const deliveryStatus=document.getElementById('delivery-status')!,refreshDelivery
 const linkStatus=document.getElementById('delivery-invitation-status')!,revokeTracked=document.getElementById('revoke-tracked-invitation') as HTMLButtonElement;
 function clearDelivery(){trackedInvitationId='';deliveryStatus.textContent='';linkStatus.textContent='';revokeTracked.hidden=true;}
 const email=document.getElementById('recipient-email') as HTMLInputElement,find=document.getElementById('find-recipient') as HTMLButtonElement,summary=document.getElementById('recipient-summary')!;
-email.addEventListener('input',()=>{recipient.value='';summary.textContent='';clearDelivery();clearInvite();});
-recipient.addEventListener('input',()=>{summary.textContent='';clearDelivery();});
+email.addEventListener('input',()=>{recipient.value='';summary.textContent='';status.textContent='';clearDelivery();clearInvite();});
+recipient.addEventListener('input',()=>{summary.textContent='';status.textContent='';clearDelivery();});
 find.addEventListener('click',async()=>{
  if(busy)return;const value=email.value.trim();if(!value||!email.checkValidity()){status.textContent='Renseignez une adresse e-mail valide.';return;}
  busy=true;find.disabled=true;create.disabled=true;revoke.disabled=true;email.disabled=true;recipient.disabled=true;recipient.value='';summary.textContent='';clearDelivery();clearInvite();
@@ -64,6 +64,7 @@ async function loadDelivery(recipientUid:string){
 }
 refreshDelivery.addEventListener('click',async()=>{
  if(busy||send.hidden)return;
+ status.textContent='';
  const recipientUid=recipient.value.trim();
  if(!/^[A-Za-z0-9_-]{1,128}$/.test(recipientUid)){deliveryStatus.textContent='Renseignez un identifiant de compte valide.';return;}
  busy=true;refreshDelivery.disabled=true;send.disabled=true;create.disabled=true;revoke.disabled=true;recipient.disabled=true;email.disabled=true;find.disabled=true;
