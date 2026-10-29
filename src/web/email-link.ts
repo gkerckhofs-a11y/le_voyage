@@ -5,6 +5,7 @@ const requestForm=document.getElementById('email-request') as HTMLFormElement;
 const completeForm=document.getElementById('email-complete') as HTMLFormElement;
 const requestEmail=document.getElementById('email-request-address') as HTMLInputElement;
 const completeEmail=document.getElementById('email-complete-address') as HTMLInputElement;
+const completeInvitation=document.getElementById('email-complete-invitation') as HTMLInputElement;
 const emailKey='rc-pilot-email-link-address';
 const invitationKey='rc-pilot-email-link-invitation';
 const maxInvitationAge=45*60*1000;
@@ -21,10 +22,19 @@ function pendingInvitation():string|null{
   return value.token;
  }catch{localStorage.removeItem(invitationKey);return null;}
 }
+function invitationForCompletion(raw:string):string|null{
+ const input=raw.trim();
+ if(!input)return pendingInvitation();
+ if(/^[a-f0-9]{64}$/.test(input))return input;
+ try{
+  const url=new URL(input);
+  if(url.origin===location.origin&&url.pathname==='/invitation.html'&&!url.search&&!url.username&&!url.password&&/^#[a-f0-9]{64}$/.test(url.hash))return url.hash.slice(1);
+ }catch{}
+ throw Error('Le lien d’invitation est invalide. Copiez le lien personnel complet reçu de Rouge Clémence.');
+}
 function setBusy(form:HTMLFormElement,busy:boolean){const button=form.querySelector<HTMLButtonElement>('button[type="submit"]');if(button)button.disabled=busy;}
-async function exchangeVerifiedIdentity(user:any){
+async function exchangeVerifiedIdentity(user:any,invitationToken:string|null){
  const idToken=await user.getIdToken();
- const invitationToken=pendingInvitation();
  const response=await fetch('/api/auth/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken,...(invitationToken?{invitationToken}:{})})});
  if(!response.ok)throw Error('Votre adresse est vérifiée, mais aucun accès ne correspond à ce compte ou à votre invitation. Rouvrez l’invitation nominative, puis réessayez.');
  const result=await response.json();
@@ -32,6 +42,7 @@ async function exchangeVerifiedIdentity(user:any){
  if(result.destination!==expected)throw Error('La destination de connexion est invalide.');
  localStorage.removeItem(invitationKey);
  localStorage.removeItem(emailKey);
+ completeInvitation.value='';
  history.replaceState(null,'','/email-link.html');
  location.replace(invitationToken?'/invitation.html#'+invitationToken:'/espaces.html');
 }
@@ -53,8 +64,9 @@ completeForm.addEventListener('submit',async e=>{
  if(!auth.isSignInWithEmailLink(location.href)){status.textContent='Le lien est invalide ou incomplet. Demandez un nouveau lien.';return;}
  setBusy(completeForm,true);status.textContent='Vérification de votre identité…';
  try{
+  const invitationToken=invitationForCompletion(completeInvitation.value);
   const credential=await auth.signInWithEmailLink(email,location.href);
-  try{await exchangeVerifiedIdentity(credential.user);}
+  try{await exchangeVerifiedIdentity(credential.user,invitationToken);}
   finally{await auth.signOut();}
  }catch(error){
   status.textContent=error instanceof Error&&!/^Firebase:/.test(error.message)?error.message:'Connexion impossible : vérifiez l’adresse destinataire ou demandez un nouveau lien.';
