@@ -1,3 +1,4 @@
+import {createReceptionOperations} from './reception-operations.mjs';
 import {summarizeGiftCommitments} from './gift-commitments.mjs';
 import {createGiftReservations,acquiredAnticipatedOrder,anticipatedOrderDigest,attachedAnticipatedOrder} from './gift-reservations.mjs';
 import {createGiftProposals,acquiredProposal} from './gift-proposals.mjs';
@@ -53,6 +54,7 @@ export function createGiftOperations(adapter,{now=()=>new Date().toISOString(),c
  }
 
  return {
+ ...createReceptionOperations({db,actor,check,campaignRef,now}),
  ...createGiftProposals({db,actor,check,campaignRef,build:buildAnticipation,now}),
  ...createGiftReservations({db,actor,check,campaignRef,build:buildAnticipation,now,catalogDocument}),
  async commitments(header){const uid=await actor(header);return db.runTransaction(async tx=>{const scopes=await check(tx,uid),rows=[];let count=0;
