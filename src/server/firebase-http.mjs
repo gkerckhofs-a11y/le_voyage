@@ -1,4 +1,5 @@
 import {createWorkspaceAccess} from './workspace-access.mjs';
+import {createInvitationDelivery} from './invitation-delivery.mjs';
 import {provisionedLogin,provisionedInvitationLogin} from './provisioned-login.mjs';
 import {createSessionStore} from './session-store.mjs';
 import {createKioskProgress} from './kiosk-progress.mjs';
@@ -62,6 +63,8 @@ export async function createFirebaseHttp(options){
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter,{provisionWorkspaces:authenticationMode==='provisioned'}),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const invitationDelivery=options?.invitationEmailTransport?createInvitationDelivery({adapter,invitations,transport:options.invitationEmailTransport,origin:options.invitationEmailOrigin,now:clock}):null;
+ if(invitationDelivery&&(authenticationMode!=='provisioned'||!['demo-rc-voyage','rc-voyage-test-20261027'].includes(adapter.db.projectId)))throw Error('Explicit isolated test project required for invitation sending');
  const workspaceAccess=createWorkspaceAccess(adapter);
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
@@ -109,7 +112,7 @@ export async function createFirebaseHttp(options){
  async function handler(req,json,path){
   const now=clock();
   const token=req.headers.cookie?.match(new RegExp('(?:^|;\\s*)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
-  if(path==='/api/auth/config'&&req.method==='GET'){json(200,{mode:authenticationMode,...(emailLink?{emailLinkEnabled:true}:{})});return;}
+  if(path==='/api/auth/config'&&req.method==='GET'){json(200,{mode:authenticationMode,...(emailLink?{emailLinkEnabled:true}:{}),...(invitationDelivery?{invitationEmailEnabled:true}:{})});return;}
   if(path==='/api/auth/email-link/config'&&req.method==='GET'){
    if(!emailLink)throw failure(404);
    json(200,{projectId:emailLink.projectId,apiKey:emailLink.apiKey,authDomain:emailLink.projectId+'.firebaseapp.com',canonical:emailLink.canonical});return;
@@ -213,7 +216,7 @@ export async function createFirebaseHttp(options){
   // Strip administrative controls from team responses even for explicitly multi-role accounts.
   const teamView=value=>session.workspaceSpace==='team'?{...value,canOpen:false,canClose:false,...(Object.hasOwn(value,'leaders')?{leaders:null}:{})}:value;
   if(session.organizerOnly&&path!=='/api/auth/logout'){
-   const routes={GET:['/api/client-budget','/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/client-budget/publish','/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/recipient','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
+   const routes={GET:['/api/client-budget','/api/organizer/overview','/api/annual-plan','/api/coordination'],POST:['/api/client-budget/publish','/api/demo/session','/api/invitation/session','/api/annual-plan/preview','/api/annual-plan/save','/api/invitation/create','/api/invitation/recipient','/api/invitation/send','/api/invitation/revoke','/api/coordination/open','/api/coordination/close','/api/coordination/postpone']};
    if(!routes[req.method]?.includes(path))throw failure(403);
    await organizerDashboard.read(session.header,session.scope);
   }
@@ -308,6 +311,7 @@ export async function createFirebaseHttp(options){
    if(path.startsWith('/api/invitation/')){
     authorized(req,session);
     if(path==='/api/invitation/recipient'){if(authenticationMode!=='provisioned'||!session.scope)throw failure(403);const {email}=await body(req,['email']);json(200,await invitations.recipient(session.header,session.scope,email));return;}
+    if(path==='/api/invitation/send'){if(!invitationDelivery||authenticationMode!=='provisioned'||!session.organizerOnly||!session.scope)throw failure(404);const input=await body(req,['recipientUid','mutationId']);json(200,await invitationDelivery.send(session.header,session.scope,input));return;}
     if(path==='/api/invitation/create'){const input=await body(req,authenticationMode==='provisioned'?['recipientUid']:[]);if(!session.scope)throw failure(403);const recipientUid=authenticationMode==='provisioned'?input.recipientUid:invitedProfile.uid;if(typeof recipientUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(recipientUid))throw failure(400);const invite=await invitations.issue(session.header,session.scope,recipientUid);json(200,{id:invite.id,url:'/invitation.html#'+invite.token,expiresAt:invite.expiresAt});return;}
     if(path==='/api/invitation/revoke'){const {id}=await body(req,['id']);if(!session.scope)throw failure(403);json(200,await invitations.revoke(session.header,session.scope,id));return;}
     if(path==='/api/invitation/preview'){const {token}=await body(req,['token']);json(200,await invitations.preview(session.header,token));return;}
