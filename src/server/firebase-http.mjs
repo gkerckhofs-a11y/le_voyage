@@ -1,3 +1,4 @@
+import {createWorkspaceAccess} from './workspace-access.mjs';
 import {provisionedLogin} from './provisioned-login.mjs';
 import {createSessionStore} from './session-store.mjs';
 import {createKioskProgress} from './kiosk-progress.mjs';
@@ -59,6 +60,7 @@ export async function createFirebaseHttp(options){
  const password=options?.password??'Fictitious-Emulator-Only-42!';
  const loginEndpoint=options?.loginEndpoint??'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-key';
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
+ const workspaceAccess=createWorkspaceAccess(adapter);
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress});
  try{
   if(authenticationMode==='demo'){
@@ -161,6 +163,10 @@ export async function createFirebaseHttp(options){
    const current=await workspaces.select(session.header,session.workspaceId);
    // Directory edits must not retarget an already open session.
    if(JSON.stringify(current.scope)!==JSON.stringify(session.scope)||current.space!==session.workspaceSpace)throw failure(403);
+  }
+  if(path==='/api/access/save'&&req.method==='POST'){
+   if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);
+   json(200,await workspaceAccess.save(session.header,await body(req,['uid','tenantId','campaignId','space','enabled','revision','mutationId','reason'])));return;
   }
   if(['team','gifts'].includes(session.workspaceSpace)&&path!=='/api/auth/logout'){
    const routes=session.workspaceSpace==='team'?{
