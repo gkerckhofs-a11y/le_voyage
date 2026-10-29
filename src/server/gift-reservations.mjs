@@ -1,10 +1,11 @@
 import {createHash} from 'node:crypto';
+import {costKeys,normalizeAmendment,planAmendment} from './gift-amendments.mjs';
 import {proposalDocumentId} from './gift-proposals.mjs';
 const fail=status=>Object.assign(Error('Reservation unavailable'),{status});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeKeys=['tenantId','campaignId','teamId','milestoneNumber'];
 function validate(input,action){
- const keys=action==='preview-cancellation-stock'?[...scopeKeys,'revision']:[...scopeKeys,'mutationId','reason',...(action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:action==='regularize-cancellation-stock'?['revision','inventoryReference','inventoryConfirmed','fingerprint']:action==='resolve-cancellation'?['revision','reference','outcome','responseAcknowledged']:['revision'])];
+ const keys=action==='preview-cancellation-stock'?[...scopeKeys,'revision']:[...scopeKeys,'mutationId','reason',...(action==='amend-cancelled-order'?['revision','reference','kind','documentConfirmed',...costKeys]:action==='reserve'?['proposalRevision','conditions']:action==='authorize'?['revision','reference','riskAccepted']:action==='confirm'?['revision','reference','confirmationAccepted']:action==='consume'?['revision','consumptionAccepted']:action==='request-cancellation'?['revision','reference','requestAcknowledged']:action==='regularize-cancellation-stock'?['revision','inventoryReference','inventoryConfirmed','fingerprint']:action==='resolve-cancellation'?['revision','reference','outcome','responseAcknowledged']:['revision'])];
  if(!input||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw fail(400);
  for(const key of scopeKeys.slice(0,3))if(typeof input[key]!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(input[key]))throw fail(400);
  for(const key of ['milestoneNumber',action==='reserve'?'proposalRevision':'revision'])if(!Number.isSafeInteger(input[key])||input[key]<1||input[key]>1000)throw fail(400);
@@ -14,10 +15,15 @@ function validate(input,action){
  if(['authorize','confirm'].includes(action)&&((action==='authorize'?input.riskAccepted:input.confirmationAccepted)!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='request-cancellation'&&(input.requestAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
  if(action==='resolve-cancellation'&&(!['accepted','refused'].includes(input.outcome)||input.responseAcknowledged!==true||typeof input.reference!=='string'||input.reference.trim().length<3||input.reference.length>120||/[\u0000-\u001f]/.test(input.reference)))throw fail(400);
+ if(action==='amend-cancelled-order'){
+  if(!['fee','credit'].includes(input.kind)||input.documentConfirmed!==true)throw fail(400);
+  const {delta}=cancellationAmendment(input);if(costKeys.some(k=>input.kind==='fee'?delta[k]<0:delta[k]>0))throw fail(400);
+ }
  if(action==='consume'&&input.consumptionAccepted!==true)throw fail(400);
  if(input.milestoneNumber>100||typeof input.mutationId!=='string'||!/^[a-f0-9-]{36}$/.test(input.mutationId))throw fail(400);
  for(const key of action==='reserve'?['reason','conditions']:['reason'])if(typeof input[key]!=='string'||input[key].trim().length<3||input[key].length>(key==='conditions'?600:240)||/[\u0000-\u001f]/.test(input[key]))throw fail(400);
 }
+function cancellationAmendment(input){return normalizeAmendment({...Object.fromEntries(['tenantId','campaignId','revision','mutationId','reason','reference',...costKeys].map(k=>[k,input[k]])),id:proposalDocumentId(input.teamId,input.milestoneNumber)});}
 // counts includes held and declared consumed units pending reconciliation; Master is never decremented here.
 export function createGiftReservations({db,actor,check,campaignRef,build,now,catalogDocument}){
  const ledgerRef=db.doc(catalogDocument).collection('reservationLedger').doc('main');
@@ -87,6 +93,15 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
    if(!old||old.status!=='ordered'||!old.order||old.revision!==input.revision||old.consumption||old.cancellationRequest?.status!=='pending'||old.cancellationRequest.orderDigest!==hash(old.order))throw fail(409);
    if(old.fulfillmentLink){const id=old.fulfillmentLink.id;if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw fail(409);const fulfillment=(await tx.get(campaignRef(input).collection('giftFulfillments').doc(id))).data();if(!attachedAnticipatedOrder({...old,reservationId:ref.id},fulfillment,id)||fulfillment.status==='delivered')throw fail(409);}
    record={...old,cancellationRequest:{...old.cancellationRequest,status:input.outcome,response:{source:'operator-declared-supplier-response',outcome:input.outcome,reference:input.reference.trim(),at:now(),actor:uid,reason:input.reason.trim(),scope:'whole-order',orderDigest:hash(old.order)}}};
+  }else if(action==='amend-cancelled-order'){
+   const c=old?.cancellationRequest;
+   // Attached orders already have their own amendments: never create a second financial ledger.
+   if(!old||old.status!=='ordered'||!old.order||old.order.version!==1||old.revision!==input.revision||old.fulfillmentLink||old.consumption||c?.status!=='accepted'||c.orderDigest!==hash(old.order)||c.response?.outcome!=='accepted'||c.response.orderDigest!==hash(old.order))throw fail(409);
+   const normalized=cancellationAmendment(input),finance=c.finance,entries=finance?.entries??[];
+   if(!Array.isArray(entries)||finance&&(!Number.isSafeInteger(finance.adjustment?.count)||entries.length!==finance.adjustment.count))throw fail(409);
+   const {before,after,adjustment}=planAmendment({...old.order,confirmation:old.order,financialAdjustment:finance?.adjustment},normalized.delta);
+   const entry={revision:old.revision+1,at:now(),actor:uid,reference:normalized.reference,reason:normalized.reason,kind:input.kind,delta:normalized.delta,before,after,orderDigest:hash(old.order)};
+   record={...old,cancellationRequest:{...c,finance:{source:'operator-declared-cancellation-costs',adjustment,effectiveCosts:after,entries:[...entries,entry]}}};
   }else if(action==='regularize-cancellation-stock'){
    const preview=await cancellationStockPreview(tx,uid,input,old,ledger,ref.id);if(preview.fingerprint!==input.fingerprint)throw fail(409);
    const committed={...ledger.committed};for(const line of preview.lines){const key=hash(line.sku);counts[key]=line.countAfter;committed[key]=line.committedAfter;if(!counts[key])delete counts[key];if(!committed[key])delete committed[key];}ledger.committed=committed;
@@ -119,6 +134,7 @@ export function createGiftReservations({db,actor,check,campaignRef,build,now,cat
  });}
  return {
  async previewCancellationStock(header,input){validate(input,'preview-cancellation-stock');const uid=await actor(header);return db.runTransaction(async tx=>{await check(tx,uid,input);const ref=campaignRef(input).collection('giftReservations').doc(proposalDocumentId(input.teamId,input.milestoneNumber)),old=(await tx.get(ref)).data(),ledger=(await tx.get(ledgerRef)).data()??{};return cancellationStockPreview(tx,uid,input,old,ledger,ref.id);});},
+ amendCancelledOrder:(header,input)=>write(header,input,'amend-cancelled-order'),
  regularizeCancellationStock:(header,input)=>write(header,input,'regularize-cancellation-stock'),
  resolveOrderCancellation:(header,input)=>write(header,input,'resolve-cancellation'),
  requestOrderCancellation:(header,input)=>write(header,input,'request-cancellation'),
