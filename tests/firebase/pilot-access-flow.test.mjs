@@ -26,6 +26,18 @@ test('pilot identity flow: bootstrap, organizer, director and kiosk grants, imme
  const kiosk=await employee.get('/api/kiosk/progress');assert.equal(kiosk.status,200);assert.doesNotMatch(JSON.stringify(await kiosk.json()),/"(?:teams|clientBudget|responses|preferences|purchaseCents)"/);assert.equal((await employee.get('/api/workspaces')).status,403);assert.equal((await employee.get('/api/director/progress')).status,403);
  await change('kiosk',false,3,'kiosk-revoke');assert.equal((await employee.get('/api/kiosk/progress')).status,403);
  const audit=await organizer.post('/api/access/read',{uid:target});assert.equal(audit.status,200);const history=(await audit.json()).history;assert.equal(history.length,4);assert.ok(history.every(e=>e.author===admin));
+ const owner=a.db.doc(`tenants/${tenantId}/members/${admin}`);
+ assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
+ await owner.update({canInvite:true});
+ assert.equal((await organizer.post('/api/invitation/create',{})).status,400);
+ assert.equal((await organizer.post('/api/invitation/create',{recipientUid:'../foreign'})).status,400);
+ assert.equal((await organizer.post('/api/invitation/create',{recipientUid:'missing-recipient'})).status,403);
+ await a.auth.updateUser(target,{disabled:true});assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);await a.auth.updateUser(target,{disabled:false});
+ const targetRef=a.db.doc(`tenants/${tenantId}/members/${target}`),beforeInvite=(await targetRef.get()).data();
+ const issued=await organizer.post('/api/invitation/create',{recipientUid:target});assert.equal(issued.status,200);const invitation=await issued.json();
+ const stored=(await a.db.doc('invitations/'+invitation.id).get()).data();assert.equal(stored.recipientUid,target);assert.equal(stored.scope.tenantId,tenantId);assert.ok(!JSON.stringify(stored).includes(invitation.url.split('#')[1]));assert.deepEqual((await targetRef.get()).data(),beforeInvite);
+ assert.equal((await organizer.post('/api/invitation/revoke',{id:invitation.id})).status,200);assert.equal((await a.db.doc('invitations/'+invitation.id).get()).data().status,'revoked');
+ await owner.update({canInvite:false});assert.equal((await organizer.post('/api/invitation/create',{recipientUid:target})).status,403);
  await a.db.doc('accessAdministrators/'+admin).update({active:false});assert.equal((await organizer.post('/api/access/read',{uid:target})).status,403);
  assert.equal((await bootstrap.apply(manifest,preview.digest)).applied,false);assert.equal((await a.db.doc('accessAdministrators/'+admin).get()).data().active,false);
 });

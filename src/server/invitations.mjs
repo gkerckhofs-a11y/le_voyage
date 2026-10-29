@@ -20,7 +20,7 @@ export function createInvitations(adapter,{now=()=>Date.now(),lifetimeMs=8640000
  }
  return {
   async issue(header,scope,recipientUid){
-   const user=await identity(header);await adapter.read(header,scope);const recipient=await auth.getUser(recipientUid);if(recipient.disabled)throw denied();
+   const user=await identity(header);await adapter.read(header,scope);let recipient;try{recipient=await auth.getUser(recipientUid);}catch(error){if(error.code==='auth/user-not-found')throw denied();throw error;}if(recipient.disabled)throw denied();
    const token=randomBytes(32).toString('hex'),id=hash(token),createdAt=now(),expiresAt=createdAt+lifetimeMs;
    await db.runTransaction(async tx=>{allowed((await tx.get(member(scope,user.uid))).data(),scope,user.uid);tx.create(db.doc(`invitations/${id}`),{scope:{...scope},issuerUid:user.uid,recipientUid,status:'pending',createdAt,expiresAt});});
    return {id,token,expiresAt};
