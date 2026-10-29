@@ -1,6 +1,7 @@
 import {assertTestAdapter} from './test-environment.mjs';
 import {teamDistance,convoyDistance,receptionLevel} from '../domain/engine.ts';
 import {displayKm} from '../domain/exact.ts';
+import {addDays} from '../domain/calendar.ts';
 import {collectiveIdentity} from '../../scripts/demo-collective.mjs';
 import {demoTeamIdentity} from './demo-service.mjs';
 const denied=()=>Object.assign(new Error('Director access denied'),{status:403});
@@ -28,7 +29,11 @@ export function createDirectorProgress(adapter){
    // Allowlist only: no weekly history, outcome source, questionnaire, tastes or costs.
    return {schemaVersion:1,organizationName:collectiveIdentity(state).organizationName,campaignId:scope.campaignId,teams,
     collective:{distance:{...distance},displayKm:displayKm(distance)},
-    reception:{baseGuaranteed:true,level:reception.level,frozen:state.freeze!==null,cutoffDate:state.config.reception.cutoffDate},
+    reception:{baseGuaranteed:true,level:reception.level,frozen:state.freeze!==null,cutoffDate:state.config.reception.cutoffDate,
+     freezeDate:addDays(state.config.reception.cutoffDate,1),frozenOn:state.freeze?.frozenOn??null,
+     distance:{...reception.km},displayKm:displayKm(reception.km),
+     tiers:state.config.reception.tiers.map((tier,i)=>({level:i+1,km:tier.km,included:i<reception.level,
+      status:i<reception.level?'included':state.freeze!==null?'not-included':i===reception.level?'next':'unreached'}))},
     clientBudget:{status:'unavailable'}};
   });
  }};
