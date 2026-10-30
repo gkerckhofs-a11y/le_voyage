@@ -20,7 +20,7 @@ export function scenicFeatures(route:Route){
 }
 function scenicMarkup(f:ReturnType<typeof scenicFeatures>[number]){
  const sheep='<ellipse rx="15" ry="10" fill="#faf1d7" stroke="#8c8a72" stroke-width="2"/><ellipse cx="17" rx="6" ry="5" fill="#696751"/>';
- const house=(x:number,y:number,angle:number)=>`<g transform="translate(${x} ${y}) rotate(${angle})"><rect x="-25" y="-19" width="58" height="45" rx="3" fill="#344b3830"/><rect x="-30" y="-25" width="60" height="45" fill="#e4d4b3" stroke="#8b795f" stroke-width="3"/><path d="M-33-28H33V17H-33Z" fill="#8c6854"/><path d="M0-28V17M-33-5H33" stroke="#d9b68d" stroke-width="3"/><rect x="16" y="-34" width="8" height="13" fill="#c3a582"/></g>`;
+ const house=(x:number,y:number,angle:number)=>`<g transform="translate(${x} ${y}) rotate(${angle})"><ellipse cx="8" cy="22" rx="43" ry="25" fill="#3d513b" opacity=".17"/><path d="M-31-15V19L5 35V0Z" fill="#e9d9b7" stroke="#9a856a" stroke-width="2.5"/><path d="M5 0L35-15V18L5 35Z" fill="#cbbb9b" stroke="#907c61" stroke-width="2.5"/><path d="M-38-16L-7-41L40-20L6 4Z" fill="#8a6954" stroke="#665147" stroke-width="3"/><path d="M-15 7L-4 11V24L-15 20Z" fill="#64817f" stroke="#e7ddc3" stroke-width="2"/><path d="M12 8L23 2V16L12 22Z" fill="#688382" stroke="#f3e6c5" stroke-width="2"/><path d="M15-24V-45H23V-19" fill="#ae947b"/></g>`;
  const art=f.kind==='hill'?'<ellipse rx="145" ry="105" fill="var(--season-meadow,#9fb67d)" stroke="#81956a" stroke-width="3"/><path d="M-127 16C-103-86 105-96 127 6M-109 30C-82-64 82-73 109 16M-85 38C-62-39 62-52 85 24M-55 43C-38-17 37-30 55 30" fill="none" stroke="#e1dfb3" stroke-width="4" opacity=".7"/><ellipse cx="18" cy="-18" rx="29" ry="16" fill="#c3cc9a"/>':
  f.kind==='hamlet'?`<path d="M-100 55Q0 5 100 70" fill="none" stroke="#d9c99d" stroke-width="18"/>${house(-55,-33,-12)}${house(48,-20,15)}${house(0,65,-5)}`:
  f.kind==='castle'?'<rect x="-105" y="-85" width="210" height="170" rx="20" fill="#536c3930"/><rect x="-88" y="-72" width="176" height="144" fill="#c1b99b" stroke="#7f8376" stroke-width="10"/><rect x="-52" y="-37" width="104" height="84" fill="#d7c9a6"/><path d="M-74-62H74V-38H-74Z" fill="#5b6c6b"/><path d="M-45 76H45V108H-45" fill="#c6b18d"/><g fill="#596c6a" stroke="#d8d3b9" stroke-width="6"><circle cx="-86" cy="-70" r="27"/><circle cx="86" cy="-70" r="27"/><circle cx="-86" cy="70" r="27"/><circle cx="86" cy="70" r="27"/></g><g fill="#e2d6b2"><circle cx="-86" cy="-70" r="6"/><circle cx="86" cy="-70" r="6"/><circle cx="-86" cy="70" r="6"/><circle cx="86" cy="70" r="6"/></g>':
@@ -115,8 +115,28 @@ export function landscape(route: Route): string {
     <g id="oak"><ellipse cx="10" cy="18" rx="35" ry="27" fill="#385638" opacity=".18"/><path d="M-2 12L2 29" stroke="#655b3b" stroke-width="8"/><path d="M-32 1C-45-17-27-27-22-28C-27-48-1-52 8-40C31-47 39-26 32-17C47-6 34 17 18 14C5 30-18 23-22 14C-32 17-42 10-32 1" fill="url(#leaf)" stroke="#5e7c48" stroke-width="2"/><path d="M-22-22Q-13-38 4-30M6-13Q19-23 27-12M-17 1Q-2 7 4-4" fill="none" stroke="#c0c885" stroke-width="5" opacity=".45" stroke-linecap="round"/></g>
     <g id="fir"><ellipse cx="9" cy="21" rx="29" ry="21" fill="#324f3d" opacity=".2"/><path d="M0 0V31" stroke="#6e6548" stroke-width="8"/><path d="M0-61L21-24L11-27L29 1L16-3L35 22Q0 37-33 22L-17-3L-29 2L-11-27L-21-24Z" fill="var(--season-fir-dark,#496b50)" stroke="#3b6048" stroke-width="2"/><path d="M0-52L-14-24L-4-27L-21 2L-6-3L-23 22L0 18Z" fill="var(--season-fir-light,#809664)"/><path d="M1-39L1 19" stroke="#a7b77c" stroke-width="2" opacity=".35"/></g>
     <g id="fruit"><use href="#oak" transform="scale(.7)"/><g fill="var(--season-fruit,#b46641)"><circle cx="-12" cy="-13" r="3"/><circle cx="10" cy="-19" r="3"/><circle cx="5" cy="6" r="3"/></g></g>
-    <g id="farm"><path d="M-52 12H58V58H-52Z" fill="#667659" opacity=".22" transform="translate(12 5)"/><path d="M-55-13H55V43H-55Z" fill="#e8ddba" stroke="#a1997d" stroke-width="3"/><path d="M-67-13L-43-50H45L69-13Z" fill="#7a8177" stroke="#53645c" stroke-width="3"/><path d="M-60-15H62M-50-29H53M-43-41H47" stroke="#aab0a0" stroke-width="3"/><rect x="-16" y="12" width="23" height="31" fill="#6a6d54"/><g fill="#61817b" stroke="#f8edca" stroke-width="4"><rect x="-43" y="1" width="17" height="19"/><rect x="24" y="1" width="17" height="19"/></g><path d="M27-43V-64H39V-34" fill="#ac9478"/></g>
-    <g id="barn"><rect x="-38" y="-4" width="76" height="43" fill="#c2ae82"/><path d="M-49-4L-31-35H31L49-4Z" fill="#a16b4f" stroke="#80573e" stroke-width="3"/><rect x="-18" y="9" width="36" height="30" fill="#777454"/><path d="M-15 12L15 35M15 12L-15 35" stroke="#bba880" stroke-width="3"/></g>
+    <g id="farm">
+      <ellipse cx="14" cy="48" rx="87" ry="48" fill="#374e3e" opacity=".18"/>
+      <path d="M-51-14L-5-38L57-14L10 10Z" fill="#635c4e" stroke="#514b43" stroke-width="3"/>
+      <path d="M-51-14V36L10 59V10Z" fill="#e8d7b5" stroke="#927f64" stroke-width="2.5"/>
+      <path d="M10 10L57-14V35L10 59Z" fill="#c9b897" stroke="#8f7b5e" stroke-width="2.5"/>
+      <path d="M-60-15L-5-49L66-19L10 13Z" fill="#89725e" stroke="#654f44" stroke-width="3"/>
+      <path d="M-51-14L-5-40L57-17L10 10Z" fill="#9b866d"/>
+      <path d="M-31 12L-13 19V36L-31 29Z" fill="#5b7977" stroke="#efe2bf" stroke-width="3"/>
+      <path d="M25 20L43 10V29L25 39Z" fill="#678580" stroke="#efe2bf" stroke-width="3"/>
+      <path d="M-5 57V23L8 28V59" fill="#6f6b55" stroke="#4f5744" stroke-width="2"/>
+      <path d="M22-20V-55H33V-15" fill="#a78b73" stroke="#736354" stroke-width="2"/>
+      <path d="M23-55H34" stroke="#5e5144" stroke-width="4"/>
+    </g>
+    <g id="barn">
+      <ellipse cx="5" cy="35" rx="63" ry="31" fill="#374e3e" opacity=".16"/>
+      <path d="M-39-8V30L2 47V9Z" fill="#bd996f" stroke="#85684d" stroke-width="2"/>
+      <path d="M2 9L43-8V29L2 47Z" fill="#a58062" stroke="#85684d" stroke-width="2"/>
+      <path d="M-46-10L-13-38L48-15L6 14Z" fill="#9d6350" stroke="#785146" stroke-width="3"/>
+      <path d="M-31-11L-8-27L34-13L6 6Z" fill="#be8262"/>
+      <path d="M-20 15L-3 21V44L-20 38Z" fill="#6e604a"/>
+      <path d="M-18 19L-3 40M-3 22L-19 39" stroke="#b79c70" stroke-width="2"/>
+    </g>
   </defs>
   <g class="landscape" aria-hidden="true">
   <rect x="-500" y="-500" width="5800" height="3600" fill="url(#land)"/>
