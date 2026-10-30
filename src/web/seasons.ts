@@ -12,9 +12,14 @@ export const seasonThemes:Record<Season,{label:string;colors:readonly string[]}>
  winter:{label:'Hiver',colors:['#d9e3dc','#e6eae0','#c8d5ce','#e0e7de','#bdcfc4','#91aaa0','#e7ece5','#c4d2c7','#6e8b81','#ceddd3','#d8dccc','#b7c5c0']},
 };
 const properties=['land-a','land-b','land-c','leaf-a','leaf-b','leaf-c','fruit','meadow','fir-dark','fir-light','crop','rock'];
-/** Only decorative paint changes: no DOM replacement, route mutation or camera movement. */
+/** Recolor the stable scenery and reveal season-specific objects in place.
+ * The route, camera, car and reward thresholds are never recreated or moved. */
 export function applySeason(world:SVGGElement,season:Season){
  const theme=seasonThemes[season];
  properties.forEach((name,i)=>world.style.setProperty(`--season-${name}`,theme.colors[i]));
+ // Landmarks, route and kilometer markers are separate from these decorative groups.
+ // SVG's display attribute also works without app-specific CSS.
+ const seasonal=world.querySelectorAll?.('[data-season-detail]')??[];
+ for(const group of seasonal)group.setAttribute('display',group.getAttribute('data-season-detail')===season?'inline':'none');
  world.dataset.season=season;
 }
