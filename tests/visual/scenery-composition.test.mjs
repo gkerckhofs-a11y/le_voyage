@@ -26,6 +26,10 @@ test('composed countryside is deterministic, contains different habitats and sta
  assert.match(markup,/id="snow-drift"/);
  assert.match(markup,/id="blossom-petal"/);
  assert.match(markup,/id="hay-bale"/);
+ for(const id of ['bocage-haze','valley-haze','forest-haze','hills-haze','harvest-haze'])assert.match(markup,new RegExp('id="'+id+'"'));
+ for(const detail of ['stone','grass','shrub','riverbank'])assert.match(markup,new RegExp('data-ground-detail="'+detail+'"'));
+ assert.doesNotMatch(first.terrain,/L3950 350L3790 1270/,'avoid rigid zone boundaries');
+
  assert.ok((markup.match(/data-scenery="forest"/g)||[]).length>60);
 });
 test('seasonal details toggle in place without changing the route or camera',()=>{
