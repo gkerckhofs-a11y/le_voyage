@@ -17,6 +17,9 @@ const properties=['land-a','land-b','land-c','leaf-a','leaf-b','leaf-c','fruit',
 export function applySeason(world:SVGGElement,season:Season){
  const theme=seasonThemes[season];
  properties.forEach((name,i)=>world.style.setProperty(`--season-${name}`,theme.colors[i]));
+ world.style.setProperty('--season-canopy-opacity',season==='winter'?'0.10':season==='spring'?'0.86':'1');
+ world.style.setProperty('--season-snow-opacity',season==='winter'?'0.94':'0');
+ world.style.setProperty('--season-fruit-opacity',season==='winter'?'0':season==='spring'?'0.18':'1');
  // Landmarks, route and kilometer markers are separate from these decorative groups.
  // SVG's display attribute also works without app-specific CSS.
  const seasonal=world.querySelectorAll?.('[data-season-detail]')??[];
