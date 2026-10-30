@@ -127,7 +127,7 @@ export function landscape(route: Route): string {
   <g fill="var(--season-rock,#a6ad84)" stroke="#889a77" stroke-width="4"><path d="M4050 110L4380 70L4630 280L4560 425L4290 280Z"/><path d="M4055 122L4270 300L4350 330L4380 460L4530 467L4560 425L4290 280Z" fill="#84967e"/><path d="M3850 1500L4070 1580L4230 1840L4130 1970L3930 1760Z"/><path d="M3850 1500L3855 1630L3910 1840L4100 2080L4130 1970L3930 1760Z" fill="#81927a"/></g>
   <path d="${river.path}" stroke="#8fa685" stroke-width="143" fill="none"/><path d="${river.path}" stroke="#c8c89f" stroke-width="123" fill="none"/><path d="${river.path}" stroke="url(#water)" stroke-width="99" fill="none"/>
   <path d="${river.path}" stroke="#cae0d2" stroke-width="2" stroke-dasharray="35 46 13 98" fill="none" opacity=".7"/>
-  <g class="map-details">${composition.decorations.sort((a,b)=>a.y-b.y).map(d=>d.html).join('')}${features.map(scenicMarkup).join('')}${composition.seasonal}</g>
+  <g class="map-details">${[...composition.decorations,...features.map(f=>({y:f.y,html:scenicMarkup(f)}))].sort((a,b)=>a.y-b.y).map(d=>d.html).join('')}${composition.seasonal}</g>
   <rect x="0" y="0" width="4800" height="2600" fill="url(#paper)" pointer-events="none"/>
   ${bridgeMarkup}
   </g>`;
