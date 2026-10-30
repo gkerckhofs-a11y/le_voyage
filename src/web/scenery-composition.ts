@@ -105,13 +105,52 @@ export function composeScenery(route:Route,river:Route,features:Feature[]):Compo
  }
  // Agricultural plots remain distinct from woods. Field edges and hedge rows
  // convey planting, drainage and scale rather than isolated symbols.
- const terrain=`<g class="land-habitats">
-   <path d="M-120 450Q410 190 1150 320T1720 740L1380 1280Q640 1040-120 1450Z" fill="#d5d49f" opacity=".18"/>
-   <path d="M1380 -120Q1940 170 2150 700T2540 1510Q2140 2040 1480 2350L1250 1730Q1800 1270 1520 660Z" fill="#88ad98" opacity=".12"/>
-   <path d="M2440 30Q3100 240 3630-50L3950 350L3790 1270L3580 2410L2840 2630Q2790 1900 2450 1500Z" fill="#486f56" opacity=".17"/>
-   <path d="M3770 60Q4170 140 4820-120V2700Q4140 2420 3790 1900Q4220 1250 3770 60Z" fill="#d6c69d" opacity=".15"/>
-   <path d="M115 1850Q520 1760 790 1990L900 2400Q600 2600 50 2520Z" fill="#d6c38f" opacity=".12"/>
-  </g>`;
+ // Broad soft-edged biomes blend together instead of exposing polygon seams.
+ // Fields remain the only hard-edged shapes, as they are cultivated parcels.
+ const terrain=`<g class="land-habitats" data-scenery="habitat-ground">
+   <ellipse cx="840" cy="1180" rx="1150" ry="1350" fill="url(#bocage-haze)"/>
+   <ellipse cx="2070" cy="1180" rx="800" ry="1460" fill="url(#valley-haze)"/>
+   <ellipse cx="3080" cy="1230" rx="1150" ry="1540" fill="url(#forest-haze)"/>
+   <ellipse cx="4320" cy="1350" rx="620" ry="1490" fill="url(#hills-haze)"/>
+   <ellipse cx="470" cy="2100" rx="660" ry="450" fill="url(#harvest-haze)"/>
+   <g class="soft-contours" fill="none" stroke="var(--season-meadow,#9fb67d)" stroke-width="6" opacity=".30">
+    <path d="M150 1020Q580 800 1060 1010T1480 1140"/>
+    <path d="M145 1060Q590 850 1060 1050T1470 1190"/>
+    <path d="M3020 190Q3390 135 3730 420M3080 220Q3400 175 3750 460"/>
+    <path d="M3880 1340Q4200 1190 4550 1420T4800 1570"/>
+    <path d="M3880 1380Q4220 1230 4550 1460T4800 1620"/>
+   </g>
+ </g>`;
+ // Planted ground details are distributed by habitat, never by a uniform
+ // scatter. Keep a road/river corridor unobstructed and leave farmyards clear.
+ const accents:Decoration[]=[];
+ for(let i=0;i<12;i++)for(let j=0;j<11;j++){
+  const x=190+i*390+(hash(i,j,16)-.5)*135,y=145+j*225+(hash(i,j,17)-.5)*75;
+  const p={x,y};
+  if(!clear(p,13,false))continue;
+  const biome=x<1450?'bocage':x<2470?'valley':x<3900?'forest':'hills';
+  const seed=hash(i,j,18),scale=.65+hash(i,j,19)*.7;
+  // Ground covers sit below the tree canopies and are deliberately subdued.
+  const color=biome==='forest'?'#4f7251':biome==='valley'?'#668a69':biome==='hills'?'#9d9c6c':'#839d5d';
+  const detail=seed<.25
+   ?`<g data-ground-detail="stone" transform="translate(${n(x)} ${n(y)}) scale(${n(scale)})"><ellipse cx="8" cy="9" rx="28" ry="10" fill="#41523b" opacity=".12"/><path d="M-20 5Q-27-10-10-14L7-12L16 2L8 11H-15Z" fill="var(--season-rock,#a6ad84)" stroke="#8d9980" stroke-width="2"/><path d="M6 7L18-9Q30-10 34 4L26 11Z" fill="#b8b59d"/></g>`
+   :seed<.66
+    ?`<g data-ground-detail="grass" transform="translate(${n(x)} ${n(y)}) scale(${n(scale)})" fill="none" stroke="${color}" stroke-linecap="round"><path d="M-17 8l-6-14M-15 7l2-19M-5 8l1-12M4 8l9-18M13 7l5-11M23 8l8-7" stroke-width="3" opacity=".78"/></g>`
+    :`<g data-ground-detail="shrub" transform="translate(${n(x)} ${n(y)}) scale(${n(scale)})"><ellipse cx="7" cy="11" rx="30" ry="11" fill="#52664a" opacity=".12"/><g fill="${color}" stroke="#607750" stroke-width="2"><ellipse cx="-13" cy="-3" rx="14" ry="11"/><ellipse cx="7" cy="-10" rx="17" ry="13"/><ellipse cx="24" cy="-2" rx="13" ry="10"/></g></g>`;
+  accents.push({y,html:detail});
+ }
+ // Riverbanks: reeds, pebbles and soft waterline greenery are attached to the
+ // actual river spline, with bridges and the journey road kept clear.
+ for(let i=0;i<48;i++){
+  const point=positionAt(river,(i+.4)/48);
+  const a=point.angle*Math.PI/180,side=i%2===0?1:-1;
+  const offset=side*(78+hash(i,7,3)*34);
+  const x=point.x-Math.sin(a)*offset,y=point.y+Math.cos(a)*offset;
+  if(!clear({x,y},12,false))continue;
+  const group=`<g data-ground-detail="riverbank" transform="translate(${n(x)} ${n(y)})"><ellipse cy="6" rx="25" ry="8" fill="#476f5e" opacity=".19"/><g fill="none" stroke="#6a9275" stroke-width="4" stroke-linecap="round"><path d="M-18 5L-21-15M-8 5L-4-24M4 5L12-18M17 5L23-10"/></g><g fill="#ad995b"><ellipse cx="-4" cy="-25" rx="3.5" ry="8"/><ellipse cx="13" cy="-19" rx="3" ry="6"/></g></g>`;
+  accents.push({y,html:group});
+ }
+ decorations.push(...accents);
  const seasonalItems:{[key:string]:string[]}={spring:[],summer:[],autumn:[],winter:[]};
  // Seasonal props belong to the courtyard, not to random points on the map.
  farms.forEach((farm,i)=>{
