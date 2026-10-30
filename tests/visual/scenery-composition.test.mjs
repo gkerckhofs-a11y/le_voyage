@@ -39,6 +39,6 @@ test('seasonal details toggle in place without changing the route or camera',()=
   assert.equal(world.dataset.season,season);
   assert.deepEqual(groups.filter(g=>g.display==='inline').map(g=>g.name),[season]);
   assert.equal(groups.filter(g=>g.display==='none').length,3);
-  assert.equal(style.size,12);
+  assert.equal(style.size,15);
  }
 });
