@@ -59,14 +59,14 @@ export function landscape(route: Route): string {
     <g id="maple">
       <ellipse cx="12" cy="25" rx="33" ry="22" fill="#304934" opacity=".21"/>
       <path d="M0 4L4 31" stroke="#65533c" stroke-width="7"/>
-      <path d="M-27-10Q-40-31-15-39Q-8-59 10-47Q33-53 35-30Q53-8 28 8Q12 27-7 16Q-36 20-33 1Z" fill="var(--season-leaf-b,#79974f)" stroke="#725e44" stroke-width="2"/>
+      <path d="M-27-10Q-40-31-15-39Q-8-59 10-47Q33-53 35-30Q53-8 28 8Q12 27-7 16Q-36 20-33 1Z" fill="var(--season-leaf-b,#79974f)" stroke="#725e44" stroke-width="2" opacity="var(--season-canopy-opacity,1)"/>
       <path d="M-15-26Q0-47 16-30M-22-6Q2 1 24-11" stroke="#f5d8a0" stroke-width="4" opacity=".45" fill="none"/>
     </g>
     <g id="birch">
       <ellipse cx="12" cy="28" rx="24" ry="18" fill="#304934" opacity=".15"/>
       <path d="M0-18L2 31" stroke="#e9e4d5" stroke-width="7"/>
       <path d="M-2-11L6-2M0 9L-5 14" stroke="#666c61" stroke-width="3"/>
-      <g fill="var(--season-leaf-a,#a6b86b)" stroke="#6f8756" stroke-width="2"><ellipse cy="-35" rx="22" ry="29"/><ellipse cx="-16" cy="-19" rx="18" ry="19"/><ellipse cx="16" cy="-22" rx="19" ry="21"/></g>
+      <g fill="var(--season-leaf-a,#a6b86b)" stroke="#6f8756" stroke-width="2" opacity="var(--season-canopy-opacity,1)"><ellipse cy="-35" rx="22" ry="29"/><ellipse cx="-16" cy="-19" rx="18" ry="19"/><ellipse cx="16" cy="-22" rx="19" ry="21"/></g>
     </g>
     <g id="pumpkin">
       <ellipse cy="8" rx="16" ry="5" fill="#69563b" opacity=".2"/>
@@ -112,9 +112,9 @@ export function landscape(route: Route): string {
       <path d="M-8 5L-6-10M1 5L1-12M9 5L7-9" stroke="#678d4b" stroke-width="2"/>
       <g fill="#f9e5a5"><circle cx="-6" cy="-10" r="4"/><circle cx="1" cy="-12" r="4"/><circle cx="7" cy="-9" r="4"/></g>
     </g>
-    <g id="oak"><ellipse cx="10" cy="18" rx="35" ry="27" fill="#385638" opacity=".18"/><path d="M-2 12L2 29" stroke="#655b3b" stroke-width="8"/><path d="M-32 1C-45-17-27-27-22-28C-27-48-1-52 8-40C31-47 39-26 32-17C47-6 34 17 18 14C5 30-18 23-22 14C-32 17-42 10-32 1" fill="url(#leaf)" stroke="#5e7c48" stroke-width="2"/><path d="M-22-22Q-13-38 4-30M6-13Q19-23 27-12M-17 1Q-2 7 4-4" fill="none" stroke="#c0c885" stroke-width="5" opacity=".45" stroke-linecap="round"/></g>
-    <g id="fir"><ellipse cx="9" cy="21" rx="29" ry="21" fill="#324f3d" opacity=".2"/><path d="M0 0V31" stroke="#6e6548" stroke-width="8"/><path d="M0-61L21-24L11-27L29 1L16-3L35 22Q0 37-33 22L-17-3L-29 2L-11-27L-21-24Z" fill="var(--season-fir-dark,#496b50)" stroke="#3b6048" stroke-width="2"/><path d="M0-52L-14-24L-4-27L-21 2L-6-3L-23 22L0 18Z" fill="var(--season-fir-light,#809664)"/><path d="M1-39L1 19" stroke="#a7b77c" stroke-width="2" opacity=".35"/></g>
-    <g id="fruit"><use href="#oak" transform="scale(.7)"/><g fill="var(--season-fruit,#b46641)"><circle cx="-12" cy="-13" r="3"/><circle cx="10" cy="-19" r="3"/><circle cx="5" cy="6" r="3"/></g></g>
+    <g id="oak"><ellipse cx="10" cy="18" rx="35" ry="27" fill="#385638" opacity=".18"/><path d="M-2 12L2 29" stroke="#655b3b" stroke-width="8"/><path d="M-28 7L-13-11L-3-30M-1-3L19-23M5 4L25-4" fill="none" stroke="#766249" stroke-width="5" stroke-linecap="round"/><path d="M-32 1C-45-17-27-27-22-28C-27-48-1-52 8-40C31-47 39-26 32-17C47-6 34 17 18 14C5 30-18 23-22 14C-32 17-42 10-32 1" fill="url(#leaf)" stroke="#5e7c48" stroke-width="2" opacity="var(--season-canopy-opacity,1)"/><path d="M-22-22Q-13-38 4-30M6-13Q19-23 27-12M-17 1Q-2 7 4-4" fill="none" stroke="#c0c885" stroke-width="5" opacity=".45" stroke-linecap="round"/></g>
+    <g id="fir"><ellipse cx="9" cy="21" rx="29" ry="21" fill="#324f3d" opacity=".2"/><path d="M0 0V31" stroke="#6e6548" stroke-width="8"/><path d="M0-61L21-24L11-27L29 1L16-3L35 22Q0 37-33 22L-17-3L-29 2L-11-27L-21-24Z" fill="var(--season-fir-dark,#496b50)" stroke="#3b6048" stroke-width="2"/><path d="M0-52L-14-24L-4-27L-21 2L-6-3L-23 22L0 18Z" fill="var(--season-fir-light,#809664)"/><path d="M1-39L1 19" stroke="#a7b77c" stroke-width="2" opacity=".35"/><path d="M0-58L14-32L6-35L19-12L5-17L16 6L0-1L-16 6L-4-17L-19-12L-6-35L-14-32Z" fill="#f5f7ef" opacity="var(--season-snow-opacity,0)"/></g>
+    <g id="fruit"><use href="#oak" transform="scale(.7)"/><g fill="var(--season-fruit,#b46641)" opacity="var(--season-fruit-opacity,1)"><circle cx="-12" cy="-13" r="3"/><circle cx="10" cy="-19" r="3"/><circle cx="5" cy="6" r="3"/></g></g>
     <g id="farm">
       <ellipse cx="14" cy="48" rx="87" ry="48" fill="#374e3e" opacity=".18"/>
       <path d="M-51-14L-5-38L57-14L10 10Z" fill="#635c4e" stroke="#514b43" stroke-width="3"/>
