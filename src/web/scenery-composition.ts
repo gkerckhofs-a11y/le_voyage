@@ -113,6 +113,14 @@ export function composeScenery(route:Route,river:Route,features:Feature[]):Compo
    <path d="M115 1850Q520 1760 790 1990L900 2400Q600 2600 50 2520Z" fill="#d6c38f" opacity=".12"/>
   </g>`;
  const seasonalItems:{[key:string]:string[]}={spring:[],summer:[],autumn:[],winter:[]};
+ // Seasonal props belong to the courtyard, not to random points on the map.
+ farms.forEach((farm,i)=>{
+  const x=farm.x,y=farm.y;
+  seasonalItems.autumn.push(seasonalDetail('pumpkin',x-76,y+56,1.15),seasonalDetail('pumpkin',x-48,y+77,.72),seasonalDetail('fallen-leaf',x+32,y+63,1.1));
+  seasonalItems.winter.push(seasonalDetail('snow-drift',x-52,y+52,1.1),seasonalDetail('snow-drift',x+76,y+44,.8),seasonalDetail('winter-twig',x-91,y+64,.85));
+  seasonalItems.spring.push(seasonalDetail('flower-clump',x-81,y+66,1.1),seasonalDetail('blossom-petal',x+43,y+73,.9),seasonalDetail('flower-clump',x+83,y+67,.8));
+  seasonalItems.summer.push(seasonalDetail('hay-bale',x-76,y+61,1),seasonalDetail('hay-bale',x-45,y+80,.7),seasonalDetail('wildflower',x+83,y+59,1));
+ });
  // Detail vignettes are attached to existing landuses. No decorations in
  // the river, on the road, or on top of the milestone markers.
  const motifs=[...farms,{x:685,y:890},{x:1010,y:2140},{x:2850,y:2130},{x:4200,y:890},{x:3340,y:360}];
