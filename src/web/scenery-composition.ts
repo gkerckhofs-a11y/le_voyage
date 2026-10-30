@@ -31,16 +31,27 @@ const groves:{biome:string;x:number;y:number;count:number;radius:number}[]=[
  {biome:'hills',x:4050,y:1450,count:12,radius:190},{biome:'hills',x:4550,y:1910,count:13,radius:200},
  {biome:'hills',x:4130,y:2300,count:12,radius:170}
 ];
-const farms:Point[]=[{x:700,y:580},{x:1250,y:1450},{x:2830,y:640},{x:4070,y:1930},{x:650,y:2320}];
+const farmCandidates:Point[]=[{x:700,y:580},{x:1250,y:1450},{x:2830,y:640},{x:4070,y:1930},{x:650,y:2320}];
 const ground=(x:number,y:number,rx:number,ry:number)=>`<ellipse cx="${n(x+7)}" cy="${n(y+19)}" rx="${n(rx)}" ry="${n(ry)}" fill="#465544" opacity=".09"/>`;
 const use=(id:string,x:number,y:number,scale:number,kind:string)=>`<use href="#${id}" data-scenery="${kind}" transform="translate(${n(x)} ${n(y)}) scale(${n(scale)})"/>`;
 const seasonalDetail=(id:string,x:number,y:number,size=1)=>`<use href="#${id}" transform="translate(${n(x)} ${n(y)}) scale(${n(size)})"/>`;
 export function composeScenery(route:Route,river:Route,features:Feature[]):Composition {
  const decorations:Decoration[]=[],placed:Placed[]=[];
+ const farms=farmCandidates.map(f=>{
+  for(const [dx,dy] of [[0,0],[185,-160],[-185,-160],[190,180],[-190,180],[290,0],[-290,0],[0,260],[0,-260]]){
+   const p={x:f.x+dx,y:f.y+dy};
+   if(p.x<160||p.y<160||p.x>route.width-160||p.y>route.height-160)continue;
+   if(distanceFromRoute(route,p)<175||distanceFromRoute(river,p)<177)continue;
+   if(features.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<v.radius+145))continue;
+   return p;
+  }
+  return null;
+ }).filter((p):p is Point=>p!==null);
  const clear=(p:Point,radius:number,avoidScenery=true)=>{
   if(p.x<radius+25||p.y<radius+25||p.x>route.width-radius-25||p.y>route.height-radius-25)return false;
   if(distanceFromRoute(route,p)<radius+63||distanceFromRoute(river,p)<radius+66)return false;
   if(features.some(f=>Math.hypot(f.x-p.x,f.y-p.y)<f.radius+radius+42))return false;
+  if(farms.some(f=>Math.hypot(f.x-p.x,f.y-p.y)<radius+115))return false;
   if(avoidScenery&&placed.some(f=>Math.hypot(f.x-p.x,f.y-p.y)<(f.radius+radius)*.74))return false;
   return true;
  };
@@ -77,8 +88,7 @@ export function composeScenery(route:Route,river:Route,features:Feature[]):Compo
  });
  // Farmyards are micro-scenes: building + driveway + enclosure + context.
  for(const [i,f] of farms.entries()){
-  const yard=clear(f,120,false)?f:null;
-  if(!yard)continue;
+  // Every farm is chosen outside both the road and the river beforehand.
   const x=f.x,y=f.y;
   const markup=`<g class="farmstead" data-scenery="farmstead" transform="translate(${x} ${y})">
     <ellipse cx="12" cy="36" rx="142" ry="103" fill="#596743" opacity=".16"/>
