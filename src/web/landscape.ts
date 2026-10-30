@@ -146,7 +146,11 @@ export function landscape(route: Route): string {
   <g class="landscape" aria-hidden="true">
   <rect x="-500" y="-500" width="5800" height="3600" fill="url(#land)"/>
   ${composition.terrain}
-  <g fill="var(--season-meadow,#9fb67d)" opacity=".58"><path d="M-100 500Q300 100 1000 270T1700 160L1800-200H-100Z"/><path d="M-200 2050Q350 1630 900 1850T1700 2150L1400 2800H-200Z"/><path d="M2900-100Q3400 480 3240 1100T3600 2200L3950 2750H3000Q2780 1700 2900 1100T2600-100Z"/></g>
+  <g class="meadow-undulations" aria-hidden="true">
+   <ellipse cx="850" cy="770" rx="1200" ry="760" fill="url(#bocage-haze)" opacity=".58"/>
+   <ellipse cx="790" cy="2160" rx="1120" ry="530" fill="url(#harvest-haze)" opacity=".52"/>
+   <ellipse cx="3320" cy="1270" rx="890" ry="1190" fill="url(#forest-haze)" opacity=".42"/>
+  </g>
   <g fill="none" stroke="#dbe1ae" stroke-width="3" opacity=".35"><path d="M-70 400Q540 100 1000 230T1650 50M-70 435Q540 135 1000 265T1650 85M-70 470Q540 170 1000 300T1650 120"/><path d="M3830 1590Q4110 1450 4440 1800T4900 2200M3820 1640Q4110 1500 4430 1850T4900 2250M3810 1690Q4110 1550 4420 1900T4900 2300"/></g>
   <g stroke="#9da873" stroke-width="9"><path d="M80 60L520 90L610 410L170 550L20 310Z" fill="url(#crops)"/><path d="M780 60L1040 100L920 450L750 400Z" fill="#d1c789"/><path d="M350 1690L600 1670L665 1880L300 1920Z" fill="url(#crops)"/><path d="M780 2150L1250 2000L1390 2380L1020 2520L740 2430Z" fill="url(#crops)"/><path d="M2740 170L3100 100L3230 570L2790 450Z" fill="url(#crops)"/><path d="M3990 2150L4210 2100L4360 2440L3980 2510Z" fill="#cfbc79"/></g>
   <g fill="var(--season-rock,#a6ad84)" stroke="#889a77" stroke-width="4"><path d="M4050 110L4380 70L4630 280L4560 425L4290 280Z"/><path d="M4055 122L4270 300L4350 330L4380 460L4530 467L4560 425L4290 280Z" fill="#84967e"/><path d="M3850 1500L4070 1580L4230 1840L4130 1970L3930 1760Z"/><path d="M3850 1500L3855 1630L3910 1840L4100 2080L4130 1970L3930 1760Z" fill="#81927a"/></g>
