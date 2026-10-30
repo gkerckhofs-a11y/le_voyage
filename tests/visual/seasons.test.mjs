@@ -11,6 +11,6 @@ test('local civil date selects all four meteorological seasons, leap day and yea
 test('season changes affect only decorative paint and preserve deterministic geometry',()=>{
  const before=JSON.stringify(journeyRoute),markup=landscape(journeyRoute),paint=new Map();
  const world={dataset:{},style:{setProperty:(name,value)=>paint.set(name,value)}};
- for(const season of Object.keys(seasonThemes)){applySeason(world,season);assert.equal(world.dataset.season,season);assert.equal(paint.size,12);assert.equal(landscape(journeyRoute),markup);assert.equal(JSON.stringify(journeyRoute),before);}
+ for(const season of Object.keys(seasonThemes)){applySeason(world,season);assert.equal(world.dataset.season,season);assert.equal(paint.size,15);assert.equal(landscape(journeyRoute),markup);assert.equal(JSON.stringify(journeyRoute),before);}
  assert.equal(new Set(Object.values(seasonThemes).map(t=>t.colors.join())).size,4);
 });
