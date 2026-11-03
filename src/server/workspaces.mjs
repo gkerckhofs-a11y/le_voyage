@@ -3,9 +3,9 @@ import {authorizedGrant} from './gift-operations.mjs';
 import {assertTestAdapter} from './test-environment.mjs';
 const denied=()=>Object.assign(new Error('Workspace access denied'),{status:403});
 const identifier=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
-export const workspaceDestinations=Object.freeze({organizer:'/organisateur.html',director:'/entreprise.html',team:'/index.html',gifts:'/cockpit.html',kpi:'/kpi.html',kiosk:'/kiosque.html','cite-gifts':'/cite-cockpit.html','cite-member':'/cite-preferences.html'});
+export const workspaceDestinations=Object.freeze({organizer:'/organisateur.html',director:'/entreprise.html',team:'/index.html',gifts:'/cockpit.html',kpi:'/kpi.html',kiosk:'/kiosque.html','cite-gifts':'/cite-cockpit.html','cite-member':'/cite-preferences.html','cite-admin':'/cite-admin.html'});
 /** Directory entries are references, never grants. Each selection rechecks the underlying service. */
-export function createWorkspaces(adapter,{organizer,director,kiosk,citeGifts,citeMember}){
+export function createWorkspaces(adapter,{organizer,director,kiosk,citeGifts,citeMember,citeAdmin}){
  assertTestAdapter(adapter);
  async function directory(header){
   if(typeof header!=='string'||!/^Bearer [^\s]{1,8192}$/.test(header))throw denied();
@@ -14,12 +14,13 @@ export function createWorkspaces(adapter,{organizer,director,kiosk,citeGifts,cit
   const d=(await adapter.db.doc(`workspaceDirectories/${identity.uid}`).get()).data();
   if(d?.uid!==identity.uid||d.active!==true||!Array.isArray(d.entries)||d.entries.length>20)throw denied();
   const ids=new Set();
-  for(const e of d.entries){if(!e||!(e.space==='gifts'?[e.id]:['cite-gifts','cite-member'].includes(e.space)?[e.id,e.tenantId,e.seasonId,e.familyId]:[e.id,e.tenantId,e.campaignId,e.teamId]).every(identifier)||!Object.hasOwn(workspaceDestinations,e.space)||typeof e.label!=='string'||!e.label.trim()||e.label.length>160||ids.has(e.id)||(['cite-gifts','cite-member'].includes(e.space)&&Object.keys(e).sort().join(',')!=='familyId,id,label,seasonId,space,tenantId')||(e.space==='gifts'&&Object.keys(e).sort().join(',')!=='id,label,space'))throw denied();ids.add(e.id);}
+  for(const e of d.entries){if(!e||!(e.space==='gifts'?[e.id]:['cite-gifts','cite-member','cite-admin'].includes(e.space)?[e.id,e.tenantId,e.seasonId,e.familyId]:[e.id,e.tenantId,e.campaignId,e.teamId]).every(identifier)||!Object.hasOwn(workspaceDestinations,e.space)||typeof e.label!=='string'||!e.label.trim()||e.label.length>160||ids.has(e.id)||(['cite-gifts','cite-member','cite-admin'].includes(e.space)&&Object.keys(e).sort().join(',')!=='familyId,id,label,seasonId,space,tenantId')||(e.space==='gifts'&&Object.keys(e).sort().join(',')!=='id,label,space'))throw denied();ids.add(e.id);}
   return {entries:d.entries,uid:identity.uid};
  }
  async function check(header,e,uid){
-  const scope=e.space==='gifts'?null:['cite-gifts','cite-member'].includes(e.space)?{tenantId:e.tenantId,seasonId:e.seasonId,familyId:e.familyId}:{tenantId:e.tenantId,campaignId:e.campaignId,teamId:e.teamId};
-  if(e.space==='cite-member'){if(!citeMember)throw denied();await citeMember.access(header,scope);
+  const scope=e.space==='gifts'?null:['cite-gifts','cite-member','cite-admin'].includes(e.space)?{tenantId:e.tenantId,seasonId:e.seasonId,familyId:e.familyId}:{tenantId:e.tenantId,campaignId:e.campaignId,teamId:e.teamId};
+  if(e.space==='cite-admin'){if(!citeAdmin)throw denied();await citeAdmin.access(header,scope);
+  }else if(e.space==='cite-member'){if(!citeMember)throw denied();await citeMember.access(header,scope);
   }else if(e.space==='cite-gifts'){if(!citeGifts)throw denied();await citeGifts.access(header,scope);
   }else if(e.space==='gifts'){
    // The gift cockpit is global over its independent, explicit client grants.

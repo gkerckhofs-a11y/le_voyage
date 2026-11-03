@@ -1,0 +1,12 @@
+import {createCiteAdminService} from './cite-admin.mjs';
+import {body,authorized} from './http.mjs';
+const fail=status=>Object.assign(Error('Cité administration refused'),{status});
+export function createCiteAdminHttp(adapter,options={}){
+ const admin=createCiteAdminService(adapter,options);
+ return {access:admin.access,async handle(req,json,path,session){
+  if(session.workspaceSpace!=='cite-admin'||!session.workspaceEnabled||!session.scope)throw fail(403);
+  if(path==='/api/cite/admin'&&req.method==='GET'){json(200,{...await admin.read(session.header,session.scope),csrf:session.csrf});return;}
+  const actions={performance:[admin.performance,['familyId','weekId','scores']],'close-week':[admin.closeWeek,['familyId','weekId']],'close-vote':[admin.closeVote,['councilId','round']],'close-funding':[admin.closeFunding,['councilId']]},name=path.slice('/api/cite/admin/'.length);
+  if(req.method!=='POST'||!Object.hasOwn(actions,name)||path!=='/api/cite/admin/'+name)throw fail(404);authorized(req,session);const [action,fields]=actions[name],input=await body(req,fields);json(200,{...await action(session.header,session.scope,input),csrf:session.csrf});
+ }};
+}

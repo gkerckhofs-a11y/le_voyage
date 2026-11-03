@@ -1,3 +1,4 @@
+import {canonicalJSON} from './canonical.ts';
 import {exact,add,multiply,divide,mean,bounded,rounded} from '../domain/exact.ts';
 import type {Exact} from '../domain/exact.ts';
 import {civilDate,addDays} from '../domain/calendar.ts';
@@ -38,12 +39,12 @@ function open(week:Week,onDate:string){check(civilDate(onDate)>=week.start&&onDa
 function canonical(definitions:Metric[],scores:Record<string,string>){normalizedScore(definitions,scores);return Object.fromEntries(definitions.map(m=>[m.id,scores[m.id]]));}
 export function submitValues(state:State,scope:Scope,uid:string,weekId:string,scores:Record<string,string>,onDate:string):State{
  const week=context(state,scope,weekId);check(eligibleMembers(state,scope.familyId,week).includes(uid),'Member not eligible for this week');const value=canonical(state.config.metrics.values,scores),old=state.values[weekId]?.[uid];
- if(old){check(old.familyId===scope.familyId&&JSON.stringify(old.scores)===JSON.stringify(value),'Correction requires an audited workflow');return state;}
+ if(old){check(old.familyId===scope.familyId&&canonicalJSON(old.scores)===canonicalJSON(value),'Correction requires an audited workflow');return state;}
  open(week,onDate);check(!state.credits[key(scope.familyId,weekId)],'Week already credited');const next=structuredClone(state);next.values[weekId]??={};next.values[weekId][uid]={familyId:scope.familyId,scores:value};return next;
 }
 export function recordPerformance(state:State,scope:Scope,weekId:string,scores:Record<string,string>,onDate:string):State{
  const week=context(state,scope,weekId),value=canonical(state.config.metrics.performance,scores),old=state.performance[weekId]?.[scope.familyId];
- if(old){check(JSON.stringify(old)===JSON.stringify(value),'Correction requires an audited workflow');return state;}
+ if(old){check(canonicalJSON(old)===canonicalJSON(value),'Correction requires an audited workflow');return state;}
  open(week,onDate);check(!state.credits[key(scope.familyId,weekId)],'Week already credited');const next=structuredClone(state);next.performance[weekId]??={};next.performance[weekId][scope.familyId]=value;return next;
 }
 export function closeFamilyWeek(state:State,scope:Scope,weekId:string,onDate:string):{state:State;credit?:Credit;deferred?:true}{
