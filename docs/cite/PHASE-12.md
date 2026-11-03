@@ -19,16 +19,16 @@ Une crise préengagée est appliquée par le moteur à la publication du Conseil
 - `src/cite/councils.ts` : expose une validation/préparation sans ouverture et compare les définitions canoniquement, indépendamment de l'ordre Firestore.
 - `src/server/cite-council-planning.mjs` : prochain créneau, validation stricte, contrôle des prix/contenus et projection du brouillon.
 - `src/server/cite-admin.mjs` : sauvegarde révisée, publication transactionnelle, conservation des brouillons et audit existant.
-- `src/server/cite-admin-http.mjs` : POST `/api/cite/admin/save-draft` et `/publish-draft`, espace gestionnaire et CSRF obligatoires, portée issue de la session.
+- `src/server/cite-admin-http.mjs` : POST `/api/cite/admin/save-draft` et `/publish-draft`, espace gestionnaire et CSRF obligatoires, portée issue de la session. Le brouillon accepte au plus 16 Kio pour les récits bornés ; les autres commandes conservent leur plafond de 4 Kio.
 - `web/assets/cite/planning.js`, `web/assets/cite/admin.js`, `web/cite-admin.html`, `.css` : formulaire, relecture enregistrée et ouverture manuelle. Libellés explicites, contenus rendus avec textContent, publication désactivée pour un formulaire modifié.
 - `src/server/cite-cockpit-demo.mjs` : société fictive « La Cité des Conseils », accessible au compte administrateur et au membre de démonstration. Aucun Conseil ouvert initialement, date de jeu du 1er mars 2027. Gardes émulateurs/projet/K_SERVICE inchangées.
-- `tests/cite/planning.test.mjs` : sept cas ciblés de confidentialité, coûts pour 1/2/5/10 familles, concurrence, idempotence, calendrier, immutabilité, crise unique, mode famille unique et HTTP/droits.
+- `tests/cite/planning.test.mjs` : huit cas ciblés de confidentialité, coûts pour 1/2/5/10 familles, concurrence, idempotence, calendrier, immutabilité, crise unique, mode famille unique et HTTP/droits.
 - `tests/cite-emulator/cockpit-http.test.mjs` : deux nouveaux parcours réels Auth/Firestore, publication simultanée, vote après publication et révisions concurrentes.
 - `tests/cite-cockpit-browser/planning.spec.mjs` : deux parcours ordinateur/mobile, brouillon/relecture/rechargement/publication/vote et conflits entre onglets.
 - `tests/visual/public-build.test.mjs` : un nouveau fichier public de présentation explicitement autorisé, aucun module serveur exposé.
 
 ## Vérifications et limites
 
-102 tests Cité, TypeScript, build et liste publique stricte réussis localement. Résultats des émulateurs et captures navigateur consignés dans la PR après exécution CI.
+103 tests Cité, TypeScript, build et liste publique stricte réussis localement. Résultats des émulateurs et captures navigateur consignés dans la PR après exécution CI.
 
 Aucun déploiement, donnée client, achat ou règle Firebase modifié. Un seul prochain brouillon est éditable à la fois ; les définitions déjà publiées ne sont pas corrigées par cet écran. Pas d'import en masse des treize Conseils, d'ouverture planifiée automatique, de clonage de scénario, d'illustrations ou de traitement des corrections après publication. Les effets différés supplémentaires restent à modéliser dans le catalogue. Les paramètres proposés de prix, quorum, calendrier et récompenses restent ceux de V1.0. La réconciliation GitHub/version historiquement publiée reste obligatoire avant déploiement.
