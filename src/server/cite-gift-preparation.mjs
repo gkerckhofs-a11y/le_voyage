@@ -74,8 +74,8 @@ export function giftPreparationOperations(rewards,scope,current,catalog,preferen
 export async function readCiteGiftPreparationOperations({db,tx,record,catalog,current=record.giftPreparation??emptyGiftPreparation(),ledger,catalogDocument='supplierCatalog/main'}){
   if(ledger===undefined)ledger=(await tx.get(db.doc(catalogDocument+'/reservationLedger/main'))).data()??{};
   const uids=[...new Set(Object.values(record.rewards.unlocks).filter(u=>u.program!=='party').map(u=>u.uid))];if(uids.length>200)throw fail(409);
-  const preferences={};for(const uid of uids)preferences[uid]=(await tx.get(db.doc(`tenants/${record.rewards.tenantId}/giftPreferences/${uid}`))).data()??null;
-  return giftPreparationOperations(record.rewards,{tenantId:record.rewards.tenantId,seasonId:record.rewards.seasonId,familyId:record.state.config.families[0].id},current,catalog,preferences,ledger);
+  const names={},preferences={};for(const uid of uids){const member=(await tx.get(db.doc(`tenants/${record.rewards.tenantId}/members/${uid}`))).data();names[uid]=typeof member?.displayName==='string'&&member.displayName.trim()&&member.displayName.length<=160?member.displayName:'Bénéficiaire';preferences[uid]=(await tx.get(db.doc(`tenants/${record.rewards.tenantId}/giftPreferences/${uid}`))).data()??null;}
+  const view=giftPreparationOperations(record.rewards,{tenantId:record.rewards.tenantId,seasonId:record.rewards.seasonId,familyId:record.state.config.families[0].id},current,catalog,preferences,ledger);return {...view,rows:view.rows.map(row=>({...row,beneficiaryName:names[row.uid]}))};
  }
 
 export function createCiteGiftPreparationService(adapter,{catalogDocument='supplierCatalog/main',...options}={}){

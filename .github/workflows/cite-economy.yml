@@ -1,7 +1,7 @@
 name: La Cite economy (targeted)
 on:
   pull_request:
-    paths: ['src/cite/**', 'src/server/cite-*.mjs', 'src/domain/exact.ts', 'src/domain/calendar.ts', 'tests/cite/**', 'tests/cite-emulator/**', 'scripts/simulate-cite-*.mjs', 'prototypes/la-cite/**', 'playwright.cite.config.mjs', 'tests/cite-browser/**', 'scripts/serve-cite-prototype.mjs', '.github/workflows/cite-economy.yml']
+    paths: ['src/cite/**', 'src/server/cite-*.mjs', 'src/domain/exact.ts', 'src/domain/calendar.ts', 'tests/cite/**', 'tests/cite-emulator/**', 'tests/cite-cockpit-browser/**', 'playwright.cite-cockpit.config.mjs', 'scripts/serve-cite-cockpit.mjs', 'web/cite-cockpit*', 'web/assets/cite/**', 'src/server/workspaces.mjs', 'src/server/firebase-http.mjs', 'scripts/build-web.mjs', 'src/web/workspaces.ts', 'src/web/login.ts', 'scripts/simulate-cite-*.mjs', 'prototypes/la-cite/**', 'playwright.cite.config.mjs', 'tests/cite-browser/**', 'scripts/serve-cite-prototype.mjs', '.github/workflows/cite-economy.yml']
 permissions:
   contents: read
 concurrency:
@@ -44,7 +44,7 @@ jobs:
 
   transactions:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,4 +59,16 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-15.34.1
-      - run: npx firebase emulators:exec --project demo-rc-voyage --config firebase/emulators.json --only auth,firestore "node --test tests/cite-emulator/*.test.mjs"
+      - run: npm run build:web
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-shell-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --only-shell chromium
+      - run: npx firebase emulators:exec --project demo-rc-voyage --config firebase/emulators.json --only auth,firestore "node --test tests/cite-emulator/*.test.mjs tests/firebase/workspaces.test.mjs tests/firebase/provisioned-login.test.mjs && npx playwright test --config playwright.cite-cockpit.config.mjs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cite-authenticated-cockpit-evidence
+          path: test-results/cite-cockpit/
+          retention-days: 14

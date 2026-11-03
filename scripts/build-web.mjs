@@ -16,6 +16,9 @@ for(const dir of ['map','web']) {
     await cp(resolve(compiled,dir,file.replace(/\.ts$/,'.js')),target);
   }
 }
+// Reuse only the explicitly public Cité presentation assets; no prototype server or fixtures.
+await mkdir(resolve(output,'assets/cite'),{recursive:true});
+for(const [source,target]of [['gift-preparation.js','gift-preparation.js'],['style.css','common.css']])await cp(resolve(root,'prototypes/la-cite',source),resolve(output,'assets/cite',target));
 await mkdir(resolve(output,'data'),{recursive:true});
 for (const scenario of collectiveScenarios) await writeFile(resolve(output,`data/collective-${scenario}.json`),JSON.stringify(demoCollective(scenario))+'\n');
 await rm(compiled,{recursive:true,force:true});
