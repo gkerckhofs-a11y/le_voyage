@@ -1,3 +1,4 @@
+import {canonicalJSON} from '../cite/canonical.ts';
 import {createHash} from 'node:crypto';
 import {identifier} from '../cite/economy.ts';
 import {civilDate} from '../domain/calendar.ts';
@@ -12,7 +13,8 @@ function context(rewards,scope){if(!rewards||rewards.tenantId!==scope.tenantId||
 function entitlement(rewards,id){const u=typeof id==='string'&&Object.hasOwn(rewards.unlocks,id)?rewards.unlocks[id]:null;if(!u||!identifier(u.uid)||u.program==='party'||!money(u.allocatedCents))throw fail(404);return u;}
 export const giftDraftId=(scope,unlockId)=>hash([scope.tenantId,scope.seasonId,unlockId]);
 export const emptyGiftPreparation=()=>({drafts:{},mutations:{}});
-const fingerprint=p=>hash(p??null);
+const fingerprint=p=>createHash('sha256').update(canonicalJSON(p??null)).digest('hex');
+export const giftPreferencesMatch=(draft,preferences)=>draft.preferenceFingerprint===fingerprint(preferences)||draft.preferenceFingerprint===hash(preferences??null);
 /** Calculate a simulation estimate from declared metadata; never infer tax or mix unknown bases. */
 export function quoteCiteGift(catalog,selection,{dueDate,asOf,packagingInclTaxCents,transportInclTaxCents,allocatedCents}){
  if(!money(packagingInclTaxCents)||!money(transportInclTaxCents)||!money(allocatedCents))throw fail(400);
@@ -41,6 +43,7 @@ export function changeGiftPreparation(rewards,scope,current,input,{kind,catalog,
  const id=giftDraftId(scope,u.id),digest=hash([scope.tenantId,scope.seasonId,kind,actor,input]),prior=current.mutations[input.mutationId];
  if(prior){if(prior.digest!==digest)throw fail(409);return current;}
  const old=current.drafts[id];if((old?.revision??0)!==input.revision)throw fail(409);
+ if(old?.stockHold?.status==='reserved')throw fail(409,'Release held stock before editing');
  const next=structuredClone(current),revision=input.revision+1;
  if(kind==='prepare'){
   if(old?.status==='reviewed')throw fail(409);
@@ -50,9 +53,9 @@ export function changeGiftPreparation(rewards,scope,current,input,{kind,catalog,
  }else{
   if(!old||old.uid!==u.uid||old.unlockId!==u.id)throw fail(409);
   if(kind==='review'){
-   if(old.status!=='draft'||old.preferenceFingerprint!==fingerprint(preferences))throw fail(409);
+   if(old.status!=='draft'||!giftPreferencesMatch(old,preferences))throw fail(409);
    const fresh=quoteCiteGift(catalog,old.quote.selection,{dueDate:old.dueDate,asOf:onDate,packagingInclTaxCents:old.quote.packagingInclTaxCents,transportInclTaxCents:old.quote.transportInclTaxCents,allocatedCents:u.allocatedCents});
-   if(JSON.stringify(fresh)!==JSON.stringify(old.quote))throw fail(409);
+   if(canonicalJSON(fresh)!==canonicalJSON(old.quote))throw fail(409);
    if(preferences?.value?.privateContactRequested===true&&input.contactConfirmed!==true)throw fail(422);
    next.drafts[id]={...old,status:'reviewed',revision,review:{actor,onDate,preferencesReviewed:true,contactConfirmed:input.contactConfirmed},audit:[...old.audit,{kind,revision,actor,onDate,reason:input.reason.trim()}]};
   }else{
@@ -62,30 +65,32 @@ export function changeGiftPreparation(rewards,scope,current,input,{kind,catalog,
  }
  next.mutations[input.mutationId]={digest,id,revision};return next;
 }
-export function personalGiftPreparation(current,uid){if(!identifier(uid))throw fail(403);return {proposals:Object.values(current.drafts).filter(d=>d.uid===uid).map(d=>({id:d.id,unlockId:d.unlockId,status:d.status,dueDate:d.dueDate,...(d.status==='reviewed'?{composition:d.quote.composition}:{}),simulationOnly:true}))};}
+export function personalGiftPreparation(current,uid){if(!identifier(uid))throw fail(403);return {proposals:Object.values(current.drafts).filter(d=>d.uid===uid).map(d=>({id:d.id,unlockId:d.unlockId,status:d.status,dueDate:d.dueDate,stockReserved:d.stockHold?.status==='reserved',...(d.status==='reviewed'?{composition:d.quote.composition}:{}),simulationOnly:true}))};}
 function operatorDraft(draft){if(!draft)return null;const {preferenceFingerprint,...view}=draft;return structuredClone(view);}
 export function giftPreferenceView(preferences){const p=preferences?.value;return {hasPreferences:!!p,revision:preferences?.revision??0,choices:Array.isArray(p?.choices)?[...p.choices]:[],alcoholFree:p?.alcoholFree===true,surprise:p?.surprise===true,contactRequired:p?.privateContactRequested===true};}
-export function giftPreparationOperations(rewards,scope,current,catalog,preferencesByUid={}){
- context(rewards,scope);if(Object.values(rewards.unlocks).filter(u=>u.program!=='party').length>200)throw fail(409,'Gift prototype capacity exceeded');return {simulationOnly:true,stockReserved:false,ordersCreated:false,rows:Object.values(rewards.unlocks).filter(u=>u.program!=='party').map(u=>({id:giftDraftId(scope,u.id),unlockId:u.id,uid:u.uid,label:u.label,allocatedCents:u.allocatedCents,earnedOn:u.earnedOn,preferences:giftPreferenceView(preferencesByUid[u.uid]??null),draft:operatorDraft(current.drafts[giftDraftId(scope,u.id)]??null)})),catalog:{revision:catalog?.revision??null,products:catalog?.products?.map(p=>({id:p.id,name:p.name,purchaseExTaxCents:p.purchaseCents,vatBasisPoints:catalog.masterById?.[p.id]?.vatBasisPoints??null,active:p.active,alcohol:p.alcohol,availability:p.availability,restrictions:p.restrictions}))??[]}};
+export function giftPreparationOperations(rewards,scope,current,catalog,preferencesByUid={},stockLedger={}){
+ context(rewards,scope);if(Object.values(rewards.unlocks).filter(u=>u.program!=='party').length>200)throw fail(409,'Gift prototype capacity exceeded');return {simulationOnly:true,stockReserved:Object.values(current.drafts).some(d=>d.stockHold?.status==='reserved'),ordersCreated:false,rows:Object.values(rewards.unlocks).filter(u=>u.program!=='party').map(u=>({id:giftDraftId(scope,u.id),unlockId:u.id,uid:u.uid,label:u.label,allocatedCents:u.allocatedCents,earnedOn:u.earnedOn,preferences:giftPreferenceView(preferencesByUid[u.uid]??null),draft:operatorDraft(current.drafts[giftDraftId(scope,u.id)]??null)})),catalog:{revision:catalog?.revision??null,products:catalog?.products?.map(p=>({id:p.id,name:p.name,purchaseExTaxCents:p.purchaseCents,vatBasisPoints:catalog.masterById?.[p.id]?.vatBasisPoints??null,active:p.active,alcohol:p.alcohol,availability:p.availability,restrictions:p.restrictions,declaredStock:catalog.masterById?.[p.id]?.stockQuantity??null,unreservedQuantity:Number.isSafeInteger(catalog.masterById?.[p.id]?.stockQuantity)?Math.max(0,catalog.masterById[p.id].stockQuantity-(stockLedger.counts?.[hash(catalog.masterById[p.id].sku??p.id)]??0)):null}))??[]}};
 }
+export async function readCiteGiftPreparationOperations({db,tx,record,catalog,current=record.giftPreparation??emptyGiftPreparation(),ledger,catalogDocument='supplierCatalog/main'}){
+  if(ledger===undefined)ledger=(await tx.get(db.doc(catalogDocument+'/reservationLedger/main'))).data()??{};
+  const uids=[...new Set(Object.values(record.rewards.unlocks).filter(u=>u.program!=='party').map(u=>u.uid))];if(uids.length>200)throw fail(409);
+  const preferences={};for(const uid of uids)preferences[uid]=(await tx.get(db.doc(`tenants/${record.rewards.tenantId}/giftPreferences/${uid}`))).data()??null;
+  return giftPreparationOperations(record.rewards,{tenantId:record.rewards.tenantId,seasonId:record.rewards.seasonId,familyId:record.state.config.families[0].id},current,catalog,preferences,ledger);
+ }
+
 export function createCiteGiftPreparationService(adapter,{catalogDocument='supplierCatalog/main',...options}={}){
  const store=createCiteStore(adapter,options),{db}=adapter;
  const operate=(header,scope,permission,fn)=>store(header,scope,permission,async(record,uid,date,{tx})=>{
   context(record.rewards,scope);return fn(record,uid,date,tx);
  });
- async function operations(record,tx,catalog,current=record.giftPreparation??emptyGiftPreparation()){
-  const uids=[...new Set(Object.values(record.rewards.unlocks).filter(u=>u.program!=='party').map(u=>u.uid))];if(uids.length>200)throw fail(409);
-  const preferences={};for(const uid of uids)preferences[uid]=(await tx.get(db.doc(`tenants/${record.rewards.tenantId}/giftPreferences/${uid}`))).data()??null;
-  return giftPreparationOperations(record.rewards,{tenantId:record.rewards.tenantId,seasonId:record.rewards.seasonId,familyId:record.state.config.families[0].id},current,catalog,preferences);
- }
  const change=(kind,header,scope,input)=>operate(header,scope,'rewardOperations',async(record,uid,date,tx)=>{
   command(input,kind);const u=entitlement(record.rewards,input.unlockId);
   const catalog=(await tx.get(db.doc(catalogDocument))).data(),preferences=(await tx.get(db.doc(`tenants/${scope.tenantId}/giftPreferences/${u.uid}`))).data()??null;
   const current=record.giftPreparation??emptyGiftPreparation(),next=changeGiftPreparation(record.rewards,scope,current,input,{kind,catalog,preferences,actor:uid,onDate:date});
-  return {record:next===current?record:{...record,giftPreparation:next},value:await operations(record,tx,catalog,next)};
+  return {record:next===current?record:{...record,giftPreparation:next},value:await readCiteGiftPreparationOperations({db,tx,record,catalog,current:next,catalogDocument})};
  });
  return {
-  list:(header,scope)=>operate(header,scope,'rewardOperations',async(record,_uid,_date,tx)=>({record,value:await operations(record,tx,(await tx.get(db.doc(catalogDocument))).data())})),
+  list:(header,scope)=>operate(header,scope,'rewardOperations',async(record,_uid,_date,tx)=>({record,value:await readCiteGiftPreparationOperations({db,tx,record,catalog:(await tx.get(db.doc(catalogDocument))).data(),catalogDocument})})),
   personal:(header,scope)=>operate(header,scope,'member',(record,uid)=>({record,value:personalGiftPreparation(record.giftPreparation??emptyGiftPreparation(),uid)})),
   prepare:(header,scope,input)=>change('prepare',header,scope,input),review:(header,scope,input)=>change('review',header,scope,input),reopen:(header,scope,input)=>change('reopen',header,scope,input)
  };
