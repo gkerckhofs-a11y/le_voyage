@@ -1,13 +1,14 @@
 const $=id=>document.getElementById(id),labels={economy:'Économie',wellbeing:'Bien-être',culture:'Culture',infrastructure:'Infrastructures',environment:'Environnement'};
 let csrf='',busy=false,fatal=false,current=null;
 function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;}
-function lock(value){busy=value;$('family-refresh').disabled=value||fatal;$('family-logout').disabled=value||!csrf;const f=$('family-ballot-fields');if(f)f.disabled=value||!current?.council?.myFamily.canVote;}
+function lock(value){busy=value;$('family-refresh').disabled=value||fatal;$('family-logout').disabled=value||!csrf;const f=$('family-ballot-fields');if(f)f.disabled=value||!current?.council?.myFamily.canVote;const w=$('weekly-fields');if(w)w.disabled=value||!current?.weekly?.canSubmit;const p=$('pledge-fields');if(p)p.disabled=value||!current?.council?.myFamily.canFund;}
 function clear(status){fatal=true;csrf='';current=null;$('family-content').replaceChildren();$('family-content').hidden=true;$('family-city').textContent='Notre Cité';$('family-status').textContent='Cet accès n’est plus disponible. Revenez à vos espaces.';if(status===401)location.replace('/connexion.html?app=cite');}
 function effects(value){return Object.entries(value).map(([k,v])=>`${labels[k]} ${v>0?'+':''}${v}`).join(' · ')||'Aucun effet immédiat';}
 function choiceName(c,value){return value==='yes'?'Oui':value==='no'?'Non':value==='abstain'?'Abstention':c.definition.projects.find(p=>p.id===value)?.name??value;}
 function render(data){
  current=data;csrf=data.csrf;$('family-city').textContent=data.city.name;$('family-name').textContent=data.family.name;$('family-purse').textContent=`Notre bourse : ${data.family.ecus} écus`;$('family-date').textContent=`Date de jeu : ${data.date}`;
  $('family-credits').replaceChildren(...data.family.credits.map(c=>node('li',`${c.weekId} : +${c.ecus} écus`)));if(!data.family.credits.length)$('family-credits').append(node('li','Aucun revenu crédité.'));
+ renderWeekly(data.weekly);
  $('city-development').textContent=`Développement de la Cité : ${data.city.development} / 100`;
  $('city-gauges').replaceChildren(...Object.entries(data.city.gauges).map(([key,value])=>{const l=node('label'),p=node('progress');p.max=100;p.value=value;p.setAttribute('aria-label',labels[key]);l.append(node('span',labels[key]),p,node('span',`${value}/100`));return l;}));
  $('city-buildings').replaceChildren(...data.city.buildings.map(b=>{const card=node('article');card.className='city-building';card.append(node('h3',b.name),node('p',b.condition==='damaged'?'Bâtiment endommagé':'Bâtiment construit'));return card;}));if(!data.city.buildings.length)$('city-buildings').append(node('p','Les premiers bâtiments attendent nos décisions.'));
@@ -24,10 +25,32 @@ function render(data){
    const form=node('form'),fields=node('fieldset');fields.id='family-ballot-fields';fields.append(node('legend','Mon vote interne'));for(const value of [...(c.definition.mode==='choice'?c.definition.projects.map(p=>p.id):['yes','no']),'abstain']){const l=node('label'),i=node('input');i.type='radio';i.name='ballot';i.value=value;i.required=true;l.append(i,document.createTextNode(choiceName(c,value)));fields.append(l);}const submit=node('button','Confirmer mon vote');submit.type='submit';fields.append(submit);form.append(fields);form.addEventListener('submit',vote);panel.append(form);
   }else if(c.phase==='funding')panel.append(node('p',`Projet adopté : ${choiceName(c,c.selected)}. Financement : ${c.funding.pledged} / ${c.funding.cost} écus. Les contributions sont négociées puis engagées par les délégués autorisés. Aucun bâtiment n’est encore construit.`));
   else panel.append(node('p',c.resolution.narrative));
+  if(c.phase==='funding')renderPledge(panel,c);
   for(const round of c.rounds)panel.append(node('p',`Résultat du tour ${round.round} : ${Object.entries(round.tally).map(([v,n])=>choiceName(c,v)+' : '+n+' voix familiale(s)').join(' · ')}`));
  }
  $('city-history').replaceChildren(...[...data.city.resolutions.map(r=>`Conseil ${r.ordinal} : ${r.narrative}`),...data.city.crises.map(c=>`${c.name} · ${c.protected?'protection active':'sans protection'} · ${effects(c.effects)}`)].map(t=>node('li',t)));if(!$('city-history').children.length)$('city-history').append(node('li','L’histoire commence.'));$('family-content').hidden=false;
 }
+
+function renderWeekly(week){
+ const panel=$('family-weekly');panel.replaceChildren(node('h2','Mon rituel de la semaine'));
+ if(!week){panel.append(node('p','Aucune semaine active à cette date.'));return;}
+ panel.append(node('p',`Du ${week.start} au ${week.endExclusive} (fin exclue).`),node('p','Mes réponses restent personnelles. Le revenu familial sera calculé à la clôture, avec la performance professionnelle et les réponses éligibles.'));
+ if(week.scores)panel.append(node('p','Votre autoévaluation est enregistrée. Toute correction nécessite une procédure tracée.'));
+ else if(!week.canSubmit)panel.append(node('p','Vous ne pouvez pas répondre pour cette semaine : vérifiez votre éligibilité ou la clôture familiale.'));
+ const form=node('form'),fields=node('fieldset');fields.id='weekly-fields';fields.append(node('legend','Mon autoévaluation — de 1 à 5'));
+ for(const m of week.metrics){const label=node('label',m.label),input=node('input');input.type='number';input.name=m.id;input.min='1';input.max='5';input.step='any';input.required=true;input.inputMode='decimal';input.value=week.scores?.[m.id]??'';label.append(input);fields.append(label);}
+ const button=node('button','Envoyer mon autoévaluation');button.type='submit';fields.append(button);form.append(fields);form.addEventListener('submit',async event=>{event.preventDefault();if(busy||fatal||!current?.weekly?.canSubmit)return;const scores=Object.fromEntries(new FormData(form));await command('weekly',{weekId:week.id,scores},'Votre autoévaluation est enregistrée.');});panel.append(form);
+}
+function renderPledge(panel,c){
+ panel.append(node('p',`Notre engagement actuel : ${c.myFamily.pledge.amount} écus. Les écus ne seront débités que si le projet est intégralement financé à la clôture. Une contribution nulle d’une famille solvable à un bâtiment construit suspend son vote au Conseil suivant, sauf en mode famille unique.`));
+ if(!c.myFamily.canFund){panel.append(node('p','Les engagements sont réservés aux délégués autorisés, pendant la fenêtre de financement.'));return;}
+ const form=node('form'),fields=node('fieldset'),label=node('label','Engagement de notre famille (écus)'),input=node('input');fields.id='pledge-fields';fields.append(node('legend','Notre contribution négociée'));input.type='number';input.name='amount';input.min='0';input.max=String(c.myFamily.maxPledge);input.step='1';input.required=true;input.inputMode='numeric';input.value=String(c.myFamily.pledge.amount);label.append(input);fields.append(label,node('p',`Maximum actuellement possible : ${c.myFamily.maxPledge} écus. Vous pouvez modifier ou ramener cet engagement à zéro avant la clôture.`));const button=node('button','Enregistrer notre engagement');button.type='submit';fields.append(button);form.append(fields);
+ form.addEventListener('submit',async event=>{event.preventDefault();if(busy||fatal||!current?.council?.myFamily.canFund)return;const amount=Number(input.value);if(!Number.isSafeInteger(amount)||amount<0||amount>c.myFamily.maxPledge)return;await command('pledge',{councilId:c.id,amount,revision:c.myFamily.pledge.revision,mutationId:crypto.randomUUID()},'Notre engagement est enregistré. Aucun écu débité.');});panel.append(form);
+}
+async function command(path,input,message){
+ lock(true);try{const r=await fetch('/api/cite/family/'+path,{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify(input)});if([401,403].includes(r.status)){if(path==='pledge'&&r.status===403){if(await load())$('family-status').textContent='Votre droit d’engager des écus a changé. Vérifiez votre accès.';return;}clear(r.status);return;}if(r.status===409){if(await load())$('family-status').textContent='Les données ont changé ou cette action est clôturée. Vérifiez les informations avant de réessayer.';return;}if(!r.ok)throw Error('Enregistrement refusé. Vérifiez les valeurs saisies.');render(await r.json());$('family-status').textContent=message;}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}
+}
+
 async function load(){const r=await fetch('/api/cite/family',{cache:'no-store'});if([401,403].includes(r.status)){clear(r.status);return false;}if(!r.ok)throw Error('La Cité est indisponible. Réessayez.');render(await r.json());return true;}
 async function refresh(){if(busy||fatal)return;lock(true);try{if(await load())$('family-status').textContent='Votre Cité est à jour.';}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}}
 async function vote(event){event.preventDefault();if(busy||fatal||!current?.council?.myFamily.canVote)return;const c=current.council,choice=new FormData(event.currentTarget).get('ballot');if(!choice)return;lock(true);try{const r=await fetch('/api/cite/family/vote',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify({councilId:c.id,round:c.round,choice})});if([401,403].includes(r.status)){clear(r.status);return;}if(r.status===409){if(await load())$('family-status').textContent='Le Conseil a changé ou votre bulletin est déjà enregistré. Vérifiez son état.';return;}if(!r.ok)throw Error('Vote refusé. Vérifiez le Conseil avant de réessayer.');render(await r.json());$('family-status').textContent='Votre vote est enregistré.';}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}}
