@@ -1,19 +1,20 @@
 import {identifier,buildingCost} from './economy.ts';
 import type {State as Economy,Scope} from './economy.ts';
 import {civilDate} from '../domain/calendar.ts';
-export const GAUGES=['economy','wellbeing','culture','infrastructure','environment'] as const;
-export type Gauge=typeof GAUGES[number];
-export type Gauges=Record<Gauge,number>;
-export type Effects=Partial<Gauges>;
+import {GAUGES,CRISIS_KINDS,observeAmbitions} from './city-state.ts';
+import type {Gauges,Effects,CityState,CrisisKind} from './city-state.ts';
+import {crisisAtOpening} from './city.ts';
+export {GAUGES} from './city-state.ts';
+export type {Gauge,Gauges,Effects} from './city-state.ts';
 export const COUNCIL_RULES={version:'cite-councils-prototype-v1',quorum:'alert-only',surplus:'reject-overfunding',runoff:'one',suspendedBallots:'disabled'} as const;
-export type Project={id:string;name:string;category:'small'|'standard'|'large';effects:Effects;narrative:string};
+export type Project={id:string;name:string;category:'small'|'standard'|'large';effects:Effects;narrative:string;protection?:CrisisKind;repairs?:string};
 export type CouncilInput={id:string;weekId:string;title:string;mode:'choice'|'yes-no';projects:Project[];voteOpensOn:string;firstVoteClosesOn:string;secondVoteClosesOn:string;fundingClosesOn:string;failure:{narrative:string;effects:Effects}};
 type Definition=Omit<CouncilInput,'projects'>&{projects:(Project&{cost:number})[]};
 type RoundResult={round:1|2;familyVotes:Record<string,{choice:string;status:'expressed'|'abstained'|'suspended';lowParticipation:boolean}>;tally:Record<string,number>;outcome:'selected'|'tie'|'rejected'|'no-votes';selected?:string};
-export type Resolution={councilId:string;ordinal:number;status:'built'|'failed';reason:string;projectId?:string;cost:number;effects:Effects;narrative:string;resolvedOn:string};
+export type Resolution={councilId:string;ordinal:number;status:'built'|'failed';reason:string;projectId?:string;repairedBuilding?:string;cost:number;effects:Effects;narrative:string;resolvedOn:string};
 export type Council={definition:Definition;ordinal:number;phase:'voting'|'funding'|'resolved';round:1|2;roster:Record<string,string[]>;suspended:string[];ballots:Record<string,Record<string,{familyId:string;choice:string}>>;rounds:RoundResult[];selected?:string;pledges:Record<string,{amount:number;revision:number}>;resolution?:Resolution};
 export type Governance={rules:typeof COUNCIL_RULES;initialGauges:Gauges;gauges:Gauges;order:string[];records:Record<string,Council>;suspendedFor:Record<string,number>;buildings:Record<string,{project:Project&{cost:number};councilId:string}>;spending:{councilId:string;familyId:string;ecus:number;postedOn:string}[];resolutions:Resolution[];mutations:Record<string,string>};
-export type Game={economy:Economy;councils:Governance};
+export type Game={economy:Economy;councils:Governance;city?:CityState};
 const requireThat=(ok:unknown,message:string,status=409):void=>{if(!ok)throw Object.assign(Error(message),{status});};
 const text=(s:unknown,max=1000):s is string=>typeof s==='string'&&s.trim().length>0&&s.length<=max;
 function effects(input:Effects):Effects{
@@ -35,7 +36,7 @@ function normalize(game:Game,input:CouncilInput,ordinal:number):Definition{
  const dates=[input.voteOpensOn,input.firstVoteClosesOn,input.secondVoteClosesOn,input.fundingClosesOn].map(civilDate);
  requireThat(week.start<=dates[0]&&dates[0]<dates[1]&&dates[1]<dates[2]&&dates[2]<dates[3]&&dates[3]<=week.endExclusive,'Invalid Council windows',400);
  requireThat(Array.isArray(input.projects)&&input.projects.length===(input.mode==='choice'?2:1),'Choose one or two projects',400);
- const seen=new Set();const projects=input.projects.map(p=>{requireThat(!!p&&Object.keys(p).sort().join(',')==='category,effects,id,name,narrative'&&identifier(p.id)&&!['abstain','yes','no'].includes(p.id)&&!seen.has(p.id)&&text(p.name,160)&&text(p.narrative),'Invalid project',400);seen.add(p.id);return {id:p.id,name:p.name,category:p.category,effects:effects(p.effects),narrative:p.narrative,cost:buildingCost(p.category,game.economy.config.families.length)};});
+ const seen=new Set();const projects=input.projects.map(p=>{requireThat(!!p&&Object.keys(p).filter(k=>!['protection','repairs'].includes(k)).sort().join(',')==='category,effects,id,name,narrative'&&(!Object.hasOwn(p,'protection')||CRISIS_KINDS.includes(p.protection!))&&(!Object.hasOwn(p,'repairs')||identifier(p.repairs))&&!(p.repairs&&p.protection)&&identifier(p.id)&&!['abstain','yes','no'].includes(p.id)&&!seen.has(p.id)&&text(p.name,160)&&text(p.narrative),'Invalid project',400);seen.add(p.id);return {id:p.id,name:p.name,category:p.category,effects:effects(p.effects),narrative:p.narrative,...(p.protection?{protection:p.protection}:{}),...(p.repairs?{repairs:p.repairs}:{}),cost:buildingCost(p.category,game.economy.config.families.length)};});
  requireThat(input.failure&&text(input.failure.narrative),'Failure consequence required',400);
  return {id:input.id,weekId:input.weekId,title:input.title,mode:input.mode,projects,voteOpensOn:dates[0],firstVoteClosesOn:dates[1],secondVoteClosesOn:dates[2],fundingClosesOn:dates[3],failure:{narrative:input.failure.narrative,effects:effects(input.failure.effects)}};
 }
@@ -45,9 +46,10 @@ export function openCouncil(game:Game,scope:Scope,input:CouncilInput,onDate:stri
  const last=game.councils.records[game.councils.order.at(-1)??''];requireThat(!last||last.phase==='resolved','Resolve previous Council first');
  requireThat(civilDate(onDate)>=definition.voteOpensOn&&onDate<definition.firstVoteClosesOn,'Council not in opening window');
  requireThat(definition.projects.every(p=>!game.councils.buildings[p.id]),'Project already built');
+ requireThat(definition.projects.every(p=>!p.repairs||(game.councils.buildings[p.repairs]&&game.city?.buildingConditions[p.repairs]==='damaged')),'Repair requires a damaged building');
  const roster=Object.fromEntries(game.economy.config.families.map(f=>[f.id,game.economy.config.memberships.filter(m=>m.familyId===f.id&&m.from<=definition.voteOpensOn&&(!m.toExclusive||definition.voteOpensOn<m.toExclusive)).map(m=>m.uid)]));
  const suspended=game.economy.config.families.length===1?[]:game.economy.config.families.filter(f=>game.councils.suspendedFor[f.id]===ordinal).map(f=>f.id);
- const next=structuredClone(game);next.councils.order.push(definition.id);next.councils.records[definition.id]={definition,ordinal,phase:'voting',round:1,roster,suspended,ballots:{'1':{},'2':{}},rounds:[],pledges:{}};return next;
+ const next=structuredClone(game);next.councils.order.push(definition.id);next.councils.records[definition.id]={definition,ordinal,phase:'voting',round:1,roster,suspended,ballots:{'1':{},'2':{}},rounds:[],pledges:{}};return crisisAtOpening(next,scope,definition.id,onDate);
 }
 export function castBallot(game:Game,scope:Scope,uid:string,id:string,round:1|2,choice:string,onDate:string):Game{
  const c=council(game,scope,id);requireThat(identifier(uid)&&c.roster[scope.familyId].includes(uid)&&!c.suspended.includes(scope.familyId),'Member cannot vote',403);requireThat((round===1||round===2)&&[...choices(c),'abstain'].includes(choice),'Invalid ballot',400);
@@ -68,13 +70,14 @@ function tally(c:Council):RoundResult{
 function resolve(game:Game,id:string,status:'built'|'failed',reason:string,onDate:string):Game{
  const next=structuredClone(game),c=next.councils.records[id],project=c.definition.projects.find(p=>p.id===c.selected);
  const delta=status==='built'?project!.effects:c.definition.failure.effects;
- const resolution:Resolution={councilId:id,ordinal:c.ordinal,status,reason,...(status==='built'?{projectId:project!.id}:{}),cost:status==='built'?project!.cost:0,effects:structuredClone(delta),narrative:status==='built'?project!.narrative:c.definition.failure.narrative,resolvedOn:onDate};
+ const resolution:Resolution={councilId:id,ordinal:c.ordinal,status,reason,...(status==='built'?{projectId:project!.id,...(project!.repairs?{repairedBuilding:project!.repairs}:{})}:{}),cost:status==='built'?project!.cost:0,effects:structuredClone(delta),narrative:status==='built'?project!.narrative:c.definition.failure.narrative,resolvedOn:onDate};
  if(status==='built'){
   requireThat(!!project&&!next.councils.buildings[project.id],'Project unavailable');
   for(const f of next.economy.config.families){const amount=c.pledges[f.id]?.amount??0,balance=next.economy.balances[f.id];requireThat(Number.isSafeInteger(balance)&&balance>=amount&&Number.isSafeInteger(amount)&&amount>=0,'Invalid funding balance');if(amount>0){next.economy.balances[f.id]-=amount;next.councils.spending.push({councilId:id,familyId:f.id,ecus:amount,postedOn:onDate});}else if(balance>0&&next.economy.config.families.length>1)next.councils.suspendedFor[f.id]=c.ordinal+1;}
-  next.councils.buildings[project!.id]={project:structuredClone(project!),councilId:id};
+  if(project!.repairs){requireThat(next.city?.buildingConditions[project!.repairs]==='damaged','Repair target unavailable');next.city!.buildingConditions[project!.repairs]='intact';}else next.councils.buildings[project!.id]={project:structuredClone(project!),councilId:id};
  }
  for(const k of GAUGES)next.councils.gauges[k]=Math.min(100,Math.max(0,next.councils.gauges[k]+(delta[k]??0)));
+ if(next.city)next.city=observeAmbitions(next.city,next.councils.gauges,'council-'+id);
  c.phase='resolved';c.resolution=resolution;next.councils.resolutions.push(resolution);return next;
 }
 export function closeVote(game:Game,scope:Scope,id:string,round:1|2,onDate:string):Game{
