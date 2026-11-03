@@ -24,11 +24,12 @@ export function createCitePrototypeServer(){
    if(!req.headers['content-type']?.startsWith('application/json'))throw fail(400);
    let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>8192)throw fail(413);chunks.push(chunk);}let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw fail(400);}if(!input||typeof input!=='object'||Array.isArray(input))throw fail(400);
    if(url.pathname==='/api/role'){if(Object.keys(input).join(',')!=='role'||!pilotRoles(pilot).some(r=>r.id===input.role))throw fail(400);session.role=input.role;session.csrf=token();json(200,view());return;}
-   const keys={vote:['type','choice','round','revision'],pledge:['type','amount','pledgeRevision','mutationId','revision']};const allowed=keys[input.type]??(['advance-week','close-vote','close-funding','automatic','reset'].includes(input.type)?['type','revision']:[]);
+   const keys={vote:['type','choice','round','revision'],pledge:['type','amount','pledgeRevision','mutationId','revision']};const allowed=keys[input.type]??(['advance-week','close-vote','close-funding','automatic','reset'].includes(input.type)?['type','revision']:input.type==='reward-mode'?['type','mode','revision']:[]);
    if(!allowed.length||Object.keys(input).sort().join(',')!==allowed.sort().join(','))throw fail(400);
-   if((['reset','automatic','advance-week','close-vote','close-funding'].includes(input.type)&&session.role!=='operator')||(['vote','pledge'].includes(input.type)&&session.role==='operator')||(input.type==='pledge'&&!session.role.endsWith('-0')))throw fail(403);
+   if((['reward-mode','reset','automatic','advance-week','close-vote','close-funding'].includes(input.type)&&session.role!=='operator')||(['vote','pledge'].includes(input.type)&&session.role==='operator')||(input.type==='pledge'&&!session.role.endsWith('-0')))throw fail(403);
    if(!Number.isSafeInteger(input.revision)||input.revision!==revision)throw fail(409);
-   if(['reset','automatic'].includes(input.type)){if(session.role!=='operator')throw fail(403);if(input.type==='automatic'&&(pilot.completedWeeks!==0||pilot.stage!=='weeks'))throw fail(409);pilot=input.type==='automatic'?runPilot():createPilot();}
+   if(input.type==='reward-mode'){if(pilot.completedWeeks!==0||pilot.stage!=='weeks')throw fail(409);pilot=createPilot(input.mode);}
+   else if(['reset','automatic'].includes(input.type)){if(session.role!=='operator')throw fail(403);if(input.type==='automatic'&&(pilot.completedWeeks!==0||pilot.stage!=='weeks'))throw fail(409);pilot=input.type==='automatic'?runPilot(pilot.rewardMode):createPilot(pilot.rewardMode);}
    else{const {revision:_revision,pledgeRevision,...action}=input;pilot=pilotAction(pilot,session.role,input.type==='pledge'?{type:'pledge',amount:input.amount,revision:pledgeRevision,mutationId:input.mutationId}:action);}
    revision++;json(200,view());
   }catch(error){json([400,401,403,404,409,413,503].includes(error.status)?error.status:400,{error:error.status===409?'État modifié ou action indisponible. Actualisez puis réessayez.':'Action refusée pour ce rôle ou ces données.'});}

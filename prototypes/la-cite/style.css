@@ -3,3 +3,4 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto;animation:none!important;transition:none!important}}
 
 [hidden]{display:none!important}.building-list{display:flex;gap:8px;flex-wrap:wrap;list-style:none;padding:0;font-size:13px}.building-list li{background:#edf0e2;border-radius:6px;padding:6px 10px}
+#reward-controls label{display:flex;gap:12px;align-items:center;flex-wrap:wrap}#reward-controls p{margin:8px 0 0}#reward-list{padding-left:20px;line-height:1.8;font-size:14px}#reward-mode{max-width:100%}

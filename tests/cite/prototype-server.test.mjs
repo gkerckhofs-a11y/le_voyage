@@ -15,3 +15,9 @@ test('local boundary rejects foreign Host, unknown fields, traversal and product
  const f=await setup(t),a=f.client();await a.get();assert.equal(await new Promise((resolve,reject)=>{const req=request(f.origin+'/api/state',{headers:{Host:'foreign.test'}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);req.end();}),403);assert.equal((await a.post('/api/action',{type:'advance-week',revision:0,uid:'forged'})).status,400);assert.equal((await fetch(f.origin+'/src/cite/pilot.ts')).status,401);
  const previous=process.env.NODE_ENV;try{process.env.NODE_ENV='production';assert.throws(()=>createCitePrototypeServer(),/Local fictional/);}finally{if(previous===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previous;}
 });
+test('only the fictional operator can choose reward options, before the first week; personal rights stay private',async t=>{
+ const f=await setup(t),a=f.client();await a.get();let r=await a.post('/api/action',{type:'reward-mode',mode:'participation',revision:a.state.revision});assert.equal(r.status,200);assert.deepEqual(r.value.rewards.programmes,{participation:true,family:false,party:false});
+ await a.post('/api/role',{role:'person-0-0'});assert.equal((await a.post('/api/action',{type:'reward-mode',mode:'all',revision:a.state.revision})).status,403);
+ await a.post('/api/role',{role:'operator'});r=await a.post('/api/action',{type:'automatic',revision:a.state.revision});assert.equal(r.status,200);assert.equal(r.value.rewards.allocatedCents,6000);assert.equal(r.value.rewards.party,null);assert.equal((await a.post('/api/action',{type:'reward-mode',mode:'all',revision:a.state.revision})).status,409);
+ r=await a.post('/api/role',{role:'person-0-0'});assert.equal(r.value.rewards.myUnlocks.length,1);assert.ok(!Object.hasOwn(r.value.rewards,'unlocks'));assert.ok(!Object.hasOwn(r.value.rewards,'budgetCents'));
+});
