@@ -1,11 +1,12 @@
 import {assertEmulators} from './firebase-emulator.mjs';
 import {runPilot} from '../cite/pilot.ts';
 import {citeDemoCatalog,citeDemoPreferences} from './cite-demo-catalog.mjs';
-export const citeCockpitDemo={uid:'cite-cockpit-operator',email:'cite-clem@example.test',password:'Fictitious-Cite-Only-42!',catalogDocument:'supplierCatalog/cite-cockpit-demo',date:'2027-03-01',tenants:['fiction-cite-cockpit-a','fiction-cite-cockpit-b']};
+export const citeCockpitDemo={uid:'cite-cockpit-operator',email:'cite-clem@example.test',password:'Fictitious-Cite-Only-42!',catalogDocument:'supplierCatalog/cite-cockpit-demo',date:'2027-03-01',memberUid:'person-0-0',memberEmail:'cite-camille@example.test',memberPassword:'Fictitious-Camille-Only-42!',tenants:['fiction-cite-cockpit-a','fiction-cite-cockpit-b']};
 /** Explicit emulator fixture only. No equivalent provisioning endpoint is exposed. */
 export async function seedCiteCockpitDemo(adapter,{reset=false}={}){
  assertEmulators();if(adapter.db.projectId!=='demo-rc-voyage'||process.env.K_SERVICE)throw Error('Emulator Cité fixture only');
  const d=citeCockpitDemo;try{const user=await adapter.auth.getUser(d.uid);if(user.email!==d.email||!user.emailVerified)throw Error('Fixture identity mismatch');}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:d.uid,email:d.email,password:d.password,emailVerified:true});}
+ try{const user=await adapter.auth.getUser(d.memberUid);if(user.email!==d.memberEmail||!user.emailVerified)throw Error('Fixture member identity mismatch');}catch(e){if(e.code!=='auth/user-not-found')throw e;await adapter.auth.createUser({uid:d.memberUid,email:d.memberEmail,password:d.memberPassword,emailVerified:true});}
  const entries=[];
  for(const [i,tenantId]of d.tenants.entries()){
   const p=runPilot(i===0?'all':'participation'),seasonId=p.rewards.seasonId,scope={tenantId,seasonId,familyId:'family-0'};p.game.economy.config.tenantId=tenantId;p.game.economy.config.name=i===0?'La Cité des Ateliers':'La Cité du Verger';p.rewards.tenantId=tenantId;
@@ -17,6 +18,7 @@ export async function seedCiteCockpitDemo(adapter,{reset=false}={}){
   }
   entries.push({id:'cite-'+i,space:'cite-gifts',...scope,label:p.game.economy.config.name});
  }
+ const memberDirectory=adapter.db.doc('workspaceDirectories/'+d.memberUid);await adapter.db.runTransaction(async tx=>{const old=await tx.get(memberDirectory);if(reset||!old.exists)tx.set(memberDirectory,{uid:d.memberUid,active:true,entries:entries.map((entry,i)=>({...entry,id:'member-'+i,space:'cite-member'}))});});
  const directory=adapter.db.doc('workspaceDirectories/'+d.uid),catalog=adapter.db.doc(d.catalogDocument),ledger=adapter.db.doc(d.catalogDocument+'/reservationLedger/main');
  await adapter.db.runTransaction(async tx=>{const [a,b]=await Promise.all([tx.get(directory),tx.get(catalog)]);if(reset||!a.exists)tx.set(directory,{uid:d.uid,active:true,entries});if(reset||!b.exists)tx.set(catalog,citeDemoCatalog());if(reset)tx.set(ledger,{counts:{},citeHeld:{}});});
 }
