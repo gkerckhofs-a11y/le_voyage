@@ -1,3 +1,4 @@
+import {canonicalJSON} from './canonical.ts';
 import {identifier,buildingCost} from './economy.ts';
 import type {State as Economy,Scope} from './economy.ts';
 import {civilDate} from '../domain/calendar.ts';
@@ -40,9 +41,12 @@ function normalize(game:Game,input:CouncilInput,ordinal:number):Definition{
  requireThat(input.failure&&text(input.failure.narrative),'Failure consequence required',400);
  return {id:input.id,weekId:input.weekId,title:input.title,mode:input.mode,projects,voteOpensOn:dates[0],firstVoteClosesOn:dates[1],secondVoteClosesOn:dates[2],fundingClosesOn:dates[3],failure:{narrative:input.failure.narrative,effects:effects(input.failure.effects)}};
 }
+export function prepareCouncilDefinition(game:Game,scope:Scope,input:CouncilInput):Definition{
+ scopeCheck(game,scope);return normalize(game,input,game.councils.records[input?.id]?.ordinal??game.councils.order.length+1);
+}
 export function openCouncil(game:Game,scope:Scope,input:CouncilInput,onDate:string):Game{
  scopeCheck(game,scope);requireThat(!!input&&identifier(input.id),'Invalid Council',400);const existing=game.councils.records[input.id];const ordinal=existing?.ordinal??game.councils.order.length+1;const definition=normalize(game,input,ordinal);
- if(existing){requireThat(JSON.stringify(existing.definition)===JSON.stringify(definition),'Council identifier already used');return game;}
+ if(existing){requireThat(canonicalJSON(existing.definition)===canonicalJSON(definition),'Council identifier already used');return game;}
  const last=game.councils.records[game.councils.order.at(-1)??''];requireThat(!last||last.phase==='resolved','Resolve previous Council first');
  requireThat(civilDate(onDate)>=definition.voteOpensOn&&onDate<definition.firstVoteClosesOn,'Council not in opening window');
  requireThat(definition.projects.every(p=>!game.councils.buildings[p.id]),'Project already built');
