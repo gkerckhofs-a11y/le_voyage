@@ -47,3 +47,7 @@ Une CI ciblée `cite-economy.yml` est ajoutée ; son exécution distante doit ê
 ## Suite
 
 Tranche 2 : vote interne confidentiel, une voix par famille, abstentions et deux tours, puis engagements révocables et clôture financière atomique. L’excédent de promesses devra avoir une politique provisoire explicite. Sanction au Conseil suivant seulement, exemption des familles insolvables et désactivation de la sanction en mode famille unique. Puis jauges/bâtiments/ambitions, crises, trois options de cadeaux plafonnées et scène jouable des quatre Conseils.
+
+## Complément — tranche 2
+
+Le moteur des Conseils et du financement est désormais décrit dans [PHASE-2.md](PHASE-2.md). La simulation économique de ce document reste volontairement sans votes ; un second script teste les Conseils. Le pilote complet avec crise, ambitions et interface reste en cours.

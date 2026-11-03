@@ -1,0 +1,25 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createCiteCouncilService} from '../../src/server/cite-councils.mjs';import {COUNCIL_RULES} from '../../src/cite/councils.ts';import {fixture} from './server-fixture.mjs';import {gauges,definition} from './councils-fixture.mjs';
+async function setup(){const f=fixture();for(const key of Object.keys(f.data.get(f.privatePath).state.balances))f.data.get(f.privatePath).state.balances[key]=100;const service=createCiteCouncilService(f.adapter,{today:f.today});await service.initialize('Bearer manager',f.s,gauges,COUNCIL_RULES);const d=definition({economy:f.data.get(f.privatePath).state,councils:{order:[]}});f.setDate(d.voteOpensOn);await service.open('Bearer manager',f.s,d);return {...f,council:service,d};}
+async function select(f){for(let i=0;i<3;i++)await f.council.vote(`Bearer person-${i}-0`,{...f.s,familyId:'family-'+i},{councilId:f.d.id,round:1,choice:f.d.projects[0].id});f.setDate(f.d.firstVoteClosesOn);await f.council.closeVote('Bearer manager',f.s,{councilId:f.d.id,round:1});}
+function delegate(f,i){f.data.get(f.memberPath(`person-${i}-0`)).citeFundingAssignments=[{seasonId:f.c.seasonId,familyId:'family-'+i}];}
+test('Council services derive voter UID, reject cross-family access and expose no personal ballots',async()=>{
+ const f=await setup(),vote={councilId:f.d.id,round:1,choice:f.d.projects[0].id};
+ await f.council.vote('Bearer person-0-0',f.s,vote);await assert.rejects(f.council.vote('Bearer manager',f.s,vote),{status:403});await assert.rejects(f.council.vote('Bearer person-1-0',f.s,vote),{status:403});
+ await assert.rejects(f.council.vote('Bearer person-0-0',f.s,{...vote,uid:'person-1-0'}),{status:400});
+ for(const scope of [{...f.s,tenantId:'foreign'},{...f.s,seasonId:'foreign'},{...f.s,familyId:'family-1'}])await assert.rejects(f.council.read('Bearer person-0-0',scope,f.d.id),{status:403});
+ const own=await f.council.read('Bearer person-0-0',f.s,f.d.id),other=await f.council.read('Bearer person-1-0',{...f.s,familyId:'family-1'},f.d.id),board=await f.council.public('Bearer manager',f.s,f.d.id);assert.equal(own.myFamily.ballot,vote.choice);assert.equal(other.myFamily.ballot,null);assert.equal(board.rounds.length,0);for(const v of [own,other,board]){assert.ok(!JSON.stringify(v).includes('person-0-0'));assert.ok(!Object.hasOwn(v,'ballots'));}assert.ok(!Object.hasOwn(board,'myFamily'));
+ f.data.get(f.memberPath('person-0-0')).active=false;await assert.rejects(f.council.read('Bearer person-0-0',f.s,f.d.id),{status:403});
+});
+test('explicit funding delegation, version leases and concurrent closing preserve gains and debit once',async()=>{
+ const f=await setup(),w=f.c.weeks[3];await f.service.submit('Bearer person-0-0',f.s,{weekId:w.id,scores:{cooperation:'4'}});await f.service.performance('Bearer manager',f.s,{weekId:w.id,scores:{quality:'3'}});await select(f);
+ const p={councilId:f.d.id,amount:100,revision:0,mutationId:'pledge-family-zero'};await assert.rejects(f.council.pledge('Bearer person-0-0',f.s,p),{status:403});delegate(f,0);delegate(f,1);await f.council.pledge('Bearer person-0-0',f.s,p);
+ await assert.rejects(f.council.pledge('Bearer person-0-0',f.s,{...p,mutationId:'different-stale-id'}),{status:409});await assert.rejects(f.council.pledge('Bearer manager',f.s,p),{status:403});
+ await f.council.pledge('Bearer person-1-0',{...f.s,familyId:'family-1'},{...p,amount:53,mutationId:'pledge-family-one'});assert.equal(f.data.get(f.privatePath).state.balances['family-0'],100);
+ f.setDate(w.endExclusive);const result=await Promise.all([f.service.close('Bearer manager',f.s,w.id),f.council.closeFunding('Bearer manager',f.s,{councilId:f.d.id}),f.council.closeFunding('Bearer manager',f.s,{councilId:f.d.id})]);assert.equal(result[0].credit.ecus,18);
+ const record=f.data.get(f.privatePath);assert.equal(record.state.balances['family-0'],18);assert.equal(record.state.balances['family-1'],47);assert.equal(record.councils.spending.length,2);assert.equal(record.councils.resolutions.length,1);assert.equal(record.preserve,'metadata');const view=await f.council.read('Bearer person-0-0',f.s,f.d.id);assert.equal(view.myFamily.spending.length,1);assert.equal(view.myFamily.spending[0].ecus,100);
+});
+test('initialization cannot reset a city; funding capability revocation is rechecked',async()=>{
+ const f=await setup();await f.council.initialize('Bearer manager',f.s,gauges,COUNCIL_RULES);await assert.rejects(f.council.initialize('Bearer manager',f.s,{...gauges,culture:80},COUNCIL_RULES),{status:409});await assert.rejects(f.council.initialize('Bearer person-0-0',f.s,gauges,COUNCIL_RULES),{status:403});assert.equal(f.data.get(f.privatePath).councils.order.length,1);
+ await select(f);delegate(f,0);const p={councilId:f.d.id,amount:50,revision:0,mutationId:'delegate-pledge-id'};await f.council.pledge('Bearer person-0-0',f.s,p);f.data.get(f.memberPath('person-0-0')).citeFundingAssignments=[];await assert.rejects(f.council.pledge('Bearer person-0-0',f.s,{...p,amount:0,revision:1,mutationId:'delegate-revoke-id'}),{status:403});
+});

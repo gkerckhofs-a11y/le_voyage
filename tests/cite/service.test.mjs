@@ -1,14 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createCiteEconomyService} from '../../src/server/cite-economy.mjs';import {createEconomy} from '../../src/cite/economy.ts';import {config,scope} from './fixture.mjs';
-Object.assign(process.env,{GCLOUD_PROJECT:'demo-rc-voyage',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080'});
-function fixture(){
- const c=config(),s=scope(c),data=new Map(),privatePath=`tenants/${c.tenantId}/citeSeasons/${c.seasonId}/privateEconomy/main`,memberPath=uid=>`tenants/${c.tenantId}/members/${uid}`;let date=c.weeks[0].start,queue=Promise.resolve();
- data.set(privatePath,{state:createEconomy(c),preserve:'metadata'});
- for(const [uid,familyId]of [['person-0-0','family-0'],['person-1-0','family-1']])data.set(memberPath(uid),{uid,tenantId:c.tenantId,active:true,citeAssignments:[{seasonId:c.seasonId,familyId}]});
- data.set(memberPath('manager'),{uid:'manager',tenantId:c.tenantId,active:true,citeSeasonManagement:[c.seasonId]});
- const adapter={auth:{app:{options:{projectId:'demo-rc-voyage'}},verifyIdToken:async(token,revoked)=>{assert.equal(revoked,true);if(!['person-0-0','person-1-0','manager'].includes(token))throw Error();return {uid:token,admin:true,tenantId:'untrusted-claim'};}},db:{projectId:'demo-rc-voyage',doc:path=>({path}),runTransaction:fn=>{const result=queue.then(async()=>{const writes=[];const value=await fn({get:async r=>({exists:data.has(r.path),data:()=>structuredClone(data.get(r.path))}),set:(r,v)=>writes.push([r.path,structuredClone(v)])});for(const [k,v]of writes)data.set(k,v);return value;});queue=result.catch(()=>{});return result;}}};
- return {c,s,data,privatePath,memberPath,service:createCiteEconomyService(adapter,{today:()=>date}),setDate:d=>date=d};
-}
+import {fixture} from './server-fixture.mjs';
 test('trusted UID and explicit city permissions separate personal values from delegated performance',async()=>{
  const f=fixture(),w=f.c.weeks[0],member='Bearer person-0-0',manager='Bearer manager';
  await f.service.submit(member,f.s,{weekId:w.id,scores:{cooperation:'4'}});await f.service.performance(manager,f.s,{weekId:w.id,scores:{quality:'3'}});
