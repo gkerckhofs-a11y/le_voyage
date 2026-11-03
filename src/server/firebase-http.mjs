@@ -194,7 +194,7 @@ export async function createFirebaseHttp(options){
    if(JSON.stringify(current.scope)!==JSON.stringify(session.scope)||current.space!==session.workspaceSpace)throw failure(403);
   }
   if(path.startsWith('/api/cite/cockpit')){await citeCockpit.handle(req,json,path,session);return;}
-  if(path.startsWith('/api/cite/preferences')){await citeMember.handle(req,json,path,session);return;}
+  if(path.startsWith('/api/cite/preferences')||path.startsWith('/api/cite/family')){await citeMember.handle(req,json,path,session);return;}
   if(['cite-gifts','cite-member'].includes(session.workspaceSpace)&&path!=='/api/auth/logout')throw failure(403);
   if(path==='/api/access/read'&&req.method==='POST'){
    if(authenticationMode!=='provisioned'||!session.organizerOnly)throw failure(403);authorized(req,session);

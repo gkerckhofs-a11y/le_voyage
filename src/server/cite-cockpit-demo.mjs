@@ -1,5 +1,7 @@
 import {assertEmulators} from './firebase-emulator.mjs';
-import {runPilot} from '../cite/pilot.ts';
+import {createCityState} from '../cite/city-state.ts';
+import {planWeeks} from '../domain/calendar.ts';
+import {createPilot,pilotAction,runPilot} from '../cite/pilot.ts';
 import {citeDemoCatalog,citeDemoPreferences} from './cite-demo-catalog.mjs';
 export const citeCockpitDemo={uid:'cite-cockpit-operator',email:'cite-clem@example.test',password:'Fictitious-Cite-Only-42!',catalogDocument:'supplierCatalog/cite-cockpit-demo',date:'2027-03-01',memberUid:'person-0-0',memberEmail:'cite-camille@example.test',memberPassword:'Fictitious-Camille-Only-42!',tenants:['fiction-cite-cockpit-a','fiction-cite-cockpit-b']};
 /** Explicit emulator fixture only. No equivalent provisioning endpoint is exposed. */
@@ -18,7 +20,10 @@ export async function seedCiteCockpitDemo(adapter,{reset=false}={}){
   }
   entries.push({id:'cite-'+i,space:'cite-gifts',...scope,label:p.game.economy.config.name});
  }
- const memberDirectory=adapter.db.doc('workspaceDirectories/'+d.memberUid);await adapter.db.runTransaction(async tx=>{const old=await tx.get(memberDirectory);if(reset||!old.exists)tx.set(memberDirectory,{uid:d.memberUid,active:true,entries:entries.map((entry,i)=>({...entry,id:'member-'+i,space:'cite-member'}))});});
+ const familyTenant='fiction-cite-family',pilot=createPilot('none');pilot.game.economy.config.tenantId=familyTenant;pilot.game.economy.config.name='La Cité des Fondateurs';pilot.game.economy.config.weeks=planWeeks('2027-02-08',16);for(const m of pilot.game.economy.config.memberships)m.from='2027-02-08';pilot.rewards.tenantId=familyTenant;pilot.game.city=createCityState(pilot.game.economy.config,pilot.game.councils.gauges,'cite-auth-family-seed-0000');let playable=pilot;for(let i=0;i<4;i++)playable=pilotAction(playable,'operator',{type:'advance-week'});
+ const familyRef=adapter.db.doc(`tenants/${familyTenant}/citeSeasons/${pilot.game.economy.config.seasonId}/privateEconomy/main`),familyMember=adapter.db.doc(`tenants/${familyTenant}/members/${d.memberUid}`);
+ await adapter.db.runTransaction(async tx=>{const [a,b]=await Promise.all([tx.get(familyRef),tx.get(familyMember)]);if(reset||!a.exists)tx.set(familyRef,{state:playable.game.economy,councils:playable.game.councils,city:playable.game.city});if(reset||!b.exists)tx.set(familyMember,{uid:d.memberUid,tenantId:familyTenant,active:true,citeAssignments:[{seasonId:pilot.game.economy.config.seasonId,familyId:'family-0'}]});});
+ const memberDirectory=adapter.db.doc('workspaceDirectories/'+d.memberUid);await adapter.db.runTransaction(async tx=>{const old=await tx.get(memberDirectory);if(reset||!old.exists)tx.set(memberDirectory,{uid:d.memberUid,active:true,entries:entries.map((entry,i)=>({...entry,id:'member-'+i,space:'cite-member'})).concat([{id:'member-family',space:'cite-member',tenantId:familyTenant,seasonId:pilot.game.economy.config.seasonId,familyId:'family-0',label:'La Cité des Fondateurs'}])});});
  const directory=adapter.db.doc('workspaceDirectories/'+d.uid),catalog=adapter.db.doc(d.catalogDocument),ledger=adapter.db.doc(d.catalogDocument+'/reservationLedger/main');
  await adapter.db.runTransaction(async tx=>{const [a,b]=await Promise.all([tx.get(directory),tx.get(catalog)]);if(reset||!a.exists)tx.set(directory,{uid:d.uid,active:true,entries});if(reset||!b.exists)tx.set(catalog,citeDemoCatalog());if(reset)tx.set(ledger,{counts:{},citeHeld:{}});});
 }
