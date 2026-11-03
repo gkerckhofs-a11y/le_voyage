@@ -12,6 +12,7 @@ Date : 3 novembre 2026. Référence : cahier V1.0, §§ 8.5, 9.4, 10 et 12. Le C
 | `src/server/cite-gift-preparation.mjs` | Noms de bénéficiaires lus dans l'entreprise autorisée, sans élargir la projection des préférences |
 | `web/cite-cockpit.html`, `web/cite-cockpit.css`, `web/assets/cite/cockpit.js` | Écran du Cockpit, actualisation, déconnexion et traitement d'un accès retiré |
 | `src/web/workspaces.ts`, `src/web/login.ts` | Ouverture du nouvel espace et intitulés de connexion adaptés au contexte Cité |
+| `tests/visual/public-build.test.mjs` | Cinq ajouts explicites à la liste publique autorisée, sans élargissement des motifs ni du contrôle de confidentialité |
 | `scripts/build-web.mjs` | Copie explicite des seuls éléments publics réutilisés du panneau Cité, sans serveur ni fixtures |
 | `src/server/cite-cockpit-demo.mjs`, `scripts/serve-cite-cockpit.mjs` | Comptes et deux entreprises fictives, exclusivement sur émulateurs |
 
