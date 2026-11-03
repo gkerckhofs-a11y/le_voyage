@@ -1,0 +1,21 @@
+name: La Cite economy (targeted)
+on:
+  pull_request:
+    paths: ['src/cite/**', 'src/server/cite-economy.mjs', 'src/domain/exact.ts', 'src/domain/calendar.ts', 'tests/cite/**', 'scripts/simulate-cite-economy.mjs', '.github/workflows/cite-economy.yml']
+  push:
+    branches: ['work/la-cite-*']
+    paths: ['src/cite/**', 'src/server/cite-economy.mjs', 'tests/cite/**', 'scripts/simulate-cite-economy.mjs', '.github/workflows/cite-economy.yml']
+permissions:
+  contents: read
+jobs:
+  economy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: node --test tests/cite/*.test.mjs
