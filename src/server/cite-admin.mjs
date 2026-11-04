@@ -34,7 +34,7 @@ export function createCiteAdminService(adapter,options={}){
    const result=applyCouncilImport(record.councilDrafts??{},review,date);return {game,...(result.changed.length?{drafts:result.drafts,event:{type:'import-council-drafts',councils:result.changed}}:{}),outcome:'drafts-imported'};
   });},
   saveDraft:async(header,scope,input)=>{keys(input,['definition','revision']);if(!Number.isSafeInteger(input.revision)||input.revision<0)throw fail(400);return operate(header,scope,(game,date,record)=>{
-   const {definition}=validateCouncilDraft(game,scope,input.definition),ordinal=game.councils.order.length+1,old=record.councilDrafts?.[String(ordinal)],revision=old?.revision??0;
+   const match=/^council-([1-9]|1[0-3])$/.exec(input.definition?.id);if(!match)throw fail(400);const ordinal=Number(match[1]),{definition}=validateCouncilDraft(game,scope,input.definition,ordinal),old=record.councilDrafts?.[String(ordinal)],revision=old?.revision??0;
    if(input.revision>revision)throw fail(409);if(old&&canonicalJSON(old.definition)===canonicalJSON(definition))return {game,outcome:'draft-saved'};
    if(input.revision!==revision||revision>=1000||old?.status==='published')throw fail(409);
    return {game,drafts:{...record.councilDrafts,[String(ordinal)]:{ordinal,status:'draft',revision:revision+1,definition,updatedOn:date}},event:{type:'save-council-draft',councilId:definition.id,revision:revision+1},outcome:'draft-saved'};
