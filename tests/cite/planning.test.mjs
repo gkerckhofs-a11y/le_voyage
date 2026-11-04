@@ -85,3 +85,18 @@ test('a matrix is previewed without writes and a refusal creates only the fallba
  const closed=await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});assert.equal(closed.planning.draft.definition.title,'place');await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});assert.equal(f.data.get(f.privatePath).councilDrafts[2].revision,1);
  const {followingNode}=await import('../../src/server/cite-story.mjs');const r=f.data.get(f.privatePath);assert.equal(followingNode(r.story,r.councilDrafts[1],{selected:'project-1-a'}).id,'ecole');
 });
+
+test('Nérisée applies multi-gauge refusal effects once and retains the customer city name',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const rows=(await readFile(new URL('../../scenarios/nerisee/Nerisee.tsv',import.meta.url),'utf8')).trimEnd().split('\n').slice(1).map(r=>r.split('\t'));
+ const f=starterPilot(),actor='Bearer manager';
+ f.data.get(f.privatePath).state.config.name='Ekhopolis';
+ const bad=structuredClone(rows);bad[0].splice(15,5,'0','0','0','0','1');
+ await assert.rejects(f.service.installStory(actor,f.s,{rows:bad}),{status:400});
+ const v=await f.service.installStory(actor,f.s,{rows});assert.equal(v.city.name,'Ekhopolis');
+ await f.service.publishDraft(actor,f.s,{councilId:'council-1',revision:1});
+ f.setDate(v.planning.draft.definition.firstVoteClosesOn);
+ const closed=await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});
+ assert.equal(closed.city.gauges.economy,36);assert.equal(closed.city.gauges.wellbeing,37);assert.equal(closed.city.gauges.environment,45);
+ const retry=await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});assert.deepEqual(retry.city.gauges,closed.city.gauges);
+});
