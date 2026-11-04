@@ -6,9 +6,15 @@ const fail=status=>Object.assign(Error('Cité family unavailable'),{status});
 /** One private transaction; no caller-selected actor, raw ballot collection or individual scores. */
 export function createCiteFamilyService(adapter,options={}){
  const store=createCiteStore(adapter,options);
- const operate=(header,scope,action,permission='member')=>store(header,scope,permission,(record,uid,date,{capabilities})=>{
+ const operate=(header,scope,action,permission='member',allowUpcoming=false)=>store(header,scope,permission,(record,uid,date,{capabilities})=>{
   const config=record.state.config,family=config.families.find(f=>f.id===scope.familyId);
-  if(!family||!config.memberships.some(m=>m.uid===uid&&m.familyId===scope.familyId&&m.from<=date&&(!m.toExclusive||date<m.toExclusive)))throw fail(403);
+  if(!family)throw fail(403);
+  const active=config.memberships.some(m=>m.uid===uid&&m.familyId===scope.familyId&&m.from<=date&&(!m.toExclusive||date<m.toExclusive)),start=config.weeks[0].start;
+  if(!active||(record.pilotSetup?.kind==='four-council-pilot'&&date<start)){
+   const upcoming=allowUpcoming&&record.pilotSetup?.kind==='four-council-pilot'&&date<start&&config.memberships.some(m=>m.uid===uid&&m.familyId===scope.familyId&&m.from===start&&(!m.toExclusive||start<m.toExclusive));
+   if(!upcoming)throw fail(403);
+   return {record,value:{phase:'upcoming',date,startsOn:start,city:{name:config.name},family:{name:family.name},fundingDelegate:capabilities.funding}};
+  }
   if(!record.councils||!record.city)throw fail(409);
   const game={economy:record.state,councils:record.councils,city:record.city},next=action(game,uid,date),id=next.councils.order.at(-1);
   const week=config.weeks.find(w=>w.active&&w.start<=date&&date<w.endExclusive),own=week?next.economy.values[week.id]?.[uid]:null;
@@ -16,11 +22,11 @@ export function createCiteFamilyService(adapter,options={}){
   const weekly=week?{id:week.id,start:week.start,endExclusive:week.endExclusive,metrics:config.metrics.values.map(m=>({id:m.id,label:m.label})),scores:own?structuredClone(own.scores):null,canSubmit:!own&&eligibleMembers(next.economy,scope.familyId,week).includes(uid)&&!Object.values(next.economy.credits).some(c=>c.familyId===scope.familyId&&c.weekId===week.id)}:null;
   const council=id?councilFamilyView(next,scope,uid,id,date):null;
   if(council)council.myFamily={...council.myFamily,canFund:capabilities.funding&&council.phase==='funding'&&date>=(council.round===1?council.definition.firstVoteClosesOn:council.definition.secondVoteClosesOn)&&date<council.definition.fundingClosesOn,maxPledge:council.phase==='funding'?Math.min(next.economy.balances[scope.familyId],council.funding.remaining+council.myFamily.pledge.amount):0};
-  const value={date,weekly,family:{name:family.name,ecus:next.economy.balances[scope.familyId],credits:Object.values(next.economy.credits).filter(c=>c.familyId===scope.familyId).map(c=>({weekId:c.weekId,ecus:c.ecus}))},city:cityFamilyView(next,scope),council};
+  const value={phase:'active',date,weekly,family:{name:family.name,ecus:next.economy.balances[scope.familyId],credits:Object.values(next.economy.credits).filter(c=>c.familyId===scope.familyId).map(c=>({weekId:c.weekId,ecus:c.ecus}))},city:cityFamilyView(next,scope),council};
   return {record:next===game?record:{...record,state:next.economy,councils:next.councils,city:next.city},value};
  });
  return {
-  read:(header,scope)=>operate(header,scope,game=>game),
+  read:(header,scope)=>operate(header,scope,game=>game,'member',true),
   submit:async(header,scope,input)=>{
    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).sort().join(',')!=='scores,weekId'||!identifier(input.weekId))throw fail(400);
    return operate(header,scope,(game,uid,date)=>{

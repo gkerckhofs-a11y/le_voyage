@@ -2,11 +2,11 @@ const $=id=>document.getElementById(id),labels={economy:'Économie',wellbeing:'B
 let csrf='',busy=false,fatal=false,current=null;
 function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;}
 function lock(value){busy=value;$('family-refresh').disabled=value||fatal;$('family-logout').disabled=value||!csrf;const f=$('family-ballot-fields');if(f)f.disabled=value||!current?.council?.myFamily.canVote;const w=$('weekly-fields');if(w)w.disabled=value||!current?.weekly?.canSubmit;const p=$('pledge-fields');if(p)p.disabled=value||!current?.council?.myFamily.canFund;}
-function clear(status){fatal=true;csrf='';current=null;$('family-content').replaceChildren();$('family-content').hidden=true;$('family-city').textContent='Notre Cité';$('family-status').textContent='Cet accès n’est plus disponible. Revenez à vos espaces.';if(status===401)location.replace('/connexion.html?app=cite');}
+function clear(status){fatal=true;csrf='';current=null;$('family-upcoming').replaceChildren();$('family-upcoming').hidden=true;$('family-common-link').hidden=true;$('family-content').replaceChildren();$('family-content').hidden=true;$('family-city').textContent='Notre Cité';$('family-status').textContent='Cet accès n’est plus disponible. Revenez à vos espaces.';if(status===401)location.replace('/connexion.html?app=cite');}
 function effects(value){return Object.entries(value).map(([k,v])=>`${labels[k]} ${v>0?'+':''}${v}`).join(' · ')||'Aucun effet immédiat';}
 function choiceName(c,value){return value==='yes'?'Oui':value==='no'?'Non':value==='abstain'?'Abstention':c.definition.projects.find(p=>p.id===value)?.name??value;}
 function render(data){
- current=data;csrf=data.csrf;$('family-city').textContent=data.city.name;$('family-name').textContent=data.family.name;$('family-purse').textContent=`Notre bourse : ${data.family.ecus} écus`;$('family-date').textContent=`Date de jeu : ${data.date}`;
+ current=data;csrf=data.csrf;if(data.phase==='upcoming'){renderUpcoming(data);return;}$('family-upcoming').replaceChildren();$('family-upcoming').hidden=true;$('family-common-link').hidden=false;$('family-city').textContent=data.city.name;$('family-name').textContent=data.family.name;$('family-purse').textContent=`Notre bourse : ${data.family.ecus} écus`;$('family-date').textContent=`Date de jeu : ${data.date}`;
  $('family-credits').replaceChildren(...data.family.credits.map(c=>node('li',`${c.weekId} : +${c.ecus} écus`)));if(!data.family.credits.length)$('family-credits').append(node('li','Aucun revenu crédité.'));
  renderWeekly(data.weekly);
  $('city-development').textContent=`Développement de la Cité : ${data.city.development} / 100`;
@@ -31,6 +31,13 @@ function render(data){
  $('city-history').replaceChildren(...[...data.city.resolutions.map(r=>`Conseil ${r.ordinal} : ${r.narrative}`),...data.city.crises.map(c=>`${c.name} · ${c.protected?'protection active':'sans protection'} · ${effects(c.effects)}`)].map(t=>node('li',t)));if(!$('city-history').children.length)$('city-history').append(node('li','L’histoire commence.'));$('family-content').hidden=false;
 }
 
+function renderUpcoming(data){
+ $('family-city').textContent=data.city.name;$('family-content').hidden=true;$('family-common-link').hidden=true;
+ for(const id of ['family-name','family-purse','family-date','family-credits','family-weekly','city-development','city-gauges','city-buildings','family-ambition','family-council','city-history'])$(id).replaceChildren();
+ const panel=$('family-upcoming');panel.replaceChildren(node('p','BIENVENUE DANS NOTRE CITÉ'),node('h2','Notre Cité commence bientôt'),node('p','Notre famille : '+data.family.name),node('p','Premier lundi : '+data.startsOn),node('p','Votre place dans la famille est enregistrée. Le rituel hebdomadaire et l’ambition familiale seront accessibles à partir du démarrage. Les votes et financements suivront le calendrier des Conseils.'),node('p',data.fundingDelegate?'Vous êtes désigné pour engager les écus de votre famille pendant les périodes de financement.':'Les engagements d’écus sont réservés aux délégués autorisés de la famille.'));
+ const link=node('a','Préparer mes choix');link.href='/cite-preferences.html';link.className='upcoming-link';panel.append(node('h3','En attendant'),node('p','Vous pouvez déjà préparer vos préférences personnelles. Elles ne déclenchent aucun cadeau et restent modifiables.'),link,node('p','Revenez ici à partir du '+data.startsOn+'. Le bouton Actualiser affichera le jeu lorsque le pilote aura commencé.'));panel.hidden=false;
+}
+
 function renderWeekly(week){
  const panel=$('family-weekly');panel.replaceChildren(node('h2','Mon rituel de la semaine'));
  if(!week){panel.append(node('p','Aucune semaine active à cette date.'));return;}
@@ -52,6 +59,6 @@ async function command(path,input,message){
 }
 
 async function load(){const r=await fetch('/api/cite/family',{cache:'no-store'});if([401,403].includes(r.status)){clear(r.status);return false;}if(!r.ok)throw Error('La Cité est indisponible. Réessayez.');render(await r.json());return true;}
-async function refresh(){if(busy||fatal)return;lock(true);try{if(await load())$('family-status').textContent='Votre Cité est à jour.';}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}}
+async function refresh(){if(busy||fatal)return;lock(true);try{if(await load())$('family-status').textContent=current?.phase==='upcoming'?'Votre accueil est à jour. Le pilote commencera le '+current.startsOn+'.':'Votre Cité est à jour.';}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}}
 async function vote(event){event.preventDefault();if(busy||fatal||!current?.council?.myFamily.canVote)return;const c=current.council,choice=new FormData(event.currentTarget).get('ballot');if(!choice)return;lock(true);try{const r=await fetch('/api/cite/family/vote',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:JSON.stringify({councilId:c.id,round:c.round,choice})});if([401,403].includes(r.status)){clear(r.status);return;}if(r.status===409){if(await load())$('family-status').textContent='Le Conseil a changé ou votre bulletin est déjà enregistré. Vérifiez son état.';return;}if(!r.ok)throw Error('Vote refusé. Vérifiez le Conseil avant de réessayer.');render(await r.json());$('family-status').textContent='Votre vote est enregistré.';}catch(e){$('family-status').textContent=e.message;}finally{lock(false);}}
 $('family-refresh').addEventListener('click',()=>void refresh());$('family-logout').addEventListener('click',async()=>{if(busy||!csrf)return;lock(true);try{const r=await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-CSRF':csrf},body:'{}'});if(!r.ok&&r.status!==401)throw Error();location.replace('/connexion.html?app=cite');}catch{$('family-status').textContent='Déconnexion non confirmée.';}finally{lock(false);}});void refresh();
