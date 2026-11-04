@@ -1,3 +1,4 @@
+import {canLoadPilotScenario,pilotScenarioDrafts,PILOT_SCENARIO} from './cite-pilot-scenario.mjs';
 import {pilotRosterEditable} from './cite-pilot-roster.mjs';
 import {preparePerformanceCorrection,performanceCorrectionView} from './cite-performance-correction.mjs';
 import {canonicalJSON} from '../cite/canonical.ts';
@@ -22,12 +23,13 @@ export function createCiteAdminService(adapter,options={}){
   if(!record.state.config.families.some(f=>f.id===scope.familyId))throw fail(403);if(!record.councils||!record.city)throw fail(409);
   const game={economy:record.state,councils:record.councils,city:record.city},result=action(game,date,record,uid),next=result.game;let updated=record;
   if(next!==game||result.drafts){const audit=record.managementAudit??[];if(audit.length>=2000)throw fail(409);updated={...record,...(result.correction?{performanceCorrections:[...(record.performanceCorrections??[]),result.correction]}:{}),state:next.economy,councils:next.councils,city:next.city,...(result.drafts?{councilDrafts:result.drafts}:{}),managementAudit:[...audit,{...result.event,actorUid:uid,date}]};if(next!==game&&record.rewards)updated.rewards=syncRewards(next,scope,record.rewards,date);}
-  return {record:updated,value:{canManagePilotRoster:capabilities.pilotCreation&&pilotRosterEditable(updated,date),canCreatePilot:capabilities.pilotCreation,...projection(next,scope,date,updated.councilDrafts,updated.performanceCorrections),...(result.importReview?{importReview:result.importReview}:{}),outcome:result.outcome??null}};
+  return {record:updated,value:{canLoadPilotScenario:canLoadPilotScenario(updated,date),canManagePilotRoster:capabilities.pilotCreation&&pilotRosterEditable(updated,date),canCreatePilot:capabilities.pilotCreation,...projection(next,scope,date,updated.councilDrafts,updated.performanceCorrections),...(result.importReview?{importReview:result.importReview}:{}),outcome:result.outcome??null}};
  });
  const familyScope=(game,scope,id)=>{if(!identifier(id))throw fail(400);if(!game.economy.config.families.some(f=>f.id===id))throw fail(403);return {...scope,familyId:id};};
  return {
   access:(header,scope)=>operate(header,scope,game=>({game})),
   read:(header,scope)=>operate(header,scope,game=>({game})),
+  previewStarter:async(header,scope,input)=>{keys(input,[]);return operate(header,scope,(game,date,record)=>{if(!canLoadPilotScenario(record,date))throw fail(409);const review=reviewCouncilImport(game,scope,record.councilDrafts??{},pilotScenarioDrafts(game));return {game,importReview:{...review,source:PILOT_SCENARIO},outcome:'import-preview'};});},
   previewImport:async(header,scope,input)=>{keys(input,['councils']);return operate(header,scope,(game,date,record)=>({game,importReview:reviewCouncilImport(game,scope,record.councilDrafts??{},input.councils),outcome:'import-preview'}));},
   importDrafts:async(header,scope,input)=>{keys(input,['councils','fingerprint']);if(typeof input.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(input.fingerprint))throw fail(400);return operate(header,scope,(game,date,record)=>{
    const review=reviewCouncilImport(game,scope,record.councilDrafts??{},input.councils);if(review.fingerprint!==input.fingerprint)throw fail(409);
