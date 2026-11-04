@@ -18,7 +18,7 @@ export function createCiteStore(adapter,{today=()=>new Intl.DateTimeFormat('en-C
    const granted={member:assigned,manager:manages,funding,rewardPlan,rewardOperations,viewer:assigned||manages};if(!Object.hasOwn(granted,permission)||!granted[permission])throw denied();
    const ref=db.doc(`tenants/${scope.tenantId}/citeSeasons/${scope.seasonId}/privateEconomy/main`),snapshot=await tx.get(ref);if(!snapshot.exists)throw denied();
    const record=snapshot.data();if(record.state?.config?.tenantId!==scope.tenantId||record.state.config.seasonId!==scope.seasonId)throw denied();
-   const result=await action(record,actor.uid,today(scope),{tx,db,capabilities:{funding,management:manages}});if(result.record!==record){if(Buffer.byteLength(JSON.stringify(result.record))>800000)throw Object.assign(Error('City prototype capacity exceeded'),{status:409});tx.set(ref,result.record);}return result.value;
+   const result=await action(record,actor.uid,today(scope),{tx,db,capabilities:{funding,management:manages,pilotCreation:member.citePilotCreation===true}});if(result.record!==record){if(Buffer.byteLength(JSON.stringify(result.record))>800000)throw Object.assign(Error('City prototype capacity exceeded'),{status:409});tx.set(ref,result.record);}return result.value;
   });
  };
 }

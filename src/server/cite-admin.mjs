@@ -17,11 +17,11 @@ function projection(game,scope,date,drafts,corrections=[]){
 /** Authenticated season management, no personal evaluations, ballots or ambitions in projections. */
 export function createCiteAdminService(adapter,options={}){
  const store=createCiteStore(adapter,options);
- const operate=(header,scope,action)=>store(header,scope,'manager',(record,uid,date)=>{
+ const operate=(header,scope,action)=>store(header,scope,'manager',(record,uid,date,{capabilities})=>{
   if(!record.state.config.families.some(f=>f.id===scope.familyId))throw fail(403);if(!record.councils||!record.city)throw fail(409);
   const game={economy:record.state,councils:record.councils,city:record.city},result=action(game,date,record,uid),next=result.game;let updated=record;
   if(next!==game||result.drafts){const audit=record.managementAudit??[];if(audit.length>=2000)throw fail(409);updated={...record,...(result.correction?{performanceCorrections:[...(record.performanceCorrections??[]),result.correction]}:{}),state:next.economy,councils:next.councils,city:next.city,...(result.drafts?{councilDrafts:result.drafts}:{}),managementAudit:[...audit,{...result.event,actorUid:uid,date}]};if(next!==game&&record.rewards)updated.rewards=syncRewards(next,scope,record.rewards,date);}
-  return {record:updated,value:{...projection(next,scope,date,updated.councilDrafts,updated.performanceCorrections),...(result.importReview?{importReview:result.importReview}:{}),outcome:result.outcome??null}};
+  return {record:updated,value:{canCreatePilot:capabilities.pilotCreation,...projection(next,scope,date,updated.councilDrafts,updated.performanceCorrections),...(result.importReview?{importReview:result.importReview}:{}),outcome:result.outcome??null}};
  });
  const familyScope=(game,scope,id)=>{if(!identifier(id))throw fail(400);if(!game.economy.config.families.some(f=>f.id===id))throw fail(403);return {...scope,familyId:id};};
  return {
