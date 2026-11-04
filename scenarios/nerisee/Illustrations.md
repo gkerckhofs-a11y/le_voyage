@@ -1,0 +1,27 @@
+# Nérisée — carnet d’illustration
+Le même olivier fourchu, la même baie et la même colline reviennent dans les sept scènes. Pierre couleur de miel, enduit à la chaux, voiles safran et terre rouge. Pas de costume de péplum. Les habitants travaillent en tuniques rapiécées, avec des tabliers et des sandales de cuir. La couleur sert à reconnaître les personnages d’un plan à l’autre. Myrto porte un fichu indigo. Doria a les avant-bras rougis par l’argile.
+
+## Vingt et un cadrages à produire
+Chaque case est une illustration distincte. Avant le vote, montrer les deux intérêts en présence. Après la résolution, ne montrer le bâtiment que s’il a été financé. Le montage suit l’issue matérielle même lorsque le prochain chapitre suit le vote.
+
+| Clé | Avant le vote | Projet réalisé | Projet refusé ou non financé |
+|---|---|---|---|
+| source | À hauteur de l’enfant, sa main sur le tronc du figuier. Derrière lui Myrto tend le cordeau du puisatier. La cruche vide est couchée à leurs pieds. | La margelle reçoit son premier seau. En dessous du parapet, Myrto et son fils plient sous une dernière corbeille de figues. | À travers le feuillage intact, la file des cruches descend vers la barque. Un batelier retourne dans sa paume la pièce qu’on vient de lui donner. |
+| tourneurs | Un osselet blanc s’arrête au bord d’une rigole rouge. La potière et la meneuse du jeu s’accroupissent de part et d’autre. | Vue rasante des trois bassins, du rouge opaque à l’eau claire. Dans la ruelle étroite du fond, six enfants poursuivent leur osselet. | Les enfants jouent toujours. Un apprenti, les bras chargés de deux pots d’eau trouble, attend que la partie lui laisse le passage. |
+| barques | Une barque gîte dans la houle. Au sec, une pêcheuse retient du pied son filet sur le tracé à la craie de la future cale. | Au premier plan la coque monte sur les rouleaux. À l’arrière, une pêcheuse et un poissonnier débarrassent ensemble une table encombrée. | La grève est tapissée de filets. Au large, une outre s’échappe entre deux coques ; le porteur a encore les mains en coupe. |
+| four | Six fonds de jarres, six signatures gravées. Doria pose une septième pièce au centre du cercle : la clef unique du futur four. | L’ouverture du four éclaire les visages des six ateliers. Doria lit la tablette des tours à l’oreille du vieil artisan. | Une petite fenêtre rouge dans la nuit. La potière charge seule sa commande ; derrière la maison attend un mulet aux paniers de bois vides. |
+| bancs | Un marchand mesure son étal avec sa ceinture. La tisserande retourne un cageot pour faire asseoir une vieille femme sous son store. | Les pieds des convives pendent sous un long banc d’ombre. Par l’arche du portique, on aperçoit un étal de sandales sans client. | Une main blanche peinte sur un tabouret devant la boutique. Un voyageur hésite, une pièce déjà prête entre ses doigts. |
+| fanal | La gardienne du pressoir éclaire la jauge d’huile avec sa lampe. Au-delà de son épaule, une voile se confond presque avec le rocher. | Deux passagers dorment sous une toile dans la barque guidée par le feu. Sur la berge, un trait de charbon noir sur une jarre blonde. | Une courbe de petites lampes épouse la grève. Entre deux flammes, un enfant distingue enfin le bout d’une rame. La pointe reste sombre. |
+| veille | À l’aube, un boulanger s’est endormi sur un sac. Sa fille pose une écuelle vide devant le gardien du grenier qui tient les clefs. | Sous le toit neuf, la relève se passe une louche. Au grenier voisin, une silhouette compte les sacs dans une travée à demi vide. | Un volet se ferme. Une miche attend sur un seuil. Plus bas, les deux gardiens habituels se passent le manteau de la première veille. |
+
+## Assemblage de la vue commune
+La vue de fond est le village avant le premier Conseil. Garder la caméra fixe et les grands passages libres. Prévoir quatre emplacements fixes, chacun partagé par les variantes de son Conseil. En cas de refus, conserver l’usage initial de la parcelle. Chaque construction requiert un élément détouré, son ombre et une courte boucle d’habitants compatible avec la perspective.
+
+| Conseil | Parcelle initiale | Construction et activité ajoutées |
+|---|---|---|
+| 1 | Jardin de figuiers au pied de la colline | Citerne. Une file se forme, le seau monte, deux porteurs repartent dans des directions différentes. |
+| 2 | Cour et grève en bord d’eau | Bassin. Un apprenti vide un pot, une pêcheuse inspecte le fond. Ou cale. Trois bateliers roulent une coque pendant que le réparateur de filets gagne le marché. |
+| 3 | Terrasse médiane près du marché | Four. Un mulet apporte du bois, des fours refroidissent et les potiers rentrent les jarres. Ou portique. Les passants s’assoient puis laissent leur place. |
+| 4 | Pointe au-dessus du quai | Fanal. La gardienne monte l’huile et un marin fait signe du large. Ou maison de veille. Une patrouille rentre à la soupe au moment où une autre descend au quai. |
+
+Les figurants de fond ont de petites occupations indépendantes : le pécheur reprend toujours la même maille, un enfant triche aux osselets et recommence avant qu’on l’attrape, l’âne refuse la pente puis suit la carotte. Décaler départs et pauses pour éviter une foule au pas. Les personnages décoratifs ne représentent pas les salariés. En mode mouvement réduit, garder les mêmes groupes en poses fixes. Le nombre de bâtiments doit provenir des résolutions construites. La croissance visuelle traduit ces constructions, pas un effectif humain mesuré.
