@@ -44,6 +44,10 @@ function normalize(game:Game,input:CouncilInput,ordinal:number):Definition{
 export function prepareCouncilDefinition(game:Game,scope:Scope,input:CouncilInput):Definition{
  scopeCheck(game,scope);return normalize(game,input,game.councils.records[input?.id]?.ordinal??game.councils.order.length+1);
 }
+/** Validate a future private plan without opening a Council or evaluating events. */
+export function preparePlannedCouncilDefinition(game:Game,scope:Scope,input:CouncilInput,ordinal:number):Definition{
+ scopeCheck(game,scope);requireThat(Number.isInteger(ordinal)&&ordinal>game.councils.order.length&&ordinal<=13,'Future Council slot required',400);return normalize(game,input,ordinal);
+}
 export function openCouncil(game:Game,scope:Scope,input:CouncilInput,onDate:string):Game{
  scopeCheck(game,scope);requireThat(!!input&&identifier(input.id),'Invalid Council',400);const existing=game.councils.records[input.id];const ordinal=existing?.ordinal??game.councils.order.length+1;const definition=normalize(game,input,ordinal);
  if(existing){requireThat(canonicalJSON(existing.definition)===canonicalJSON(definition),'Council identifier already used');return game;}
