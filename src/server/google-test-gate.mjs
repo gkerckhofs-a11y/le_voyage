@@ -15,6 +15,10 @@ export async function createGoogleTestGate({auth,config,now=Date.now,identityLog
  const put=async(previous,next,value,s)=>{if(sessionStore)await sessionStore.issue(previous,next,value,s?{expectedVersion:s._version}:{});else{sessions.delete(previous);sessions.set(next,value);}};
  const assets=new Map(await Promise.all(['html','js','css'].map(async ext=>['/test-access'+(ext==='html'?'':'.'+ext),{type:ext==='html'?'text/html':ext==='js'?'text/javascript':'text/css',data:await readFile(new URL(`./test-access/access.${ext}`,import.meta.url))}])));
  if(provisioned){const page=assets.get('/test-access');page.data=Buffer.from(page.data.toString().replace('découvrir la démonstration.','ouvrir vos espaces autorisés.').replace('Les entreprises, les équipes et les cadeaux présentés sont fictifs.','Votre compte doit être autorisé pour le test et affecté à un espace du Voyage.'));}
+ if(canonical.includes('--cite-pilot-')){
+  const page=assets.get('/test-access');
+  page.data=Buffer.from(page.data.toString().replace('LE VOYAGE DE VOTRE ENTREPRISE','LA CITÉ').replace('Le voyage<br>commence ici.','Bienvenue dans La Cité').replace('un espace du Voyage','une famille ou un espace organisateur de La Cité'));
+ }
  const headers={'Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',Vary:'Cookie','Content-Security-Policy':`default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self'; img-src 'self' data: https://www.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src ${canonical} https://${config.projectId}.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`};
  const allowedClaims=c=>c?.firebase?.sign_in_provider==='google.com'&&c.email_verified===true&&typeof c.email==='string'&&allowed.has(c.email.toLowerCase());
  const tokenOf=req=>req.headers.cookie?.match(/(?:^|;\s*)__session=([a-f0-9]{64})(?:;|$)/)?.[1];

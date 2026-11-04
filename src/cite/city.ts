@@ -29,6 +29,6 @@ export function crisisAtOpening(game:Game,scope:Scope,councilId:string,onDate:st
 }
 export function cityPublicView(game:Game,scope:Scope){
  scopeCheck(game,scope);check(!!game.city,'City not initialized');
- return {name:game.economy.config.name,gauges:structuredClone(game.councils.gauges),development:development(game.councils.gauges),buildings:Object.values(game.councils.buildings).map(b=>({id:b.project.id,name:b.project.name,condition:game.city!.buildingConditions[b.project.id]??'intact',protection:b.project.protection??null})),crises:Object.values(game.city!.crises).map(c=>structuredClone(c)),resolutions:structuredClone(game.councils.resolutions),commitment:game.city!.commitment,rules:structuredClone(CITY_RULES)};
+ return {name:game.economy.config.name,gauges:structuredClone(game.councils.gauges),development:development(game.councils.gauges),buildings:Object.values(game.councils.buildings).map(b=>({id:b.project.id,name:b.project.name,...(b.project.image?{image:b.project.image}:{}),condition:game.city!.buildingConditions[b.project.id]??'intact',protection:b.project.protection??null})),crises:Object.values(game.city!.crises).map(c=>structuredClone(c)),resolutions:structuredClone(game.councils.resolutions),commitment:game.city!.commitment,rules:structuredClone(CITY_RULES)};
 }
 export function cityFamilyView(game:Game,scope:Scope){scopeCheck(game,scope);check(!!game.city,'City not initialized');return {...cityPublicView(game,scope),myAmbition:structuredClone(game.city!.ambitions[scope.familyId])};}

@@ -16,7 +16,7 @@ function render(data){
  const panel=$('family-council'),c=data.council;panel.replaceChildren(node('h2','Le Conseil des familles'));
  if(!c)panel.append(node('p','Aucun Conseil ouvert pour le moment.'));else{
   panel.append(node('h3',c.definition.title),node('p',`Conseil ${c.ordinal} · tour ${c.round}`));const projects=node('div');projects.className='council-projects';
-  for(const p of c.definition.projects){const card=node('article');card.className='council-project';card.append(node('h4',p.name),node('p',`${p.cost} écus · ${effects(p.effects)}`),node('p',p.narrative));projects.append(card);}panel.append(projects,node('p',`En cas d’échec : ${c.definition.failure.narrative} ${effects(c.definition.failure.effects)}.`));
+  for(const p of c.definition.projects){const card=node('article');card.className='council-project';if(p.image){const img=node('img');img.alt=p.name;img.loading='lazy';img.referrerPolicy='no-referrer';img.src=p.image;img.style.maxWidth='100%';card.append(img);}card.append(node('h4',p.name),node('p',`${p.cost} écus · ${effects(p.effects)}`),node('p',p.narrative));projects.append(card);}panel.append(projects,node('p',`En cas d’échec : ${c.definition.failure.narrative} ${effects(c.definition.failure.effects)}.`));
   if(c.phase==='voting'){
    panel.append(node('p',`Vote ouvert du ${c.round===1?c.definition.voteOpensOn:c.definition.firstVoteClosesOn} au ${c.round===1?c.definition.firstVoteClosesOn:c.definition.secondVoteClosesOn} (fin exclue).`),node('p','Votre bulletin est confidentiel et définitif pour ce tour. La majorité interne détermine l’unique voix de notre famille.'));
    if(c.myFamily.ballot!==null)panel.append(node('p',`Votre bulletin enregistré : ${choiceName(c,c.myFamily.ballot)}.`));

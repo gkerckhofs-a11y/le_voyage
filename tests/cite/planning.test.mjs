@@ -73,3 +73,15 @@ test('starter is restricted to a fresh four-Council pilot and concurrent custom 
 test('starter HTTP enforces manager access, selected workspace, CSRF and empty input',async()=>{
  const f=starterPilot(),api=createCiteAdminHttp(f.adapter,{today:f.today}),session={header:'Bearer manager',scope:f.s,workspaceEnabled:true,workspaceSpace:'cite-admin',csrf:'a'.repeat(64)},req=(input={},csrf=session.csrf)=>{const r=Readable.from([Buffer.from(JSON.stringify(input))]);r.method='POST';r.headers={'content-type':'application/json','x-demo-csrf':csrf};return r;};await assert.rejects(f.service.previewStarter('Bearer person-0-0',f.s,{}),{status:403});await assert.rejects(api.handle(req({},'b'.repeat(64)),()=>{},'/api/cite/admin/preview-starter',session),{status:403});await assert.rejects(api.handle(req({seasonId:'other'}),()=>{},'/api/cite/admin/preview-starter',session),{status:400});await api.handle(req(),status=>assert.equal(status,200),'/api/cite/admin/preview-starter',session);
 });
+
+test('a matrix is previewed without writes and a refusal creates only the fallback draft once',async()=>{
+ const f=starterPilot(),actor='Bearer manager';
+ const row=(id,level,next,otherwise,image='')=>[id,String(level),id,id,'petit','Un lieu ouvre.',image,next,otherwise,'Le projet est reporté.','0','0','10','0','0'];
+ const rows=[row('origine',1,'ecole','place','https://example.org/ecole.jpg'),row('ecole',2,'atelier','atelier'),row('place',2,'atelier','atelier'),row('atelier',3,'final','final'),row('final',4,'FIN','FIN')];
+ const before=structuredClone(f.data.get(f.privatePath));await f.service.previewStory(actor,f.s,{rows});assert.deepEqual(f.data.get(f.privatePath),before);
+ await assert.rejects(f.service.installStory(actor,f.s,{rows:rows.slice(0,-1)}));assert.deepEqual(f.data.get(f.privatePath),before);
+ const v=await f.service.installStory(actor,f.s,{rows});assert.equal(v.storyActive,true);assert.equal(v.planning.draft.definition.projects[0].image,'https://example.org/ecole.jpg');
+ await f.service.publishDraft(actor,f.s,{councilId:'council-1',revision:1});f.setDate(v.planning.draft.definition.firstVoteClosesOn);
+ const closed=await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});assert.equal(closed.planning.draft.definition.title,'place');await f.service.closeVote(actor,f.s,{councilId:'council-1',round:1});assert.equal(f.data.get(f.privatePath).councilDrafts[2].revision,1);
+ const {followingNode}=await import('../../src/server/cite-story.mjs');const r=f.data.get(f.privatePath);assert.equal(followingNode(r.story,r.councilDrafts[1],{selected:'project-1-a'}).id,'ecole');
+});

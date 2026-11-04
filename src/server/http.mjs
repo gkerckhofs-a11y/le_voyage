@@ -77,7 +77,7 @@ export function createDemoServer({root,directory,apiHandler,remoteOrigins=[],ema
       const decoded=decodeURIComponent(path),file=resolve(root,'.'+(decoded==='/'?'/index.html':decoded));
       if(!file.startsWith(root+sep))throw failure(403);
       let content;try{content=await readFile(file);}catch(e){if(e.code==='ENOENT'||e.code==='EISDIR')throw failure(404);throw e;}
-      res.writeHead(200,{...headers,...(path==='/email-link.html'&&emailCsp?{'Content-Security-Policy':emailCsp}:{}),'Content-Type':types[extname(file)]||'application/octet-stream'});res.end(req.method==='HEAD'?undefined:content);
+      res.writeHead(200,{...headers,...(['/cite-family.html','/cite-city.html'].includes(path)?{'Content-Security-Policy':headers['Content-Security-Policy'].replace("img-src 'self' data:", "img-src 'self' data: https:")}:{}),...(path==='/email-link.html'&&emailCsp?{'Content-Security-Policy':emailCsp}:{}),'Content-Type':types[extname(file)]||'application/octet-stream'});res.end(req.method==='HEAD'?undefined:content);
     }catch(error){if(!res.headersSent)json(error.status??500,{error:error.status===401?'Session de démonstration à rouvrir.':'La demande ne peut pas être traitée.'});else res.end();}
   });
   server.requestTimeout=15000;return server;

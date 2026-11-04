@@ -9,6 +9,12 @@ function summarize(effects){return Object.entries(effects).filter(([,v])=>v!==0)
 export function lockCouncilPlanning(value){busy=value;const selector=$('planning-selected');if(selector)selector.disabled=value||dirty;const fields=$('planning-fields');if(fields)fields.disabled=value;const batch=$('planning-import-fields');if(batch)batch.disabled=value||dirty;const b=$('planning-publish');if(b)b.disabled=value||dirty||!canPublish;const second=$('planning-project-b');if(second)second.disabled=value||mode!=='choice';}
 export function renderCouncilPlanning(data,command){
  const panel=$('admin-planning');if(!panel)return;panel.replaceChildren(node('h2','Préparer les Conseils'));let p=data.planning;dirty=false;
+ if(data.canLoadPilotScenario)matrixPanel(panel,data,command);
+ if(data.storyActive){
+  const slot=p.schedule[0];panel.append(node('p','Parcours installé. La branche choisie prépare le prochain brouillon à la résolution du Conseil.'));
+  if(slot?.saved){panel.append(node('h3',slot.definition.title));for(const project of slot.preview.projects)panel.append(node('p',project.name+' · '+project.cost+' écus'));const publish=node('button','Publier et ouvrir le vote');publish.disabled=!slot.canPublish;publish.onclick=()=>command('publish-draft',{councilId:slot.definition.id,revision:slot.revision});panel.append(publish);}
+  return;
+ }
  const selected=p.schedule.find(row=>row.ordinal===selectedOrdinal)??p.schedule[0];if(selected){selectedOrdinal=selected.ordinal;history.replaceState(null,'','#conseil-'+selectedOrdinal);p={...p,ordinal:selected.ordinal,template:selected.template,draft:selected.saved?{revision:selected.revision,status:'draft',definition:selected.definition,preview:selected.preview}:null,canPublish:selected.canPublish};}canPublish=p.canPublish;
  if(!p.template){panel.append(node('p','Aucun créneau de Conseil supplémentaire dans le calendrier configuré.'));return;}
  panel.append(select('planning-selected','Conseil à préparer',p.schedule.map(row=>[String(row.ordinal),`Conseil ${row.ordinal} · ${row.template.voteOpensOn}${row.saved?' · brouillon enregistré':''}`]),String(selectedOrdinal)),node('p','Enregistrez les modifications du formulaire avant de changer de Conseil. Seul le prochain Conseil pourra être publié, dans sa fenêtre de vote.'));
@@ -39,4 +45,47 @@ function renderCouncilImport(panel,planning,review,command,canLoadStarter){
  confirm.addEventListener('click',()=>{if(!busy&&!dirty&&!confirm.disabled&&review)void command('import-drafts',{councils:review.entries.map(({definition,revision})=>({definition,revision})),fingerprint:review.fingerprint});});fields.append(preview,status);
  if(review){const list=node('div');list.id='planning-import-review';list.append(node('h3','Aperçu des brouillons à importer'));if(review.source)list.append(node('p',review.source.label+' · Contenus proposés, à relire et tester. Aucun résultat de vote, contribution ou crise n’est imposé.'));for(const entry of review.entries){const d=entry.preview,article=node('article');article.append(node('h4',`Conseil ${entry.ordinal} · ${d.title}`),node('p',`Révision source ${entry.revision} · ${d.mode==='choice'?'Deux projets':'Oui / Non'} · Vote du ${d.voteOpensOn} au ${d.firstVoteClosesOn}, second tour jusqu’au ${d.secondVoteClosesOn}, financement jusqu’au ${d.fundingClosesOn}.`));for(const p of d.projects)article.append(node('p',`${p.name} · ${p.cost} écus · ${summarize(p.effects)}${p.protection?' · Protection : '+protections[p.protection]:''}${p.repairs?' · Réparation : '+p.repairs:''}`),node('p',p.narrative));article.append(node('p',`Échec : ${d.failure.narrative} ${summarize(d.failure.effects)}`));list.append(article);}fields.append(list);}
  fields.append(confirm);const schedule=node('ul');schedule.id='planning-schedule';for(const row of planning.schedule)schedule.append(node('li',`Conseil ${row.ordinal} · ${row.definition.voteOpensOn} · ${row.saved?row.definition.title+' · brouillon, révision '+row.revision:'À préparer'}`));fields.append(schedule);section.append(fields);panel.append(section);
+}
+
+const matrixColumns=['ID','Conseil','Dilemme','Action ou bâtiment','Taille','Récit','Image HTTPS','Si choisi','Sans choix','Récit d’échec','Économie','Bien-être','Culture','Infrastructures','Environnement'];
+function exampleMatrix(){
+ const row=(id,level,title,name,next,otherwise,gauge)=>{
+  const scores=[0,0,0,0,0];scores[gauge]=10;
+  return [id,level,title,name,'petit',name+' ouvre ses portes.','',next,otherwise,'Le Conseil reporte le projet.',...scores];
+ };
+ return [matrixColumns,row('fondation',1,'Quel lieu ouvrir ?', 'Bibliothèque','lecteurs','place',2),
+  row('fondation',1,'Quel lieu ouvrir ?', 'Marché','place','place',0),
+  row('lecteurs',2,'Former des apprentis ?', 'École','savoir','quartier',2),
+  row('place',2,'Abriter les étals ?', 'Halle','quartier','savoir',3),
+  row('savoir',3,'Accueillir des chercheurs ?', 'Observatoire','fete','fete',2),
+  row('quartier',3,'Créer un parc ?', 'Jardin','fete','fete',4),
+  row('fete',4,'Organiser une fête ?', 'Scène publique','FIN','FIN',1)];
+}
+function parseMatrix(text){
+ const source=text.replace(/^\uFEFF/,'').replace(/[\r\n]+$/,''),first=source.split(/\r?\n/)[0];
+ const separator=['\t',';',','].find(s=>first===matrixColumns.join(s));
+ if(!separator)throw Error('Les en-têtes doivent correspondre au modèle.');
+ const rows=[];let row=[],value='',quoted=false;
+ for(let i=0;i<source.length;i++){
+  const c=source[i];
+  if(c==='"'){if(quoted&&source[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}
+  else if(c===separator&&!quoted){row.push(value.trim());value='';}
+  else if(c==='\n'&&!quoted){row.push(value.trim());if(row.some(Boolean))rows.push(row);row=[];value='';}
+  else value+=c;
+ }
+ if(quoted)throw Error('Guillemet non fermé dans la matrice.');
+ row.push(value.trim());rows.push(row);
+ const data=rows.slice(1),ids=new Map(data.map(r=>[r[0],Number(r[1])]));
+ data.forEach((r,i)=>{const issue=r.length!==15?'15 colonnes attendues':!r[0]||!r[2]||!r[3]||!r[5]||!r[9]?'identifiant, dilemme, action et récits obligatoires':!['petit','standard','grand'].includes(r[4])?'taille attendue : petit, standard ou grand':[r[7],r[8]].some(k=>Number(r[1])===4?k!=='FIN':ids.get(k)!==Number(r[1])+1)?'la suite doit désigner un dilemme du Conseil suivant, ou FIN au quatrième Conseil':'';if(issue)throw Error('Ligne '+(i+2)+' : '+issue);});return data;
+}
+function matrixPanel(panel,data,command){
+ const box=node('section');box.className='history';box.append(node('h3','Scénario à embranchements'),node('p','Une ligne par choix. Dans Sheets, indiquez le prochain dilemme dans « Si choisi » et la suite d’un refus ou d’une égalité définitive dans « Sans choix ». Exportez la feuille en CSV ou TSV.'));
+ const download=node('button','Télécharger le modèle pour Sheets');download.type='button';download.onclick=()=>{
+  const url=URL.createObjectURL(new Blob(['\uFEFF'+exampleMatrix().map(r=>r.join('\t')).join('\n')],{type:'text/tab-separated-values;charset=utf-8'}));
+  const a=node('a');a.href=url;a.download='La-Cite-matrice.tsv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };const file=node('input');file.type='file';file.accept='.csv,.tsv';file.setAttribute('aria-label','Importer une matrice Sheets');const message=node('p');message.setAttribute('role','status');
+ file.onchange=async()=>{try{const f=file.files[0];if(!f)return;if(f.size>240000)throw Error('La matrice dépasse 240 Ko.');const rows=parseMatrix(await f.text());await command('preview-story',{rows});}catch(e){message.textContent=e.message;}};
+ const pasted=node('textarea');pasted.setAttribute('aria-label','Coller les cellules de Google Sheets');pasted.placeholder='Ou collez ici les cellules, avec la ligne des titres';const check=node('button','Vérifier les cellules collées');check.onclick=()=>{try{void command('preview-story',{rows:parseMatrix(pasted.value)});}catch(e){message.textContent=e.message;}};box.append(download,file,pasted,check,message);
+ if(data.storyReview){const {rows}=data.storyReview;box.append(node('h4','Parcours à confirmer'));for(const r of rows)box.append(node('p',r[0]+' · '+r[3]+' → '+r[7]+' · sans choix → '+r[8]));const confirm=node('button','Installer ce parcours');confirm.onclick=()=>command('install-story',{rows});box.append(confirm);}
+ panel.append(box);
 }
