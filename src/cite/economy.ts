@@ -47,6 +47,16 @@ export function recordPerformance(state:State,scope:Scope,weekId:string,scores:R
  if(old){check(canonicalJSON(old)===canonicalJSON(value),'Correction requires an audited workflow');return state;}
  open(week,onDate);check(!state.credits[key(scope.familyId,weekId)],'Week already credited');const next=structuredClone(state);next.performance[weekId]??={};next.performance[weekId][scope.familyId]=value;return next;
 }
+/** Server-authorized correction only: no retroactive change to a posted credit. */
+export function correctUncreditedPerformance(state:State,scope:Scope,weekId:string,expected:Record<string,string>|null,scores:Record<string,string>,onDate:string):State{
+ const week=context(state,scope,weekId),date=civilDate(onDate),value=canonical(state.config.metrics.performance,scores),old=state.performance[weekId]?.[scope.familyId]??null;
+ check(date>=week.start&&!state.credits[key(scope.familyId,weekId)],'Uncredited started week required');
+ check(old!==null||date>=week.endExclusive,'Use normal recording during the first submission window');
+ if(expected!==null)canonical(state.config.metrics.performance,expected);
+ check(canonicalJSON(old)===canonicalJSON(expected),'Performance changed since review');
+ check(canonicalJSON(old)!==canonicalJSON(value),'Correction must change the performance');
+ const next=structuredClone(state);next.performance[weekId]??={};next.performance[weekId][scope.familyId]=value;return next;
+}
 export function closeFamilyWeek(state:State,scope:Scope,weekId:string,onDate:string):{state:State;credit?:Credit;deferred?:true}{
  const week=context(state,scope,weekId);check(civilDate(onDate)>=week.endExclusive,'Cannot close a future week');const id=key(scope.familyId,weekId);if(state.credits[id])return {state,credit:state.credits[id]};
  const professional=state.performance[weekId]?.[scope.familyId],members=eligibleMembers(state,scope.familyId,week),responses=members.flatMap(uid=>{const r=state.values[weekId]?.[uid];return r?.familyId===scope.familyId?[r.scores]:[];});
