@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {simulateCouncils} from '../../scripts/simulate-cite-councils.mjs';
+test('four economic Council cycles use earned funds, two constructions, a tie and an unfunded project',()=>{
+ const r=simulateCouncils();assert.equal(r.incomeCredits,48);assert.equal(r.incomeTotal,960);assert.equal(r.spentTotal,306);assert.equal(Object.values(r.finalPurses).reduce((a,b)=>a+b,0),654);assert.deepEqual(r.finalPurses,{'family-0':180,'family-1':205,'family-2':269});
+ assert.deepEqual(r.checkpoints.map(c=>c.council.resolution.reason),['funded','funded','persistent-tie','underfunded']);assert.equal(r.checkpoints[2].council.rounds[0].familyVotes['family-2'].status,'suspended');assert.notEqual(r.checkpoints[3].council.rounds[0].familyVotes['family-2'].status,'suspended');assert.equal(r.checkpoints[3].council.buildings.length,2);assert.equal(r.crisisCouncilImplemented,false);assert.ok(!JSON.stringify(r).includes('family-0-person-'));assert.deepEqual(simulateCouncils(),r);
+});

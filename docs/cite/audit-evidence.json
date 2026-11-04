@@ -1,0 +1,14 @@
+{
+  "auditedOn": "2026-11-03",
+  "repository": "https://github.com/gkerckhofs-a11y/le_voyage",
+  "recoveredBuild": "021c833e-02f2-4e38-aae3-5bf41f08652f",
+  "testRevision": "voyage-test-00027-wbc",
+  "archiveSha256": "26abd04033b395a80b152cbbc683121a1df8eb3f80457ea4b660a45312bd5a56",
+  "restoredSourceFiles": 828,
+  "differencesFromRecoveredSource": [],
+  "productionModified": false,
+  "cloudDataModified": false,
+  "reviewBranch": "work/la-cite-economy-tranche-1",
+  "reviewBaseCommit": "ec30fc8e26d2df65b26f5c7e69807b1db5acc9c7",
+  "archiveComparisonContext": "local restored worktree, before adding La Cite"
+}

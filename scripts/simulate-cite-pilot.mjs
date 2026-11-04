@@ -1,0 +1,2 @@
+import {runPilot,pilotView} from '../src/cite/pilot.ts';
+const p=runPilot();const report={status:'fictional-pilot',weeks:p.completedWeeks,councils:pilotView(p,'operator').city,income:p.game.economy.audit.reduce((s,c)=>s+c.ecus,0),spent:p.game.councils.spending.reduce((s,c)=>s+c.ecus,0),remainingTotal:Object.values(p.game.economy.balances).reduce((s,n)=>s+n,0),ambitionMilestones:Object.values(p.game.city.ambitions).reduce((s,a)=>s+a.milestones.length,0),commercialRewardsEnabled:false,simulatedRewards:pilotView(p,'operator').rewards};console.log(JSON.stringify(report,null,2));

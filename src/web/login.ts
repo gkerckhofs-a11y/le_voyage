@@ -1,3 +1,4 @@
+if(new URL(location.href).searchParams.get('app')==='cite'){document.title='Connexion · La Cité';document.getElementById('login-title')!.textContent='Accéder à votre Cité.';}
 const buttons=[...document.querySelectorAll<HTMLButtonElement>('[data-profile]')];
 for(const button of buttons)button.addEventListener('click',async()=>{
  buttons.forEach(b=>b.disabled=true);document.getElementById('login-status')!.textContent='Votre voyage se prépare…';

@@ -9,7 +9,7 @@ const context=Symbol('test-access');
 export async function createGoogleTestGate({auth,config,now=Date.now,identityLogin,identityInvitationLogin,identityLogout,sessionStore}){
  const provisioned=config.authenticationMode==='provisioned';
  if(provisioned&&(typeof identityLogin!=='function'||typeof identityLogout!=='function'||!sessionStore||!['get','issue','update','revoke'].every(k=>typeof sessionStore[k]==='function')))throw Error('Explicit identity session bridge required');
- const canonical=`https://${config.projectId}.web.app`,allowed=new Set(config.testerEmails),sessions=new Map(),ttl=provisioned?3300000:8*60*60*1000;
+ const canonical=config.canonical??`https://${config.projectId}.web.app`,allowed=new Set(config.testerEmails),sessions=new Map(),ttl=provisioned?3300000:8*60*60*1000;
  const get=async token=>{const s=sessionStore?await sessionStore.get(token):sessions.get(token);return sessionStore&&s&&!['google-gate','google-gate-pending'].includes(s.kind)?null:s;};
  const remove=async(token,s)=>{if(sessionStore){if(s)await sessionStore.revoke(token,s._version);}else sessions.delete(token);};
  const put=async(previous,next,value,s)=>{if(sessionStore)await sessionStore.issue(previous,next,value,s?{expectedVersion:s._version}:{});else{sessions.delete(previous);sessions.set(next,value);}};
@@ -31,7 +31,7 @@ export async function createGoogleTestGate({auth,config,now=Date.now,identityLog
     const asset=assets.get(path);res.writeHead(200,{...headers,'Content-Type':asset.type+'; charset=utf-8'});res.end(req.method==='HEAD'?undefined:asset.data);return false;
    }
    if(path==='/test-access/config'&&req.method==='GET'&&!url.search){
-    const pending=s&&!s.credential?{token,s}:await fresh();send(200,{canonical,apiKey:config.apiKey,authDomain:new URL(canonical).host,projectId:config.projectId,csrf:pending.s.csrf},{'Set-Cookie':cookie(pending.token,600)});return false;
+    const pending=s&&!s.credential?{token,s}:await fresh();send(200,{canonical,apiKey:config.apiKey,authDomain:canonical===`https://${config.projectId}.web.app`?new URL(canonical).host:config.projectId+'.firebaseapp.com',projectId:config.projectId,csrf:pending.s.csrf},{'Set-Cookie':cookie(pending.token,600)});return false;
    }
    if(path==='/test-access/session'&&req.method==='POST'&&!url.search){
     sameOrigin(req);if(!s||s.credential||!equal(req.headers['x-test-csrf'],s.csrf))throw fail(403);

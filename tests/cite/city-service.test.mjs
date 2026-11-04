@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {fixture} from './server-fixture.mjs';import {createCiteCityService} from '../../src/server/cite-city.mjs';import {createCiteCouncilService} from '../../src/server/cite-councils.mjs';import {COUNCIL_RULES} from '../../src/cite/councils.ts';import {gauges,definition} from './councils-fixture.mjs';
+test('server chooses the seed once, projects only the own ambition, and refuses foreign season/family',async()=>{
+ const f=fixture(),council=createCiteCouncilService(f.adapter,{today:f.today});await council.initialize('Bearer manager',f.s,gauges,COUNCIL_RULES);let generated=0;const city=createCiteCityService(f.adapter,{today:f.today,newSeed:()=>{generated++;return 'server-owned-secret-seed-001';}});
+ await assert.rejects(city.initialize('Bearer person-0-0',f.s),{status:403});const first=await city.initialize('Bearer manager',f.s);const before=structuredClone(f.data.get(f.privatePath).city);await city.initialize('Bearer manager',f.s);assert.equal(generated,1);assert.deepEqual(f.data.get(f.privatePath).city,before);
+ const own=await city.family('Bearer person-0-0',f.s);assert.deepEqual(own.myAmbition,before.ambitions['family-0']);assert.ok(!Object.hasOwn(first,'myAmbition'));assert.ok(!JSON.stringify(first).includes('server-owned-secret'));assert.ok(!Object.hasOwn(own,'ambitions'));
+ for(const scope of [{...f.s,tenantId:'other'},{...f.s,seasonId:'other'},{...f.s,familyId:'family-1'}])await assert.rejects(city.family('Bearer person-0-0',scope),{status:403});
+ await assert.rejects(city.family('Bearer manager',f.s),{status:403});f.data.get(f.memberPath('person-0-0')).active=false;await assert.rejects(city.family('Bearer person-0-0',f.s),{status:403});
+});
+test('weekly gains and Council mutations preserve private city state and never add it to public Council views',async()=>{
+ const f=fixture(),council=createCiteCouncilService(f.adapter,{today:f.today}),city=createCiteCityService(f.adapter,{today:f.today,newSeed:()=> 'server-owned-secret-seed-001'});await council.initialize('Bearer manager',f.s,gauges,COUNCIL_RULES);await city.initialize('Bearer manager',f.s);const secret=structuredClone(f.data.get(f.privatePath).city);
+ await f.service.submit('Bearer person-0-0',f.s,{weekId:f.c.weeks[0].id,scores:{cooperation:'4'}});assert.deepEqual(f.data.get(f.privatePath).city,secret);const d=definition({economy:f.data.get(f.privatePath).state,councils:{order:[]}});f.setDate(d.voteOpensOn);const pub=await council.open('Bearer manager',f.s,d);assert.ok(!Object.hasOwn(pub,'city'));assert.ok(!Object.hasOwn(pub,'ambitions'));assert.deepEqual(f.data.get(f.privatePath).city,secret);
+});
