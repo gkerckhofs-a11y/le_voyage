@@ -1,7 +1,7 @@
 name: La Cite economy (targeted)
 on:
   pull_request:
-    paths: ['src/cite/**', 'src/server/cite-*.mjs', 'src/domain/exact.ts', 'src/domain/calendar.ts', 'tests/cite/**', 'tests/cite-emulator/**', 'tests/cite-cockpit-browser/**', 'playwright.cite-cockpit.config.mjs', 'scripts/serve-cite-cockpit.mjs', 'web/cite-admin*', 'web/cite-city*', 'web/cite-setup*', 'web/cite-cockpit*', 'web/cite-preferences*', 'web/cite-family*', 'web/assets/cite/**', 'src/server/workspaces.mjs', 'src/server/firebase-http.mjs', 'scripts/build-web.mjs', 'src/web/workspaces.ts', 'src/web/login.ts', 'scripts/simulate-cite-*.mjs', 'prototypes/la-cite/**', 'playwright.cite.config.mjs', 'tests/cite-browser/**', 'scripts/serve-cite-prototype.mjs', '.github/workflows/cite-economy.yml']
+    paths: ['src/cite/**', 'src/server/cite-*.mjs', 'src/domain/exact.ts', 'src/domain/calendar.ts', 'tests/cite/**', 'tests/cite-emulator/**', 'tests/cite-cockpit-browser/**', 'playwright.cite-cockpit.config.mjs', 'scripts/serve-cite-cockpit.mjs', 'web/cite-admin*', 'web/cite-city*', 'web/cite-setup*', 'web/cite-roster*', 'web/cite-cockpit*', 'web/cite-preferences*', 'web/cite-family*', 'web/assets/cite/**', 'src/server/workspaces.mjs', 'src/server/firebase-http.mjs', 'scripts/build-web.mjs', 'src/web/workspaces.ts', 'src/web/login.ts', 'scripts/simulate-cite-*.mjs', 'prototypes/la-cite/**', 'playwright.cite.config.mjs', 'tests/cite-browser/**', 'scripts/serve-cite-prototype.mjs', '.github/workflows/cite-economy.yml']
 permissions:
   contents: read
 concurrency:

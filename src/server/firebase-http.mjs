@@ -1,3 +1,4 @@
+import {createCitePilotRosterHttp} from './cite-pilot-roster.mjs';
 import {createCitePilotSetupHttp} from './cite-pilot-setup.mjs';
 import {createCiteDashboardHttp} from './cite-dashboard.mjs';
 import {createCiteAdminHttp} from './cite-admin-http.mjs';
@@ -70,6 +71,7 @@ export async function createFirebaseHttp(options){
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter,{provisionWorkspaces:authenticationMode==='provisioned'}),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter,{now:clock}),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
  const invitationDelivery=options?.invitationEmailTransport?createInvitationDelivery({adapter,invitations,transport:options.invitationEmailTransport,origin:options.invitationEmailOrigin,now:clock}):null;
  if(invitationDelivery&&(authenticationMode!=='provisioned'||!['demo-rc-voyage','rc-voyage-test-20261027'].includes(adapter.db.projectId)))throw Error('Explicit isolated test project required for invitation sending');
+ const citePilotRoster=createCitePilotRosterHttp(adapter,options?.citeOptions??{});
  const citePilotSetup=createCitePilotSetupHttp(adapter,options?.citeOptions??{});
  const citeDashboard=createCiteDashboardHttp(adapter,options?.citeOptions??{});
  const workspaceAccess=createWorkspaceAccess(adapter),citeCockpit=createCiteCockpitHttp(adapter,options?.citeOptions??{}),citeMember=createCiteMemberHttp(adapter,options?.citeOptions??{}),citeAdmin=createCiteAdminHttp(adapter,options?.citeOptions??{});
@@ -198,6 +200,7 @@ export async function createFirebaseHttp(options){
    // Directory edits must not retarget an already open session.
    if(JSON.stringify(current.scope)!==JSON.stringify(session.scope)||current.space!==session.workspaceSpace)throw failure(403);
   }
+  if(path.startsWith('/api/cite/pilot-roster')){await citePilotRoster.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/pilot-setup')){await citePilotSetup.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/city')){await citeDashboard.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/admin')){await citeAdmin.handle(req,json,path,session);return;}
