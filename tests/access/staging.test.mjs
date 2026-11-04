@@ -44,3 +44,7 @@ test('email-link pilot is opt-in, isolated from Google gate, and disabled by def
   {RC_TEST_EMAIL_LINK_MODE:'invalid'}
  ])assert.throws(()=>stagingConfig({...stage,RC_TEST_EMAIL_LINK_MODE:'enabled',...patch}));
 });
+
+test('Cité preview uses only its explicitly listed canonical origin and keeps the old default',()=>{
+ const preview='https://rc-voyage-test-20261027--cite-pilot-abc123.web.app';assert.equal(stagingConfig(valid).canonical,`https://${stagingProjectId}.web.app`);assert.equal(stagingConfig({...valid,RC_ALLOWED_ORIGINS:preview,RC_TEST_CANONICAL_ORIGIN:preview}).canonical,preview);for(const canonical of ['https://foreign.example','https://rc-voyage-test-20261027--foreign-abc123.web.app',preview+'/path'])assert.throws(()=>stagingConfig({...valid,RC_ALLOWED_ORIGINS:preview,RC_TEST_CANONICAL_ORIGIN:canonical}));assert.throws(()=>stagingConfig({...valid,RC_TEST_CANONICAL_ORIGIN:preview}));
+});
