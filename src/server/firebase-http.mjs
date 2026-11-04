@@ -1,3 +1,4 @@
+import {createCiteDashboardHttp} from './cite-dashboard.mjs';
 import {createCiteAdminHttp} from './cite-admin-http.mjs';
 import {createCiteMemberHttp} from './cite-member-http.mjs';
 import {createCiteCockpitHttp} from './cite-cockpit-http.mjs';
@@ -68,6 +69,7 @@ export async function createFirebaseHttp(options){
  const adapter=options?.adapter??createFirebaseEmulatorAdapter(),sessions=createSessionStore(adapter,{key:options?.sessionEncryptionKey,now:clock}),clientBudget=createClientBudget(adapter),kioskProgress=createKioskProgress(adapter),organizerDashboard=createOrganizerDashboard(adapter),directorProgress=createDirectorProgress(adapter),kpiPeriods=createKpiPeriods(adapter),kpiAccess=createKpiAccess(adapter),kpiCollection=createKpiCollection(adapter),annualPlanning=createAnnualPlanning(adapter),invitations=createInvitations(adapter,{provisionWorkspaces:authenticationMode==='provisioned'}),teamVote=createTeamVote(adapter),giftPreferences=createGiftPreferences(adapter),questionnaire=createWeeklyQuestionnaire(adapter,{now:clock}),coordination=createWeekCoordination(adapter),giftOperations=createGiftOperations(adapter),supplierCatalog=createSupplierCatalog(adapter,{sheetsSource:options?.sheetsSource??null}),giftBeneficiaries=createGiftBeneficiaries(adapter);
  const invitationDelivery=options?.invitationEmailTransport?createInvitationDelivery({adapter,invitations,transport:options.invitationEmailTransport,origin:options.invitationEmailOrigin,now:clock}):null;
  if(invitationDelivery&&(authenticationMode!=='provisioned'||!['demo-rc-voyage','rc-voyage-test-20261027'].includes(adapter.db.projectId)))throw Error('Explicit isolated test project required for invitation sending');
+ const citeDashboard=createCiteDashboardHttp(adapter,options?.citeOptions??{});
  const workspaceAccess=createWorkspaceAccess(adapter),citeCockpit=createCiteCockpitHttp(adapter,options?.citeOptions??{}),citeMember=createCiteMemberHttp(adapter,options?.citeOptions??{}),citeAdmin=createCiteAdminHttp(adapter,options?.citeOptions??{});
  const workspaces=createWorkspaces(adapter,{organizer:organizerDashboard,director:directorProgress,kiosk:kioskProgress,citeGifts:citeCockpit,citeMember,citeAdmin});
  try{
@@ -194,6 +196,7 @@ export async function createFirebaseHttp(options){
    // Directory edits must not retarget an already open session.
    if(JSON.stringify(current.scope)!==JSON.stringify(session.scope)||current.space!==session.workspaceSpace)throw failure(403);
   }
+  if(path.startsWith('/api/cite/city')){await citeDashboard.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/admin')){await citeAdmin.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/cockpit')){await citeCockpit.handle(req,json,path,session);return;}
   if(path.startsWith('/api/cite/preferences')||path.startsWith('/api/cite/family')){await citeMember.handle(req,json,path,session);return;}
